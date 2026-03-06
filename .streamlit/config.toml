@@ -1,0 +1,16 @@
+[theme]
+primaryColor        = "#4f8ef7"
+backgroundColor     = "#07080f"
+secondaryBackgroundColor = "#0e0f1a"
+textColor           = "#dde1f5"
+font                = "monospace"
+
+[server]
+maxUploadSize       = 200
+enableXsrfProtection = true
+
+[runner]
+fastReruns          = true
+
+[browser]
+gatherUsageStats    = false
