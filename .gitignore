@@ -1,0 +1,28 @@
+Content:
+# Secrets — NEVER commit
+.streamlit/secrets.toml
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+env/
+.venv/
+*.egg-info/
+
+# Data files
+*.csv
+*.xlsx
+*.xls
+*.json
+uploads/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
