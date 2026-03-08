@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 from core.data_profiler import profile_dataset
 from core.data_cleaner import clean_with_strategy, auto_clean
-from components.kpi_cards import inject_global_css, kpi_grid, quality_score_banner
+from components.kpi_cards import inject_global_css, quality_score_banner
 
 st.set_page_config(
     page_title="Data Quality — DataForge AI",
@@ -13,8 +13,8 @@ st.set_page_config(
 inject_global_css()
 
 if "df_active" not in st.session_state:
-    st.warning("⚠️ No data loaded.")
-    st.page_link("pages/1_📥_Data_Upload.py", label="← Go to Upload", icon="📥")
+    st.warning("No data loaded.")
+    st.page_link("pages/1_📥_Data_Upload.py", label="Go to Upload", icon="📥")
     st.stop()
 
 df      = st.session_state["df_active"]
@@ -31,15 +31,20 @@ with col_score:
     quality_score_banner(profile.overall_quality_score)
 
 with col_kpis:
-    kpi_grid([
-        {"label": "Total Cells",  "value": f"{profile.total_cells:,}",      "accent": "#4f8ef7"},
-        {"label": "Missing",      "value": f"{profile.missing_cells:,}",    "sub": f"{profile.missing_pct}%",  "accent": "#f7934f"},
-        {"label": "Duplicates",   "value": str(profile.duplicate_rows),     "sub": f"{profile.duplicate_pct}%","accent": "#f77070"},
-        {"label": "Numeric Cols", "value": str(len(profile.numeric_cols)),   "accent": "#22d3a5"},
-        {"label": "Cat. Cols",    "value": str(len(profile.categorical_cols)),"accent": "#a78bfa"},
-    ])
+    k1, k2, k3, k4, k5 = st.columns(5)
+    k1.metric("Total Cells",    f"{profile.total_cells:,}")
+    k2.metric("Missing",        f"{profile.missing_cells:,}",
+              f"{profile.missing_pct}%")
+    k3.metric("Duplicates",     f"{profile.duplicate_rows:,}",
+              f"{profile.duplicate_pct}%")
+    k4.metric("Numeric Cols",   str(len(profile.numeric_cols)))
+    k5.metric("Category Cols",  str(len(profile.categorical_cols)))
 
-tab1, tab2, tab3 = st.tabs(["📊 Column Report", "🔧 Clean Data", "📥 Export"])
+tab1, tab2, tab3 = st.tabs([
+    "📊 Column Report",
+    "🔧 Clean Data",
+    "📥 Export"
+])
 
 # ── TAB 1 — Column report ──────────────────────────────────
 with tab1:
@@ -48,45 +53,60 @@ with tab1:
     rows = []
     for p in profile.column_profiles:
         if p.missing_pct > 50:
-            flag = "🚨 High Missing"
+            flag = "High Missing"
         elif p.missing_pct > 20:
-            flag = "⚠️ Some Missing"
+            flag = "Some Missing"
         elif p.is_constant:
-            flag = "🗑️ Constant"
+            flag = "Constant"
         elif p.has_outliers:
-            flag = "📊 Has Outliers"
+            flag = "Has Outliers"
         else:
-            flag = "✅ Good"
+            flag = "Good"
 
         rows.append({
-            "Column":  p.name,
-            "Type":    p.dtype,
+            "Column":    p.name,
+            "Type":      p.dtype,
             "Missing %": f"{p.missing_pct}%",
-            "Unique":  p.unique_count,
-            "Outliers": p.outlier_count if p.has_outliers else "—",
-            "Score":   f"{p.quality_score}/100",
-            "Status":  flag,
+            "Unique":    p.unique_count,
+            "Outliers":  p.outlier_count if p.has_outliers else 0,
+            "Score":     f"{p.quality_score}/100",
+            "Status":    flag,
         })
 
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, height=400)
+    st.dataframe(
+        pd.DataFrame(rows),
+        use_container_width=True,
+        height=400
+    )
 
     # Missing values chart
-    miss = [(p.name, p.missing_pct) for p in profile.column_profiles if p.missing_pct > 0]
+    miss = [
+        (p.name, p.missing_pct)
+        for p in profile.column_profiles
+        if p.missing_pct > 0
+    ]
     if miss:
         st.subheader("Missing Values by Column")
         mdf = pd.DataFrame(miss, columns=["Column", "Missing %"])
         mdf = mdf.sort_values("Missing %")
         fig = px.bar(
-            mdf, x="Missing %", y="Column", orientation="h",
+            mdf, x="Missing %", y="Column",
+            orientation="h",
             title="Missing Value % per Column",
-            template="plotly_dark", color="Missing %",
+            template="plotly_dark",
+            color="Missing %",
             color_continuous_scale=["#22d3a5", "#f7934f", "#f77070"]
         )
-        fig.update_layout(paper_bgcolor="#07080f", plot_bgcolor="#0e0f1a")
+        fig.update_layout(
+            paper_bgcolor="#07080f",
+            plot_bgcolor="#0e0f1a"
+        )
         st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.success("No missing values found in any column.")
 
     if profile.recommendations:
-        st.subheader("🎯 Recommendations")
+        st.subheader("Recommendations")
         for r in profile.recommendations:
             st.markdown(f"- {r}")
 
@@ -94,20 +114,41 @@ with tab1:
 with tab2:
     st.subheader("Cleaning Controls")
 
-    if st.button("⚡ Auto Clean", type="primary"):
-        with st.spinner("Cleaning..."):
-            df_c = auto_clean(df)
-            st.session_state["df_active"] = df_c
-            st.session_state["profile"]   = profile_dataset(df_c)
-        st.success(f"✅ Done! {len(df) - len(df_c):,} rows removed.")
-        st.rerun()
+    ca, cb = st.columns(2)
+    with ca:
+        st.markdown("**Auto Clean** — removes duplicates, fills missing values automatically")
+        if st.button("Auto Clean", type="primary", use_container_width=True):
+            with st.spinner("Cleaning..."):
+                df_c = auto_clean(df)
+                st.session_state["df_active"] = df_c
+                st.session_state["profile"]   = profile_dataset(df_c)
+            st.success(f"Done! {len(df) - len(df_c):,} rows removed.")
+            st.rerun()
+
+    with cb:
+        st.markdown("**Reset** — restore original uploaded data")
+        if st.button("Reset to Original", use_container_width=True):
+            if "df_raw" in st.session_state:
+                st.session_state["df_active"] = st.session_state["df_raw"]
+                st.session_state["profile"]   = profile_dataset(
+                    st.session_state["df_raw"]
+                )
+                st.success("Reset to original data.")
+                st.rerun()
 
     st.divider()
     st.markdown("**Or choose strategy per column:**")
 
     OPTS = [
-        "keep", "fill_mean", "fill_median", "fill_mode",
-        "fill_zero", "fill_unknown", "ffill", "drop_rows", "drop_col"
+        "keep",
+        "fill_mean",
+        "fill_median",
+        "fill_mode",
+        "fill_zero",
+        "fill_unknown",
+        "ffill",
+        "drop_rows",
+        "drop_col"
     ]
 
     strategies = {}
@@ -121,30 +162,48 @@ with tab2:
         else:
             default = "keep"
 
-        strategies[p.name] = st.selectbox(
-            f"**{p.name}** — {p.dtype} | {p.missing_pct}% missing",
-            OPTS,
-            index=OPTS.index(default),
-            key=f"s_{p.name}"
-        )
+        col_a, col_b = st.columns([2, 1])
+        with col_a:
+            st.markdown(
+                f"**{p.name}** — `{p.dtype}` | "
+                f"{p.missing_pct}% missing | "
+                f"Score: {p.quality_score}/100"
+            )
+        with col_b:
+            strategies[p.name] = st.selectbox(
+                "Strategy",
+                OPTS,
+                index=OPTS.index(default),
+                key=f"s_{p.name}",
+                label_visibility="collapsed"
+            )
 
-    if st.button("✅ Apply Strategies", type="secondary"):
+    st.divider()
+    if st.button("Apply Strategies", type="secondary",
+                 use_container_width=True):
         with st.spinner("Cleaning..."):
             df_c = clean_with_strategy(df, strategies)
             st.session_state["df_active"] = df_c
             st.session_state["profile"]   = profile_dataset(df_c)
-        st.success(f"✅ Done! Dataset now has {len(df_c):,} rows.")
+        st.success(f"Done! Dataset now has {len(df_c):,} rows.")
         st.rerun()
 
 # ── TAB 3 — Export ─────────────────────────────────────────
 with tab3:
     st.subheader("Export Cleaned Data")
+
     df_export = st.session_state["df_active"]
+
+    st.markdown(f"**{len(df_export):,} rows × {len(df_export.columns)} columns**")
+    st.dataframe(df_export.head(10), use_container_width=True)
+
+    st.divider()
     csv = df_export.to_csv(index=False).encode("utf-8")
     st.download_button(
-        "📥 Download CSV",
+        "Download CSV",
         data=csv,
         file_name=f"cleaned_{st.session_state.get('filename', 'data')}.csv",
         mime="text/csv",
-        type="primary"
+        type="primary",
+        use_container_width=True
     )
