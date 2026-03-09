@@ -455,18 +455,18 @@ def _metrics_page(story, ST, theme, df, profile, CW):
 def _chart_page(story, ST, theme, img_bytes, title, narrative, num, CW):
     T = theme
     _page_h(story, ST, theme, "Chart {}: {}".format(num, title))
-    story.append(Spacer(1, 3*mm))
 
+    blk = []
     try:
-        img = Image(io.BytesIO(img_bytes), width=CW, height=CW * 0.52)
+        img = Image(io.BytesIO(img_bytes), width=CW, height=CW * 0.50)
         img.hAlign = "CENTER"
-        story.append(img)
+        blk.append(img)
     except Exception:
-        story.append(Paragraph("[Chart image unavailable]", ST["muted"]))
+        blk.append(Paragraph("[Chart image unavailable]", ST["muted"]))
 
-    story.append(Spacer(1, 5*mm))
-    _sec_h(story, ST, theme, "Analysis")
-    story.append(Spacer(1, 2*mm))
+    blk.append(Spacer(1, 4*mm))
+    blk.append(Paragraph("Analysis", ST["sec_title"]))
+    blk.append(Spacer(1, 2*mm))
     box = Table(
         [[Paragraph(narrative or "Chart analysis not available.", ST["body_j"])]],
         colWidths=[CW]
@@ -479,7 +479,8 @@ def _chart_page(story, ST, theme, img_bytes, title, narrative, num, CW):
         ("TOPPADDING",    (0,0),(-1,-1), 8),
         ("BOTTOMPADDING", (0,0),(-1,-1), 8),
     ]))
-    story.append(box)
+    blk.append(box)
+    story.append(KeepTogether(blk))
 
 
 def _anomaly_page(story, ST, theme, df, profile, CW):
@@ -626,9 +627,10 @@ def _appendix_page(story, ST, theme, config, CW):
 def _page_h(target, ST, theme, title):
     T = theme
     target.append(Paragraph(title, ST["page_title"]))
+    target.append(Spacer(1, 2.5*mm))   # gap between title and underline
     target.append(HRFlowable(width="100%", thickness=2,
-                              color=_rgb(T.accent), spaceAfter=1))
-    target.append(Spacer(1, 1*mm))
+                              color=_rgb(T.accent), spaceAfter=0))
+    target.append(Spacer(1, 3*mm))     # breathing room below line
 
 
 def _sec_h(target, ST, theme, title):
