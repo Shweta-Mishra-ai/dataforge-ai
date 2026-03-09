@@ -122,17 +122,37 @@ def _profile_column(df, col) -> ColumnProfile:
 
 def _generate_recommendations(profiles, dup_rows, missing, total, n_rows) -> List[str]:
     recs = []
+
     if dup_rows > 0:
-        recs.append(f"🔁 {dup_rows} duplicate rows found. Remove them.")
-    if missing / max(total, 1) > 0.10:
-        recs.append(f"⚠️ {missing/max(total,1)*100:.1f}% cells are missing.")
+        recs.append(
+            "{} duplicate rows found. Consider removing them before analysis.".format(dup_rows)
+        )
+
+    missing_pct = missing / max(total, 1) * 100
+    if missing_pct > 10:
+        recs.append(
+            "{:.1f}% of cells have missing values. Review imputation strategy.".format(missing_pct)
+        )
+
     for p in profiles:
         if p.is_constant:
-            recs.append(f"🗑️ '{p.name}' has only 1 unique value — drop it.")
+            recs.append(
+                "'{}' has only 1 unique value and provides no information. Consider dropping it.".format(p.name)
+            )
         elif p.missing_pct > 60:
-            recs.append(f"🚨 '{p.name}' is {p.missing_pct}% empty — drop it.")
+            recs.append(
+                "'{}' is {:.0f}% empty. Consider dropping this column.".format(p.name, p.missing_pct)
+            )
         elif p.missing_pct > 20:
-            recs.append(f"⚠️ '{p.name}' has {p.missing_pct}% missing values.")
+            recs.append(
+                "'{}' has {:.0f}% missing values. Apply imputation or flag for review.".format(p.name, p.missing_pct)
+            )
+
         if p.has_outliers and p.outlier_count > 5:
-            recs.append(f"📊 '{p.name}' has {p.outlier_count} outliers.")
+            recs.append(
+                "'{}' has {} outliers ({:.1f}%). Investigate before modeling.".format(
+                    p.name, p.outlier_count, p.outlier_pct
+                )
+            )
+
     return recs
