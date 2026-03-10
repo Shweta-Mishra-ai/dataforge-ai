@@ -5,17 +5,17 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-# â”€â”€ Guard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Guard ─────────────────────────────────────────────────
 if "df_active" not in st.session_state:
     st.warning("Please upload a dataset first.")
-    st.page_link("pages/1_ðŸ“¥_Data_Upload.py", label="Go to Upload", icon="ðŸ“¥")
+    st.page_link("pages/1_📥_Data_Upload.py", label="Go to Upload", icon="📥")
     st.stop()
 
 from core.stats_engine import analyze
 
 st.set_page_config(page_title="Dashboard", layout="wide")
 
-# â”€â”€ Theme â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Theme ─────────────────────────────────────────────────
 COLORS = ["#1a4a8a", "#2196F3", "#42A5F5", "#22d3a5",
           "#f7934f", "#a78bfa", "#f77070", "#ffd43b"]
 
@@ -29,13 +29,13 @@ PLOTLY_THEME = dict(
     colorway=COLORS,
 )
 
-# â”€â”€ Cache â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Cache ──────────────────────────────────────────────────
 @st.cache_data(show_spinner=False)
 def get_stats(df_json: str):
     df = pd.read_json(df_json)
     return analyze(df), df
 
-# â”€â”€ Load data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Load data ─────────────────────────────────────────────
 df_master = st.session_state["df_active"]
 stats, _   = get_stats(df_master.to_json())
 
@@ -46,12 +46,12 @@ id_cols   = [c for c in stats.categorical_cols
              if df_master[c].nunique() > 50]
 dt_cols   = stats.datetime_cols
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-#  SIDEBAR FILTERS â€” Power BI style
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════
+#  SIDEBAR FILTERS — Power BI style
+# ══════════════════════════════════════════════════════════
 with st.sidebar:
-    st.markdown("### ðŸŽ›ï¸ Filters")
-    st.caption("Filter once â†’ all charts update")
+    st.markdown("### 🎛️ Filters")
+    st.caption("Filter once → all charts update")
 
     df_filtered = df_master.copy()
 
@@ -89,20 +89,20 @@ with st.sidebar:
     if st.button("Reset Filters", use_container_width=True):
         st.rerun()
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════
 #  HEADER
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════
 fname = st.session_state.get("filename", "Dataset")
-st.markdown("## ðŸ“Š Dashboard â€” {}".format(fname))
-st.caption("Real-time analysis Â· {:,} rows Â· {} columns Â· {} filtered".format(
+st.markdown("## 📊 Dashboard — {}".format(fname))
+st.caption("Real-time analysis · {:,} rows · {} columns · {} filtered".format(
     len(df_master), len(df_master.columns), len(df_filtered)))
 st.divider()
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-#  SECTION 1 â€” KPI CARDS with context
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════
+#  SECTION 1 — KPI CARDS with context
+# ══════════════════════════════════════════════════════════
 if num_cols:
-    st.markdown("### ðŸ“Œ Key Performance Indicators")
+    st.markdown("### 📌 Key Performance Indicators")
 
     kpi_cols = num_cols[:4]
     cols_ui  = st.columns(len(kpi_cols))
@@ -137,17 +137,17 @@ if num_cols:
                    abs(stats.column_stats[c].skewness) > 1]
     if skewed_cols:
         st.warning(
-            "âš ï¸ **Statistical note:** {} â€” distribution is skewed. "
+            "⚠️ **Statistical note:** {} — distribution is skewed. "
             "Median shown in brackets is more reliable than mean.".format(
                 ", ".join(skewed_cols))
         )
 
     st.divider()
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-#  SECTION 2 â€” SMART CHART GRID
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-st.markdown("### ðŸ“ˆ Visual Analysis")
+# ══════════════════════════════════════════════════════════
+#  SECTION 2 — SMART CHART GRID
+# ══════════════════════════════════════════════════════════
+st.markdown("### 📈 Visual Analysis")
 
 chart_tab_labels = ["Overview", "Distribution", "Relationships", "Deep Dive"]
 if dt_cols:
@@ -156,7 +156,7 @@ if dt_cols:
 tabs = st.tabs(chart_tab_labels)
 tab_idx = 0
 
-# â”€â”€ Tab: Overview â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Tab: Overview ─────────────────────────────────────────
 with tabs[tab_idx]:
     tab_idx += 1
     if cat_cols and num_cols:
@@ -204,7 +204,7 @@ with tabs[tab_idx]:
                 fig2.update_layout(**PLOTLY_THEME)
                 st.plotly_chart(fig2, use_container_width=True)
     elif num_cols:
-        # No categorical â€” show top numeric overview
+        # No categorical — show top numeric overview
         fig = px.bar(
             x=num_cols[:8],
             y=[df_filtered[c].mean() for c in num_cols[:8]],
@@ -218,7 +218,7 @@ with tabs[tab_idx]:
     else:
         st.info("No numeric + categorical columns available for overview charts.")
 
-# â”€â”€ Tab: Trends (only if datetime) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Tab: Trends (only if datetime) ────────────────────────
 if dt_cols and "Trends" in chart_tab_labels:
     with tabs[tab_idx]:
         tab_idx += 1
@@ -236,7 +236,7 @@ if dt_cols and "Trends" in chart_tab_labels:
 
         fig = px.line(
             trend, x=dt_col, y=val_col,
-            title="{} â€” {} Trend".format(val_col, agg_by),
+            title="{} — {} Trend".format(val_col, agg_by),
             line_shape="spline",
             markers=True,
         )
@@ -251,7 +251,7 @@ if dt_cols and "Trends" in chart_tab_labels:
         fig.update_layout(**PLOTLY_THEME)
         st.plotly_chart(fig, use_container_width=True)
 
-# â”€â”€ Tab: Distribution â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Tab: Distribution ─────────────────────────────────────
 with tabs[tab_idx]:
     tab_idx += 1
     if not num_cols:
@@ -294,7 +294,7 @@ with tabs[tab_idx]:
                     ],
                     "Interpretation": [
                         "Average value",
-                        "Middle value â€” robust to outliers",
+                        "Middle value — robust to outliers",
                         "Spread of data",
                         "Squared spread",
                         "Smallest value",
@@ -313,7 +313,7 @@ with tabs[tab_idx]:
                     use_container_width=True, hide_index=True
                 )
 
-# â”€â”€ Tab: Relationships â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Tab: Relationships ────────────────────────────────────
 with tabs[tab_idx]:
     tab_idx += 1
     if len(num_cols) < 2:
@@ -343,15 +343,33 @@ with tabs[tab_idx]:
             color_by = st.selectbox("Color by (optional)",
                                     ["None"] + cat_cols[:5], key="scatter_c")
 
+            sample_df = df_filtered.sample(
+                min(2000, len(df_filtered)), random_state=42
+            ).dropna(subset=[x_col, y_col])
+
             fig = px.scatter(
-                df_filtered.sample(min(2000, len(df_filtered)), random_state=42),
+                sample_df,
                 x=x_col, y=y_col,
                 color=color_by if color_by != "None" else None,
-                trendline="ols",
                 title="{} vs {}".format(x_col, y_col),
                 color_discrete_sequence=COLORS,
                 opacity=0.6,
             )
+            # Manual trendline using numpy — no statsmodels needed
+            try:
+                x_vals = sample_df[x_col].values
+                y_vals = sample_df[y_col].values
+                m, b   = np.polyfit(x_vals, y_vals, 1)
+                x_line = np.linspace(x_vals.min(), x_vals.max(), 100)
+                y_line = m * x_line + b
+                fig.add_trace(go.Scatter(
+                    x=x_line, y=y_line,
+                    mode="lines",
+                    name="Trend",
+                    line=dict(color="#f7934f", width=2, dash="dash"),
+                ))
+            except Exception:
+                pass
             fig.update_layout(**PLOTLY_THEME)
             st.plotly_chart(fig, use_container_width=True)
 
@@ -359,10 +377,10 @@ with tabs[tab_idx]:
         if stats.top_correlations:
             st.markdown("**Statistically Significant Relationships (p < 0.05)**")
             for c in stats.top_correlations[:5]:
-                icon = "ðŸ”´" if c.strength == "strong" else "ðŸŸ¡"
+                icon = "🔴" if c.strength == "strong" else "🟡"
                 st.markdown("{} {}".format(icon, c.label))
 
-# â”€â”€ Tab: Deep Dive â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Tab: Deep Dive ────────────────────────────────────────
 with tabs[tab_idx]:
     tab_idx += 1
     st.markdown("#### Custom Analysis")
@@ -401,7 +419,7 @@ with tabs[tab_idx]:
                                 color_discrete_sequence=COLORS)
             elif chart_type == "Scatter":
                 fig = px.scatter(df_filtered.sample(min(2000, len(df_filtered))),
-                                 x=x_ax, y=y_ax, trendline="ols",
+                                 x=x_ax, y=y_ax, 
                                  title="{} vs {}".format(x_ax, y_ax),
                                  opacity=0.6,
                                  color_discrete_sequence=[COLORS[0]])
@@ -418,24 +436,24 @@ with tabs[tab_idx]:
 
 st.divider()
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-#  SECTION 3 â€” STATISTICAL INSIGHTS PANEL
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-st.markdown("### ðŸ’¡ Statistical Insights")
+# ══════════════════════════════════════════════════════════
+#  SECTION 3 — STATISTICAL INSIGHTS PANEL
+# ══════════════════════════════════════════════════════════
+st.markdown("### 💡 Statistical Insights")
 
 if stats.dataset_insights:
     c1, c2 = st.columns(2)
     mid = len(stats.dataset_insights) // 2
     with c1:
         for insight in stats.dataset_insights[:mid+1]:
-            st.info("ðŸ“Œ " + insight)
+            st.info("📌 " + insight)
     with c2:
         for insight in stats.dataset_insights[mid+1:]:
-            st.info("ðŸ“Œ " + insight)
+            st.info("📌 " + insight)
 else:
-    st.success("âœ… No major statistical concerns detected in this dataset.")
+    st.success("✅ No major statistical concerns detected in this dataset.")
 
 if stats.recommended_analysis:
     st.markdown("**Recommended next steps:**")
     for rec in stats.recommended_analysis:
-        st.markdown("â†’ " + rec)
+        st.markdown("→ " + rec)
