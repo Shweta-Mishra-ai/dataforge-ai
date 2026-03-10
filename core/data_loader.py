@@ -1,90 +1,129 @@
+import io
 import pandas as pd
-from dataclasses import dataclass, field
-from typing import Optional
-from config.settings import config
+import numpy as np
+import re
+from typing import Tuple
 
 
-@dataclass
-class LoadResult:
-    df: Optional[pd.DataFrame]
-    success: bool
-    error: Optional[str] = None
-    file_size_mb: float = 0.0
-    sheet_names: list = field(default_factory=list)
-    row_count: int = 0
-    col_count: int = 0
-    filename: str = ""
+# ── Currency / unit patterns to auto-strip ────────────────
+_CURRENCY = re.compile(r"[₹$£€¥₩\$]")
+_COMMAS   = re.compile(r"(?<=\d),(?=\d)")   # 1,234 → 1234
+_PERCENT  = re.compile(r"%\s*$")
+_TRAIL    = re.compile(r"[^\d.\-+eE]+$")    # trailing junk
 
 
-def load_file(uploaded_file, sheet_name=0) -> LoadResult:
+def _try_numeric(series: pd.Series) -> Tuple[pd.Series, bool, str]:
+    """
+    Try to coerce an object series to numeric.
+    Returns (converted_series, success, method_used).
+    """
+    s = series.astype(str).str.strip()
+
+    # Step 1 — direct
+    direct = pd.to_numeric(s, errors="coerce")
+    if direct.notna().mean() > 0.85:
+        return direct, True, "direct"
+
+    # Step 2 — strip currency + commas
+    cleaned = s.copy()
+    cleaned = _CURRENCY.sub("", cleaned)
+    cleaned = _COMMAS.sub("", cleaned)
+    cleaned = cleaned.str.strip()
+    attempt = pd.to_numeric(cleaned, errors="coerce")
+    if attempt.notna().mean() > 0.85:
+        return attempt, True, "currency_strip"
+
+    # Step 3 — strip percent
+    pct = cleaned.copy()
+    pct = _PERCENT.sub("", pct).str.strip()
+    attempt2 = pd.to_numeric(pct, errors="coerce")
+    if attempt2.notna().mean() > 0.85:
+        return attempt2, True, "percent_strip"
+
+    # Step 4 — aggressive trailing junk strip
+    agg = cleaned.apply(lambda x: _TRAIL.sub("", x) if isinstance(x, str) else x)
+    attempt3 = pd.to_numeric(agg, errors="coerce")
+    if attempt3.notna().mean() > 0.70:
+        return attempt3, True, "junk_strip"
+
+    return series, False, "none"
+
+
+def _try_datetime(series: pd.Series) -> Tuple[pd.Series, bool]:
+    """Try to parse a series as datetime."""
+    s = series.astype(str).str.strip()
+    # Skip if looks like pure numbers or IDs
+    if s.str.match(r"^\d{1,6}$").mean() > 0.5:
+        return series, False
     try:
-        size_mb = uploaded_file.size / (1024 * 1024)
-        if size_mb > config.max_file_mb:
-            return LoadResult(
-                df=None, success=False,
-                error=f"File is {size_mb:.1f} MB. Maximum allowed is {config.max_file_mb} MB."
-            )
+        converted = pd.to_datetime(s, infer_datetime_format=True, errors="coerce")
+        if converted.notna().mean() > 0.80:
+            return converted, True
+    except Exception:
+        pass
+    return series, False
 
-        fname = uploaded_file.name.lower()
-        sheets = []
-        df = None
 
-        if fname.endswith(".csv"):
-            df = pd.read_csv(
-                uploaded_file,
-                encoding_errors="replace",
-                low_memory=False
-            )
+def load_file(uploaded_file) -> Tuple[pd.DataFrame, dict]:
+    """
+    Load CSV or Excel, run smart type inference.
+    Returns (df, load_info) where load_info logs what was done.
+    """
+    info = {"filename": "", "rows": 0, "cols": 0,
+            "type_conversions": [], "parse_errors": []}
 
-        elif fname.endswith((".xlsx", ".xls")):
-            xl = pd.ExcelFile(uploaded_file)
-            sheets = xl.sheet_names
-            df = xl.parse(sheet_name)
+    name = getattr(uploaded_file, "name", "file")
+    info["filename"] = name
 
-        elif fname.endswith(".json"):
-            df = pd.read_json(uploaded_file)
-
+    # ── Read file ─────────────────────────────────────────
+    try:
+        if name.endswith(".csv"):
+            # Try common encodings
+            for enc in ["utf-8", "latin-1", "cp1252"]:
+                try:
+                    df = pd.read_csv(uploaded_file, encoding=enc,
+                                     low_memory=False)
+                    break
+                except UnicodeDecodeError:
+                    uploaded_file.seek(0)
+            else:
+                df = pd.read_csv(uploaded_file, encoding="utf-8",
+                                 errors="replace", low_memory=False)
+        elif name.endswith((".xlsx", ".xls")):
+            df = pd.read_excel(uploaded_file)
         else:
-            return LoadResult(
-                df=None, success=False,
-                error="Unsupported format. Please upload CSV, Excel or JSON."
-            )
-
-        if df is None or df.empty:
-            return LoadResult(df=None, success=False, error="File is empty.")
-
-        if len(df) > config.max_rows_preview:
-            df = df.head(config.max_rows_preview)
-
-        df = _infer_dtypes(df)
-
-        return LoadResult(
-            df=df,
-            success=True,
-            file_size_mb=round(size_mb, 2),
-            sheet_names=sheets,
-            row_count=len(df),
-            col_count=len(df.columns),
-            filename=uploaded_file.name
-        )
-
+            raise ValueError("Unsupported file type. Use CSV or Excel.")
     except Exception as e:
-        return LoadResult(df=None, success=False, error=f"Failed to load file: {str(e)}")
+        raise ValueError("File read error: {}".format(str(e)))
 
+    info["rows"] = len(df)
+    info["cols"] = len(df.columns)
 
-def _infer_dtypes(df: pd.DataFrame) -> pd.DataFrame:
+    # ── Smart type inference on object columns ─────────────
     for col in df.select_dtypes(include="object").columns:
-        try:
-            converted = pd.to_datetime(df[col], infer_datetime_format=True)
-            if converted.notna().sum() > len(df) * 0.7:
-                df[col] = converted
-                continue
-        except Exception:
-            pass
-        try:
-            converted = pd.to_numeric(df[col], errors="coerce")
-            if converted.notna().sum() > len(df) * 0.7:
-                df[col] = converted
-        except Exception:
-            pass
-    return df
+        # Skip if >90% unique (likely ID / free text)
+        if df[col].nunique() / max(len(df), 1) > 0.90:
+            continue
+
+        converted, ok, method = _try_numeric(df[col])
+        if ok:
+            df[col] = converted
+            info["type_conversions"].append({
+                "column": col,
+                "from": "object",
+                "to": "numeric",
+                "method": method,
+            })
+            continue
+
+        dt_converted, dt_ok = _try_datetime(df[col])
+        if dt_ok:
+            df[col] = dt_converted
+            info["type_conversions"].append({
+                "column": col,
+                "from": "object",
+                "to": "datetime",
+                "method": "datetime_parse",
+            })
+
+    return df, info
