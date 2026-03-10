@@ -16,7 +16,6 @@ class LoadResult:
 
 
 def _looks_like_id(series: pd.Series) -> bool:
-    """True if column looks like ID/free-text — most values contain letters."""
     sample = series.dropna().astype(str).head(30)
     if len(sample) == 0:
         return False
@@ -25,7 +24,6 @@ def _looks_like_id(series: pd.Series) -> bool:
 
 
 def _clean_numeric_string(val) -> object:
-    """Strip currency, commas, percent from a single value."""
     if val is None:
         return np.nan
     if isinstance(val, float) and np.isnan(val):
@@ -43,25 +41,18 @@ def _clean_numeric_string(val) -> object:
 
 
 def _try_numeric(series: pd.Series) -> Tuple[pd.Series, bool, str]:
-    """Try to coerce an object series to numeric."""
     s = series.astype(str).str.strip()
-
-    # Step 1 — direct
     direct = pd.to_numeric(s, errors="coerce")
     if direct.notna().mean() > 0.85:
         return direct, True, "direct"
-
-    # Step 2 — strip currency / commas / percent
     cleaned = s.apply(_clean_numeric_string)
     attempt = pd.to_numeric(cleaned, errors="coerce")
     if attempt.notna().mean() > 0.80:
         return attempt, True, "currency_strip"
-
     return series, False, "none"
 
 
 def _try_datetime(series: pd.Series) -> Tuple[pd.Series, bool]:
-    """Try to parse a series as datetime."""
     s = series.astype(str).str.strip()
     if s.str.match(r"^\d{1,6}$").mean() > 0.5:
         return series, False
@@ -75,52 +66,34 @@ def _try_datetime(series: pd.Series) -> Tuple[pd.Series, bool]:
 
 
 def _infer_types(df: pd.DataFrame) -> List[dict]:
-    """Run type inference on all object columns. Returns list of conversions."""
     conversions = []
     for col in list(df.select_dtypes(include="object").columns):
         try:
             if _looks_like_id(df[col]):
                 continue
-
             converted, ok, method = _try_numeric(df[col])
             if ok:
                 df[col] = converted
-                conversions.append({
-                    "column": col, "from": "object",
-                    "to": "numeric", "method": method,
-                })
+                conversions.append({"column": col, "from": "object", "to": "numeric", "method": method})
                 continue
-
             dt_converted, dt_ok = _try_datetime(df[col])
             if dt_ok:
                 df[col] = dt_converted
-                conversions.append({
-                    "column": col, "from": "object",
-                    "to": "datetime", "method": "auto_parse",
-                })
+                conversions.append({"column": col, "from": "object", "to": "datetime", "method": "auto_parse"})
         except Exception:
             continue
     return conversions
 
 
 def load_file(uploaded_file, sheet_name=None) -> LoadResult:
-    """
-    Load CSV or Excel with smart type inference.
-    Returns LoadResult with .success, .df, .filename, .file_size_mb,
-    .sheet_names, .type_conversions, .error
-    """
     name = getattr(uploaded_file, "name", "file")
-
-    # File size
     try:
         uploaded_file.seek(0, 2)
-        size_bytes = uploaded_file.tell()
+        size_mb = round(uploaded_file.tell() / (1024 * 1024), 2)
         uploaded_file.seek(0)
-        size_mb = round(size_bytes / (1024 * 1024), 2)
     except Exception:
         size_mb = 0.0
 
-    # ── CSV ───────────────────────────────────────────────
     if name.lower().endswith(".csv"):
         try:
             df = None
@@ -133,52 +106,33 @@ def load_file(uploaded_file, sheet_name=None) -> LoadResult:
                     continue
             if df is None:
                 uploaded_file.seek(0)
-                df = pd.read_csv(uploaded_file, encoding="utf-8",
-                                 errors="replace", low_memory=False)
-            conversions = _infer_types(df)
-            return LoadResult(
-                success=True, df=df, filename=name,
-                file_size_mb=size_mb, sheet_names=[],
-                type_conversions=conversions,
-            )
+                df = pd.read_csv(uploaded_file, encoding="utf-8", errors="replace", low_memory=False)
+            return LoadResult(success=True, df=df, filename=name, file_size_mb=size_mb,
+                              sheet_names=[], type_conversions=_infer_types(df))
         except Exception as e:
             return LoadResult(success=False, error=str(e), filename=name)
 
-    # ── Excel ─────────────────────────────────────────────
     elif name.lower().endswith((".xlsx", ".xls")):
         try:
             uploaded_file.seek(0)
             xl = pd.ExcelFile(uploaded_file)
-            sheet_names = xl.sheet_names
-
-            target = sheet_name if sheet_name else sheet_names[0]
+            sheets = xl.sheet_names
+            target = sheet_name if sheet_name else sheets[0]
             df = xl.parse(target)
-            conversions = _infer_types(df)
-            return LoadResult(
-                success=True, df=df, filename=name,
-                file_size_mb=size_mb, sheet_names=sheet_names,
-                type_conversions=conversions,
-            )
+            return LoadResult(success=True, df=df, filename=name, file_size_mb=size_mb,
+                              sheet_names=sheets, type_conversions=_infer_types(df))
         except Exception as e:
             return LoadResult(success=False, error=str(e), filename=name)
 
-    # ── JSON ──────────────────────────────────────────────
     elif name.lower().endswith(".json"):
         try:
             uploaded_file.seek(0)
             df = pd.read_json(uploaded_file)
-            conversions = _infer_types(df)
-            return LoadResult(
-                success=True, df=df, filename=name,
-                file_size_mb=size_mb, sheet_names=[],
-                type_conversions=conversions,
-            )
+            return LoadResult(success=True, df=df, filename=name, file_size_mb=size_mb,
+                              sheet_names=[], type_conversions=_infer_types(df))
         except Exception as e:
             return LoadResult(success=False, error=str(e), filename=name)
 
     else:
-        return LoadResult(
-            success=False,
-            error="Unsupported file type. Please upload CSV, Excel, or JSON.",
-            filename=name,
-        )
+        return LoadResult(success=False, filename=name,
+                          error="Unsupported file. Use CSV, Excel, or JSON.")
