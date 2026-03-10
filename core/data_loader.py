@@ -3,40 +3,51 @@ import numpy as np
 from typing import Tuple
 
 
-def _clean_numeric_string(val: str) -> str:
-    """Remove currency symbols, commas, percent from a single string value."""
-    if not isinstance(val, str):
-        return val
+def _looks_like_id(series: pd.Series) -> bool:
+    """
+    Returns True only if column looks like an ID/free-text field.
+    Logic: most values contain letters (product IDs, names, URLs etc.)
+    Pure numeric-with-symbols like prices will NOT be flagged as ID.
+    """
+    sample = series.dropna().astype(str).head(30)
+    if len(sample) == 0:
+        return False
+    has_letters = sample.str.contains(r"[A-Za-z]", regex=True)
+    return bool(has_letters.mean() > 0.7)
+
+
+def _clean_numeric_string(val) -> object:
+    """Remove currency symbols, commas, percent from a single value."""
+    if val is None:
+        return np.nan
+    if isinstance(val, float) and np.isnan(val):
+        return np.nan
+    s = str(val).strip()
     # Remove currency symbols
-    for sym in ["₹", "$", "£", "€", "¥", "₩"]:
-        val = val.replace(sym, "")
-    # Remove commas between digits (1,234 → 1234)
-    result = ""
-    for i, ch in enumerate(val):
-        if ch == "," and i > 0 and i < len(val) - 1:
-            if val[i-1].isdigit() and val[i+1].isdigit():
-                continue
-        result += ch
+    for sym in ["₹", "$", "£", "€", "¥", "₩", "Rs.", "Rs", "rs"]:
+        s = s.replace(sym, "")
+    # Remove commas (thousands separator)
+    s = s.replace(",", "")
     # Remove trailing percent
-    result = result.strip()
-    if result.endswith("%"):
-        result = result[:-1].strip()
-    return result
+    if s.endswith("%"):
+        s = s[:-1]
+    s = s.strip()
+    # Common null strings → NaN
+    if s in ("", "-", "N/A", "NA", "null", "None", "nan", "NaN", "#N/A"):
+        return np.nan
+    return s
 
 
 def _try_numeric(series: pd.Series) -> Tuple[pd.Series, bool, str]:
-    """
-    Try to coerce an object series to numeric.
-    Returns (converted_series, success, method_used).
-    """
+    """Try to coerce an object series to numeric."""
     s = series.astype(str).str.strip()
 
-    # Step 1 — direct
+    # Step 1 — direct (already clean numbers)
     direct = pd.to_numeric(s, errors="coerce")
     if direct.notna().mean() > 0.85:
         return direct, True, "direct"
 
-    # Step 2 — clean currency/commas/percent then try
+    # Step 2 — strip currency / commas / percent then retry
     cleaned = s.apply(_clean_numeric_string)
     attempt = pd.to_numeric(cleaned, errors="coerce")
     if attempt.notna().mean() > 0.80:
@@ -48,9 +59,8 @@ def _try_numeric(series: pd.Series) -> Tuple[pd.Series, bool, str]:
 def _try_datetime(series: pd.Series) -> Tuple[pd.Series, bool]:
     """Try to parse a series as datetime."""
     s = series.astype(str).str.strip()
-    # Skip if mostly short integers (IDs, counts)
-    short_int = s.str.match(r"^\d{1,6}$")
-    if short_int.mean() > 0.5:
+    # Skip columns that are mostly short integers
+    if s.str.match(r"^\d{1,6}$").mean() > 0.5:
         return series, False
     try:
         converted = pd.to_datetime(s, infer_datetime_format=True, errors="coerce")
@@ -85,7 +95,7 @@ def load_file(uploaded_file) -> Tuple[pd.DataFrame, dict]:
                     uploaded_file.seek(0)
                     df = pd.read_csv(uploaded_file, encoding=enc, low_memory=False)
                     break
-                except (UnicodeDecodeError, Exception):
+                except Exception:
                     continue
             if df is None:
                 uploaded_file.seek(0)
@@ -106,11 +116,8 @@ def load_file(uploaded_file) -> Tuple[pd.DataFrame, dict]:
     # ── Type inference on object columns ──────────────────
     for col in list(df.select_dtypes(include="object").columns):
         try:
-            n_unique = df[col].nunique()
-            n_rows   = max(len(df), 1)
-
-            # Skip high-cardinality (ID/free-text columns)
-            if n_unique / n_rows > 0.90:
+            # Skip ID/free-text columns (contain letters like product_id, name, URL)
+            if _looks_like_id(df[col]):
                 continue
 
             # Try numeric
@@ -137,7 +144,6 @@ def load_file(uploaded_file) -> Tuple[pd.DataFrame, dict]:
                 })
 
         except Exception:
-            # Never crash the whole upload for one column
-            continue
+            continue   # never crash upload for one bad column
 
     return df, info
