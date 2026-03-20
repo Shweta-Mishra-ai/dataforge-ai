@@ -194,10 +194,14 @@ def _hash_df(df: pd.DataFrame) -> str:
             str(df.shape),
             str(list(df.columns)),
             str(list(df.dtypes.astype(str))),
-            str(df.iloc[0].tolist()) if len(df) > 0 else "",
-            str(df.iloc[-1].tolist()) if len(df) > 0 else "",
             str(len(df)),
         ]
+        # Safe row hash — avoid datetime serialization issues
+        try:
+            parts.append(str(df.iloc[0].astype(str).tolist()) if len(df) > 0 else "")
+            parts.append(str(df.iloc[-1].astype(str).tolist()) if len(df) > 0 else "")
+        except Exception:
+            pass
         content = "|".join(parts)
         return hashlib.md5(content.encode("utf-8", errors="replace")).hexdigest()
     except Exception:
@@ -211,4 +215,3 @@ def _invalidate_caches():
     st.session_state[KEY_ML_RESULT]    = None
     st.session_state[KEY_CLEAN_REPORT] = None
     st.session_state[KEY_PROFILE]      = None
-
