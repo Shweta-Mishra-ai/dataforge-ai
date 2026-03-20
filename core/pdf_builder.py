@@ -396,8 +396,8 @@ def _dataset_overview(story, ST, theme, df, profile, cleaning_summary, CW):
          "sub": "features"},
         {"label": "MISSING",
          "value": "{:.1f}%".format(
-             df.isna().sum().sum() / max(df.shape[0]*df.shape[1],1)*100),
-         "sub": "{} cells".format(int(df.isna().sum().sum()))},
+             df.isna().sum().sum() / max(df.shape[0]*df.shape[1], 1) * 100),
+         "sub": "{:,} cells missing".format(int(df.isna().sum().sum()))},
         {"label": "QUALITY SCORE", "value": "{}".format(
              getattr(profile, "overall_quality_score", "N/A")),
          "sub": "out of 100"},
@@ -821,25 +821,29 @@ def build_pdf(
     ST    = _styles(theme, CW)
     story = []
 
-    # ── TOC sections ──────────────────────────────────────
-    page_num = 3
+    # ── TOC sections — sequential numbering ───────────────
+    page_num  = 3
+    sec_num   = 1
     toc_sections = []
-    toc_sections.append((1, "Executive Summary", page_num)); page_num += 1
-    toc_sections.append((2, "Dataset Overview", page_num)); page_num += 1
+
+    def _toc_add(title):
+        nonlocal page_num, sec_num
+        toc_sections.append((sec_num, title, page_num))
+        sec_num  += 1
+        page_num += 1
+
+    _toc_add("Executive Summary")
+    _toc_add("Dataset Overview")
     if stats_report:
-        toc_sections.append((3, "Statistical Analysis", page_num)); page_num += 1
+        _toc_add("Statistical Analysis")
     if bi_report:
-        toc_sections.append((4, "Business Intelligence", page_num)); page_num += 1
+        _toc_add("Business Intelligence")
     if ml_report:
-        toc_sections.append((5, "ML Predictions", page_num)); page_num += 1
+        _toc_add("ML Predictions")
     for i, (title, _, _) in enumerate(chart_data, 1):
-        toc_sections.append((
-            len(toc_sections)+1,
-            "Chart {}: {}".format(i, title[:35]),
-            page_num
-        )); page_num += 1
-    toc_sections.append((len(toc_sections)+1, "Recommendations", page_num)); page_num += 1
-    toc_sections.append((len(toc_sections)+1, "Appendix", page_num))
+        _toc_add("Chart {}: {}".format(i, title[:35]))
+    _toc_add("Recommendations")
+    _toc_add("Appendix")
 
     # ── Build story ───────────────────────────────────────
     _cover(story, ST, theme, config, CW)
