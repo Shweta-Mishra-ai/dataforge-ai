@@ -3,9 +3,9 @@ import pandas as pd
 import numpy as np
 
 # ── Guard ─────────────────────────────────────────────────
-if "df_active" not in st.session_state:
-    st.warning("Please upload a dataset first.")
-    st.stop()
+from core.session_manager import require_data, get_df
+require_data()
+df = get_df()
 
 from core.data_cleaner import auto_clean, get_cleaning_summary
 from core.stats_engine import analyze
