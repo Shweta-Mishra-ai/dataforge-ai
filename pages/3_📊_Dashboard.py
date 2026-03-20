@@ -34,7 +34,7 @@ def get_stats(df_json: str):
 
 # ── Load data ─────────────────────────────────────────────
 df_master = get_df()
-stats, _   = get_stats(df_master.to_json())
+stats, _   = get_stats(df_master.to_json(date_format="iso"))
 
 num_cols  = stats.numeric_cols
 cat_cols  = [c for c in stats.categorical_cols
