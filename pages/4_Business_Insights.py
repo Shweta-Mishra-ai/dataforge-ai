@@ -22,7 +22,7 @@ df = get_df()
 fname = get_filename()
 
 with st.spinner("Generating business insights..."):
-    report = get_story(df.to_json())
+    report = get_story(df.to_json(date_format="iso"))
 
 # ══════════════════════════════════════════════════════════
 #  HEADER — Domain badge + headline
