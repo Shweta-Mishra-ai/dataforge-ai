@@ -36,11 +36,11 @@ st.caption("{} — {:,} rows, {} columns".format(
 st.divider()
 
 with st.spinner("Running cleaning pipeline..."):
-    df_clean, summary = run_cleaning(df_raw.to_json())
+    df_clean, summary = run_cleaning(df_raw.to_json(date_format="iso"))
     update_active_df(df_clean)   # update via session_manager
 
 with st.spinner("Running statistical analysis..."):
-    stats = run_stats(df_clean.to_json())
+    stats = run_stats(df_clean.to_json(date_format="iso"))
     cache_stats(stats)           # cache for other pages to reuse
 
 # ══════════════════════════════════════════════════════════
