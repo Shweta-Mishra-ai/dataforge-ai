@@ -6,11 +6,9 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 # ── Guard ─────────────────────────────────────────────────
-if "df_active" not in st.session_state:
-    st.warning("Please upload a dataset first.")
-    st.page_link("pages/1_📥_Data_Upload.py", label="Go to Upload", icon="📥")
-    st.stop()
-
+from core.session_manager import require_data, get_df
+require_data()
+df_master = get_df()  
 from core.stats_engine import analyze
 
 st.set_page_config(page_title="Dashboard", layout="wide")

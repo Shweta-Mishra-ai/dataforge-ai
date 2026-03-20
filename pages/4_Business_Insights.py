@@ -4,9 +4,9 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 
-if "df_active" not in st.session_state:
-    st.warning("Please upload a dataset first.")
-    st.stop()
+from core.session_manager import require_data, get_df
+require_data()
+df = get_df()
 
 from core.story_engine import generate_story
 
