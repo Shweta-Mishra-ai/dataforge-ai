@@ -5,10 +5,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-# ── Guard ─────────────────────────────────────────────────
-from core.session_manager import require_data, get_df
+from core.session_manager import require_data, get_df, get_filename, get_cached_stats
 require_data()
-df_master = get_df()  
+
 from core.stats_engine import analyze
 
 st.set_page_config(page_title="Dashboard", layout="wide")
@@ -34,7 +33,7 @@ def get_stats(df_json: str):
     return analyze(df), df
 
 # ── Load data ─────────────────────────────────────────────
-df_master = st.session_state["df_active"]
+df_master = get_df()
 stats, _   = get_stats(df_master.to_json())
 
 num_cols  = stats.numeric_cols
@@ -90,7 +89,7 @@ with st.sidebar:
 # ══════════════════════════════════════════════════════════
 #  HEADER
 # ══════════════════════════════════════════════════════════
-fname = st.session_state.get("filename", "Dataset")
+fname = get_filename()
 st.markdown("## 📊 Dashboard — {}".format(fname))
 st.caption("Real-time analysis · {:,} rows · {} columns · {} filtered".format(
     len(df_master), len(df_master.columns), len(df_filtered)))
