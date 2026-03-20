@@ -4,9 +4,8 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 
-from core.session_manager import require_data, get_df
+from core.session_manager import require_data, get_df, get_filename
 require_data()
-df = get_df()
 
 from core.story_engine import generate_story
 
@@ -19,8 +18,8 @@ def get_story(df_json: str):
     df = pd.read_json(df_json)
     return generate_story(df)
 
-df = st.session_state["df_active"]
-fname = st.session_state.get("filename", "Dataset")
+df = get_df()
+fname = get_filename()
 
 with st.spinner("Generating business insights..."):
     report = get_story(df.to_json())
