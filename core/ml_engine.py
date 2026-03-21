@@ -450,36 +450,44 @@ def get_feature_importance(
         if raw_imp is None:
             return importances, shap_values
 
+    # Ensure raw_imp matches feature_names length — trim or pad
+    raw_imp = np.array(raw_imp).flatten()
+    n_feats = len(feature_names)
+    if len(raw_imp) > n_feats:
+        raw_imp = raw_imp[:n_feats]
+    elif len(raw_imp) < n_feats:
+        raw_imp = np.pad(raw_imp, (0, n_feats - len(raw_imp)))
+
     # Normalize
     total    = raw_imp.sum()
     norm_imp = raw_imp / total if total > 0 else raw_imp
 
-    # Direction from SHAP or coef
-    directions = []
-    if shap_values is not None:
-        for i in range(len(feature_names)):
-            mean_shap = float(np.mean(shap_values[:, i]))
-            directions.append(
-                "positive" if mean_shap > 0.01
-                else "negative" if mean_shap < -0.01
-                else "mixed"
-            )
-    elif hasattr(model, "coef_"):
-        coef = model.coef_.flatten()
-        for i in range(min(len(feature_names), len(coef))):
-            directions.append("positive" if coef[i] > 0 else "negative")
-    else:
-        directions = ["mixed"] * len(feature_names)
+    # Direction from SHAP or coef — safely
+    directions = ["mixed"] * n_feats
+    try:
+        if shap_values is not None:
+            sv = np.array(shap_values)
+            if sv.ndim == 2 and sv.shape[1] >= n_feats:
+                for i in range(n_feats):
+                    mean_shap = float(np.mean(sv[:, i]))
+                    directions[i] = (
+                        "positive" if mean_shap > 0.01
+                        else "negative" if mean_shap < -0.01
+                        else "mixed"
+                    )
+        elif hasattr(model, "coef_"):
+            coef = np.array(model.coef_).flatten()
+            for i in range(min(n_feats, len(coef))):
+                directions[i] = "positive" if coef[i] > 0 else "negative"
+    except Exception:
+        directions = ["mixed"] * n_feats
 
-    # Build FeatureImportance list
-    ranked = sorted(
-        enumerate(zip(feature_names, norm_imp)),
-        key=lambda x: x[1][1], reverse=True
-    )
+    # Build FeatureImportance list — zip ensures equal length
+    pairs  = list(zip(feature_names, norm_imp, directions))
+    ranked = sorted(enumerate(pairs), key=lambda x: x[1][1], reverse=True)
 
-    for rank, (i, (feat, imp)) in enumerate(ranked, 1):
-        direction = directions[i] if i < len(directions) else "mixed"
-        pct = imp * 100
+    for rank, (i, (feat, imp, direction)) in enumerate(ranked, 1):
+        pct = float(imp) * 100
 
         if pct > 30:
             explanation = "Dominant feature — drives {:.0f}% of predictions. {}influence.".format(
@@ -736,4 +744,3 @@ def run_ml_pipeline(
 
     report.insights = _generate_insights(report)
     return report
-
