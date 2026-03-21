@@ -13,7 +13,8 @@ st.set_page_config(
     layout="wide"
 )
 
-from core.data_loader import load_file, SAMPLE_THRESHOLD
+from core.data_loader import load_file
+SAMPLE_THRESHOLD = 100_000
 from core.data_profiler import profile_dataset
 from core.session_manager import init_session, set_dataframe
 
