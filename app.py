@@ -1,10 +1,6 @@
 """
 DataForge AI — Entry Point
-==========================
-This file does ONE thing: configure the app and redirect to the first page.
-All logic lives in pages/, core/, ai/, and components/.
 """
-
 import streamlit as st
 
 st.set_page_config(
@@ -14,4 +10,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-st.switch_page("pages/1_Data_Upload.py")
+# Auto-redirect to first page
+# Streamlit will show the first page in pages/ automatically
+# No explicit switch_page needed — avoids filename mismatch errors
