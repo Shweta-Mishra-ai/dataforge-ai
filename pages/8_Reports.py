@@ -335,9 +335,6 @@ if gen_btn:
             risks=risks,
             opportunities=opportunities,
             recommendations=actions,
-            top_insights=getattr(story_obj, "top_insights", []),
-            attrition=getattr(story_obj, "attrition", None),
-            domain=domain_name,
         )
 
         progress.progress(100, text="Done!")
