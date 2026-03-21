@@ -317,6 +317,10 @@ if gen_btn:
 
         cleaning_summary = st.session_state.get("clean_report")
 
+        # Domain detection for theme
+        from core.story_engine import detect_domain
+        domain_name, _ = detect_domain(df)
+
         pdf_bytes = build_pdf(
             df=df,
             config=config,
@@ -331,6 +335,9 @@ if gen_btn:
             risks=risks,
             opportunities=opportunities,
             recommendations=actions,
+            top_insights=getattr(story_obj, "top_insights", []),
+            attrition=getattr(story_obj, "attrition", None),
+            domain=domain_name,
         )
 
         progress.progress(100, text="Done!")
