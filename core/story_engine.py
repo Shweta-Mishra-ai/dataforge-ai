@@ -223,270 +223,311 @@ def _detect_anomalies(df: pd.DataFrame, stats: Dict) -> List[str]:
 #  DOMAIN-SPECIFIC STORY GENERATORS
 # ══════════════════════════════════════════════════════════
 
-def _story_ecommerce(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
+def _senior_insight(what: str, why: str, action: str, impact: str = "") -> str:
+    """Format a senior analyst insight: What happened, Why, What to do, Impact."""
+    parts = ["WHAT: " + what, "WHY: " + why, "ACTION: " + action]
+    if impact:
+        parts.append("IMPACT: " + impact)
+    return " | ".join(parts)
+
+
+def _story_ecommerce(df, stats, corrs):
     findings, risks, opps, actions = [], [], [], []
 
-    # Rating analysis
     rating_col = next((c for c in df.columns if "rating" in c.lower()
                        and "count" not in c.lower()), None)
+    price_col  = next((c for c in df.columns
+                       if any(k in c.lower() for k in ["price","cost"])
+                       and c in stats), None)
+    disc_col   = next((c for c in df.columns
+                       if "discount" in c.lower() and c in stats), None)
+    cat_col    = next((c for c in df.select_dtypes(include="object").columns
+                       if "category" in c.lower()
+                       and df[c].nunique() <= 30), None)
+
     if rating_col and rating_col in stats:
-        st = stats[rating_col]
-        mean_r = st.get("mean", 0)
-        if mean_r >= 4.0:
-            findings.append(
-                "Strong customer satisfaction: average rating of {:.2f}/5 "
-                "indicates most customers are happy with products.".format(mean_r)
-            )
-            opps.append(
-                "High ratings ({:.2f}/5) are a competitive advantage — "
-                "highlight in marketing.".format(mean_r)
-            )
+        st      = stats[rating_col]
+        mean_r  = st.get("mean", 0)
+        q1      = st.get("q1", 0)
+        out_ct  = st.get("outliers", 0)
+        out_pct = st.get("outlier_pct", 0)
+
+        if mean_r >= 4.3:
+            findings.append(_senior_insight(
+                what="Excellent avg rating {:.2f}/5".format(mean_r),
+                why="Products consistently meeting customer expectations",
+                action="Use high ratings in marketing — highlight in ads and product pages",
+                impact="High ratings correlate with 20-30% higher conversion rates"))
+            opps.append("Premium pricing opportunity — customers willing to pay more for high-rated products.")
+        elif mean_r >= 4.0:
+            findings.append(_senior_insight(
+                what="Good avg rating {:.2f}/5 but 25% of products rated below {:.1f}".format(mean_r, q1),
+                why="Bottom quartile products dragging overall performance",
+                action="Identify and fix bottom 25% rated products — quality review or removal",
+                impact="Improving bottom quartile to average could raise overall rating to 4.3+"))
         elif mean_r >= 3.5:
-            findings.append(
-                "Average rating of {:.2f}/5 is acceptable but below top-tier. "
-                "25% of products rated below {:.2f}.".format(mean_r, st.get("q1", 0))
-            )
-            risks.append(
-                "Ratings below 3.5 risk losing customers to competitors. "
-                "Focus on bottom-rated products."
-            )
+            risks.append(_senior_insight(
+                what="Below-average rating {:.2f}/5 — at risk of losing customers".format(mean_r),
+                why="Customer dissatisfaction indicates product-quality or expectation mismatch",
+                action="URGENT: Audit lowest-rated products, collect feedback, fix top complaints",
+                impact="Every 0.1 drop in rating = estimated 5-10% drop in sales"))
         else:
-            findings.append(
-                "Low average rating of {:.2f}/5 — significant customer "
-                "dissatisfaction detected.".format(mean_r)
-            )
-            risks.append("Critical: Low ratings may drive churn and negative reviews.")
+            risks.append(_senior_insight(
+                what="CRITICAL: Low rating {:.2f}/5 — severe customer dissatisfaction".format(mean_r),
+                why="Products failing to meet basic customer expectations",
+                action="Immediate product quality audit, remove products rated below 3.0",
+                impact="Ratings below 3.5 result in 40-60% lower purchase likelihood"))
 
-        # Outlier products
-        if st.get("outliers", 0) > 0:
-            findings.append(
-                "{} products have outlier ratings (below {:.1f} or above {:.1f}) — "
-                "these need immediate review.".format(
-                    st["outliers"],
-                    st["q1"] - 1.5*st["iqr"],
-                    st["q3"] + 1.5*st["iqr"]
-                )
-            )
+        if out_ct > 0:
+            findings.append(_senior_insight(
+                what="{} products with outlier ratings ({:.1f}% of catalog)".format(out_ct, out_pct),
+                why="Outlier products are either exceptional or seriously problematic",
+                action="Review each outlier individually — low outliers need urgent attention",
+                impact="Low-rated outliers disproportionately affect brand perception"))
 
-    # Price analysis
-    price_col = next((c for c in df.columns
-                      if any(k in c.lower() for k in ["price", "cost", "amount"])
-                      and c in stats), None)
-    if price_col:
-        st = stats[price_col]
-        findings.append(
-            "Price range: {:.0f} to {:.0f}. "
-            "Median price {:.0f} vs mean {:.0f} — {} skew indicates "
-            "a few expensive products pulling the average up.".format(
-                st.get("min", 0), st.get("max", 0),
-                st.get("median", 0), st.get("mean", 0),
-                "right" if st.get("skew", 0) > 0 else "left"
-            )
-        )
+    if price_col and price_col in stats:
+        st   = stats[price_col]
+        skew = st.get("skew", 0)
+        cv   = st.get("cv", 0)
+        if skew > 1:
+            findings.append(_senior_insight(
+                what="Price right-skewed — median {:.0f} vs mean {:.0f}".format(
+                    st.get("median",0), st.get("mean",0)),
+                why="Few expensive products pull mean up — most products are budget-range",
+                action="Segment pricing: budget vs premium. Use median not mean for pricing decisions",
+                impact="Skewed pricing often indicates untapped mid-market opportunity"))
 
-    # Discount analysis
-    disc_col = next((c for c in df.columns
-                     if "discount" in c.lower() and "pct" in c.lower()
-                     or "discount" in c.lower() and "percent" in c.lower()), None)
     if disc_col and disc_col in stats:
-        st = stats[disc_col]
-        avg_disc = st.get("mean", 0)
-        findings.append(
-            "Average discount of {:.1f}%. Products discounted up to {:.0f}%.".format(
-                avg_disc, st.get("max", 0)
-            )
-        )
+        avg_disc = stats[disc_col].get("mean", 0)
         if avg_disc > 40:
-            risks.append(
-                "High average discount ({:.1f}%) may be eroding margins. "
-                "Analyze profitability at these discount levels.".format(avg_disc)
-            )
+            risks.append(_senior_insight(
+                what="High avg discount {:.1f}% — potentially eroding margins".format(avg_disc),
+                why="Heavy discounting trains customers to wait for sales, devalues brand",
+                action="Analyze margin impact. Reduce discounts on high-rated products",
+                impact="Every 10% unnecessary discount = direct margin loss"))
 
-    # Price-rating correlation
-    price_rating = next(
-        (c for c in corrs if "rating" in c["col_a"].lower()
-         or "rating" in c["col_b"].lower()), None
-    )
-    if price_rating:
-        r = price_rating["r"]
+    pr_corr = next((c for c in corrs if
+        ("rating" in c["col_a"].lower() or "rating" in c["col_b"].lower()) and
+        ("price" in c["col_a"].lower() or "price" in c["col_b"].lower())), None)
+    if pr_corr:
+        r = pr_corr["r"]
         if r < -0.3:
-            findings.append(
-                "Higher-priced products tend to have LOWER ratings (r={:.2f}) — "
-                "premium pricing may not match perceived value.".format(r)
-            )
-            risks.append("Price-quality mismatch: customers feel premium products underdeliver.")
+            risks.append(_senior_insight(
+                what="Higher-priced products have LOWER ratings (r={:.2f})".format(r),
+                why="Premium pricing not delivering premium experience — expectation gap",
+                action="Review premium product quality. Align quality with price or reduce prices",
+                impact="Price-quality mismatch is leading cause of negative reviews and returns"))
         elif r > 0.3:
-            findings.append(
-                "Higher-priced products tend to have HIGHER ratings (r={:.2f}) — "
-                "premium products are delivering on expectations.".format(r)
-            )
+            opps.append(_senior_insight(
+                what="Higher-priced products have HIGHER ratings (r={:.2f}) — quality-price alignment".format(r),
+                why="Premium products delivering on value",
+                action="Expand premium range. Use as proof point in marketing"))
 
-    # Category analysis
-    cat_col = next((c for c in df.select_dtypes(include="object").columns
-                    if "category" in c.lower() and df[c].nunique() <= 30), None)
-    if cat_col and rating_col:
-        cat_ratings = df.groupby(cat_col)[rating_col].mean().sort_values()
-        if len(cat_ratings) >= 2:
-            worst = cat_ratings.index[0]
-            best  = cat_ratings.index[-1]
-            findings.append(
-                "Category performance gap: '{}' has lowest avg rating ({:.2f}) "
-                "vs '{}' with highest ({:.2f}).".format(
-                    worst, cat_ratings.iloc[0], best, cat_ratings.iloc[-1]
-                )
-            )
-            actions.append(
-                "Priority: Investigate '{}' category — "
-                "lowest rated at {:.2f}/5.".format(worst, cat_ratings.iloc[0])
-            )
+    if cat_col and rating_col and rating_col in df.columns:
+        grp = df.groupby(cat_col)[rating_col].mean().sort_values()
+        if len(grp) >= 2:
+            gap = grp.iloc[-1] - grp.iloc[0]
+            findings.append(_senior_insight(
+                what="Category gap: '{}' ({:.2f}) vs '{}' ({:.2f}) — {:.2f} point difference".format(
+                    grp.index[0], grp.iloc[0], grp.index[-1], grp.iloc[-1], gap),
+                why="Categories have different quality standards or supplier performance",
+                action="Prioritize quality improvement in '{}'. Study best practices from '{}'".format(
+                    grp.index[0], grp.index[-1]),
+                impact="Closing category gap by 50% could add {:.1f} points to overall rating".format(gap*0.5)))
 
-    actions.append("Review all products rated below 3.0 for quality issues.")
-    actions.append("A/B test pricing on top-rated products to optimize margins.")
-
-    return {"findings": findings, "risks": risks,
-            "opportunities": opps, "actions": actions}
+    actions.extend([
+        "Review all products rated below 3.0 — fix or remove",
+        "A/B test pricing on top-rated products to optimize revenue",
+        "Implement post-purchase review collection system",
+        "Monthly competitor rating comparison — maintain advantage",
+    ])
+    return {"findings": findings, "risks": risks, "opportunities": opps, "actions": actions}
 
 
-def _story_hr(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
+def _story_hr(df, stats, corrs):
     findings, risks, opps, actions = [], [], [], []
 
-    # Attrition
-    attr_col = next((c for c in df.columns if "attrition" in c.lower()
-                     or "churn" in c.lower()), None)
-    if attr_col:
-        vc = df[attr_col].value_counts(normalize=True)
-        yes_keys = [k for k in vc.index if str(k).lower() in ["yes", "1", "true"]]
+    sat_col  = next((c for c in df.columns if "satisfaction" in c.lower()), None)
+    attr_col = next((c for c in df.columns
+                     if "attrition" in c.lower() or c.lower() == "left"), None)
+    sal_col  = next((c for c in df.columns
+                     if "salary" in c.lower() and df[c].dtype == object), None)
+    hrs_col  = next((c for c in df.columns if "hour" in c.lower()), None)
+    dept_col = next((c for c in df.columns
+                     if "department" in c.lower() and df[c].nunique() <= 20), None)
+    eval_col = next((c for c in df.columns if "evaluat" in c.lower()), None)
+
+    if attr_col and attr_col in df.columns:
+        vc       = df[attr_col].value_counts(normalize=True)
+        yes_keys = [k for k in vc.index if str(k).lower() in ["yes","1","1.0","true"]]
         if yes_keys:
-            rate = vc[yes_keys[0]] * 100
+            rate  = vc[yes_keys[0]] * 100
+            n_left= int(vc[yes_keys[0]] * len(df))
             if rate > 20:
-                risks.append(
-                    "Critical attrition rate of {:.1f}% — "
-                    "industry benchmark is typically 10-15%.".format(rate)
-                )
-                findings.append(
-                    "{:.1f}% of employees have left — "
-                    "significant talent drain and recruitment cost.".format(rate)
-                )
-                actions.append(
-                    "Urgent: Conduct exit interviews and identify "
-                    "top attrition drivers."
-                )
+                risks.append(_senior_insight(
+                    what="CRITICAL attrition {:.1f}% — {:,} employees left".format(rate, n_left),
+                    why="Exceeds industry benchmark 10-15% — systemic retention failure",
+                    action="URGENT: Exit interviews, salary benchmarking, manager effectiveness audit",
+                    impact="Replacing {:,} employees estimated at 1-2x annual salary each — significant cost".format(n_left)))
+            elif rate > 15:
+                risks.append(_senior_insight(
+                    what="Above-average attrition {:.1f}% ({:,} employees)".format(rate, n_left),
+                    why="Early warning sign — exceeds healthy 10-15% benchmark",
+                    action="Survey current employees. Identify top attrition drivers by department and tenure",
+                    impact="Each percentage point above benchmark = significant additional recruitment cost"))
             else:
-                findings.append(
-                    "Attrition rate of {:.1f}% is within acceptable range.".format(rate)
-                )
+                findings.append(_senior_insight(
+                    what="Healthy attrition {:.1f}% — within industry benchmark 10-15%".format(rate),
+                    why="Retention programs appear effective",
+                    action="Maintain programs. Focus on keeping high-performers with career development paths"))
 
-    # Salary analysis
-    sal_col = next((c for c in df.columns if "salary" in c.lower()
-                    or "income" in c.lower() or "pay" in c.lower()), None)
-    if sal_col and sal_col in stats:
-        st = stats[sal_col]
-        findings.append(
-            "Salary range: {:.0f} to {:.0f}. "
-            "Median salary {:.0f} — {} skew detected.".format(
-                st["min"], st["max"], st["median"],
-                "right" if st.get("skew", 0) > 0 else "left"
-            )
-        )
-        if st.get("cv", 0) > 0.5:
-            risks.append(
-                "High salary variation (CV={:.2f}) suggests "
-                "significant pay inequality across roles or departments.".format(st["cv"])
-            )
+            if sat_col and sat_col in df.columns:
+                left_mask = df[attr_col].astype(str).str.lower().isin(["yes","1","1.0","true"])
+                left_sat  = df.loc[left_mask, sat_col].mean()
+                stay_sat  = df.loc[~left_mask, sat_col].mean()
+                if not (pd.isna(left_sat) or pd.isna(stay_sat)) and stay_sat > 0:
+                    diff_pct = (1 - left_sat/stay_sat) * 100
+                    if diff_pct > 10:
+                        risks.append(_senior_insight(
+                            what="Leavers had {:.0f}% lower satisfaction ({:.2f} vs {:.2f})".format(
+                                diff_pct, left_sat, stay_sat),
+                            why="Satisfaction is a leading indicator — dissatisfied employees leave",
+                            action="Target employees with satisfaction below {:.2f} — engage proactively".format(
+                                stay_sat * 0.85),
+                            impact="Proactive engagement of at-risk employees can reduce attrition by 20-30%"))
 
-    # Satisfaction
-    sat_col = next((c for c in df.columns
-                    if "satisfaction" in c.lower() or "engage" in c.lower()), None)
     if sat_col and sat_col in stats:
-        st = stats[sat_col]
+        st     = stats[sat_col]
         mean_s = st.get("mean", 0)
         max_s  = st.get("max", 1)
         pct    = (mean_s / max_s * 100) if max_s > 0 else 0
+        low_n  = int((df[sat_col].dropna() < 0.4).sum()) if sat_col in df.columns else 0
+
         if pct < 50:
-            risks.append(
-                "Low employee satisfaction ({:.1f}% of max score) — "
-                "retention risk is high.".format(pct)
-            )
+            risks.append(_senior_insight(
+                what="LOW satisfaction {:.0f}% — {:,} employees highly dissatisfied (<40%)".format(pct, low_n),
+                why="Below 50% satisfaction indicates fundamental issues: culture, workload, or pay",
+                action="Anonymous pulse survey. Form action team. Address top 3 pain points within 30 days",
+                impact="Low satisfaction = 2x higher attrition risk, 20% lower productivity"))
+        elif pct < 70:
+            findings.append(_senior_insight(
+                what="Moderate satisfaction {:.0f}% — improvement needed ({:,} dissatisfied)".format(pct, low_n),
+                why="Mid-range satisfaction often has specific fixable causes",
+                action="Focus groups to find top 3 issues. Quick wins: flexibility, recognition, communication",
+                impact="Improving satisfaction from 60% to 80% reduces attrition by 15-25%"))
         else:
-            findings.append(
-                "Employee satisfaction at {:.1f}% of maximum score.".format(pct)
-            )
+            findings.append(_senior_insight(
+                what="Good satisfaction {:.0f}% — majority of employees engaged".format(pct),
+                why="Effective HR practices in place",
+                action="Maintain current programs. Develop career paths for high-performers"))
 
-    actions.append("Analyze salary equity across departments and tenure bands.")
-    actions.append("Identify top performers at risk of leaving using satisfaction scores.")
+    if hrs_col and hrs_col in stats:
+        mean_hrs = stats[hrs_col].get("mean", 0)
+        if mean_hrs > 220:
+            risks.append(_senior_insight(
+                what="HIGH avg monthly hours {:.0f} — overwork detected".format(mean_hrs),
+                why="Overwork leads to burnout and drives attrition",
+                action="Hire additional staff or redistribute tasks. Set clear overtime limits",
+                impact="Overworked employees are 2-3x more likely to leave within 12 months"))
 
-    return {"findings": findings, "risks": risks,
-            "opportunities": opps, "actions": actions}
+    if dept_col and sat_col and dept_col in df.columns and sat_col in df.columns:
+        dept_sat = df.groupby(dept_col)[sat_col].mean().sort_values()
+        if len(dept_sat) >= 2:
+            gap = dept_sat.iloc[-1] - dept_sat.iloc[0]
+            findings.append(_senior_insight(
+                what="Dept gap: '{}' ({:.2f}) vs '{}' ({:.2f})".format(
+                    dept_sat.index[0], dept_sat.iloc[0],
+                    dept_sat.index[-1], dept_sat.iloc[-1]),
+                why="Management style, workload, career growth differ by department",
+                action="Focus retention on '{}' dept. Leadership coaching if needed".format(
+                    dept_sat.index[0]),
+                impact="Closing dept gap reduces dept-level attrition risk"))
+
+    actions.extend([
+        "Quarterly satisfaction surveys — track trends, dont rely on annual reviews",
+        "Identify flight-risk employees: low satisfaction + high tenure + average salary",
+        "Salary benchmarking against market — competitive pay is top retention factor",
+        "Career development paths for all levels — lack of growth is #1 reason people leave",
+    ])
+    return {"findings": findings, "risks": risks, "opportunities": opps, "actions": actions}
 
 
-def _story_finance(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
+def _story_finance(df, stats, corrs):
     findings, risks, opps, actions = [], [], [], []
-
     for col, st in stats.items():
         col_lower = col.lower()
-        if any(k in col_lower for k in ["revenue", "sales", "income"]):
-            findings.append(
-                "Revenue ({}) ranges from {:.0f} to {:.0f}, "
-                "median {:.0f}.".format(col, st["min"], st["max"], st["median"])
-            )
-            if st.get("skew", 0) > 1:
-                opps.append(
-                    "Revenue distribution is right-skewed — "
-                    "a small number of high-value transactions drive disproportionate income."
-                )
-        elif any(k in col_lower for k in ["cost", "expense"]):
-            findings.append(
-                "Cost ({}) average: {:.0f}, ranging {:.0f} to {:.0f}.".format(
-                    col, st["mean"], st["min"], st["max"]
-                )
-            )
+        if any(k in col_lower for k in ["revenue","sales","income"]):
+            skew = st.get("skew", 0)
+            findings.append(_senior_insight(
+                what="{} ranges {:,.0f} to {:,.0f}, median {:,.0f}".format(
+                    col, st.get("min",0), st.get("max",0), st.get("median",0)),
+                why="Revenue distribution shows business performance spread",
+                action="Focus on understanding top 20% revenue drivers — likely driving 80% of total"))
+            if skew > 1:
+                opps.append(_senior_insight(
+                    what="Revenue right-skewed — few transactions drive disproportionate income",
+                    why="Pareto effect: small number of high-value clients/products dominate",
+                    action="Identify and protect top revenue sources. Develop more high-value relationships"))
+        elif any(k in col_lower for k in ["cost","expense"]):
+            cv = st.get("cv", 0)
+            if cv > 0.5:
+                risks.append(_senior_insight(
+                    what="High cost variance in '{}' (CV={:.2f})".format(col, cv),
+                    why="Inconsistent costs indicate process inefficiency or uncontrolled spending",
+                    action="Audit highest-cost instances. Standardize procurement. Set cost thresholds"))
+    actions.extend([
+        "Identify top 20% revenue drivers and protect them",
+        "Set cost variance thresholds — flag anything >2 std deviations",
+        "Monthly margin analysis by product/segment",
+    ])
+    return {"findings": findings, "risks": risks, "opportunities": opps, "actions": actions}
 
-    actions.append("Focus cost reduction on highest-variance expense categories.")
-    actions.append("Segment revenue by top-performing categories for resource allocation.")
 
-    return {"findings": findings, "risks": risks,
-            "opportunities": opps, "actions": actions}
-
-
-def _story_general(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
+def _story_general(df, stats, corrs):
     findings, risks, opps, actions = [], [], [], []
 
-    num_cols = list(stats.keys())
-
-    for col in num_cols[:4]:
-        st = stats[col]
+    for col in list(stats.keys())[:4]:
+        st = stats.get(col, {})
         if not st:
             continue
-        findings.append(
-            "'{}': mean={:.2f}, median={:.2f}, std={:.2f}. "
-            "{} distribution.".format(
-                col, st["mean"], st["median"], st["std"],
-                "Normal" if st.get("is_normal") else "Non-normal"
-            )
-        )
-        if st.get("outlier_pct", 0) > 5:
-            risks.append(
-                "'{}' has {:.1f}% outliers — "
-                "validate data collection process.".format(
-                    col, st["outlier_pct"]
-                )
-            )
+        skew    = st.get("skew", 0)
+        out_pct = st.get("outlier_pct", 0)
+        cv      = st.get("cv", 0)
+        mean    = st.get("mean", 0)
+        median  = st.get("median", 0)
+
+        if out_pct > 10:
+            risks.append(_senior_insight(
+                what="'{}' has {:.1f}% outliers".format(col, out_pct),
+                why="High outlier rate = data quality issues or genuine anomalies",
+                action="Investigate each outlier — data entry error? Genuine extreme? Fix or cap",
+                impact="Outliers distort all statistical analyses and reduce ML model accuracy"))
+        if abs(skew) > 1:
+            findings.append(_senior_insight(
+                what="'{}' is {}-skewed (mean {:.2f} vs median {:.2f})".format(
+                    col, "right" if skew>0 else "left", mean, median),
+                why="Skewed data makes mean misleading as a summary statistic",
+                action="Report median ({:.2f}) not mean. Apply log-transform before modeling".format(median),
+                impact="Using mean on skewed data can misrepresent reality by {:.0f}%".format(
+                    abs(mean-median)/abs(median)*100 if median!=0 else 0)))
 
     for corr in corrs[:3]:
-        findings.append(
-            "{} {} correlation between '{}' and '{}' (r={:.2f}) — "
-            "statistically significant (p={:.4f}).".format(
-                corr["strength"].title(), corr["direction"],
-                corr["col_a"], corr["col_b"],
-                corr["r"], corr["p"]
-            )
-        )
+        if corr.get("strength") in ("strong","moderate"):
+            findings.append(_senior_insight(
+                what="{} {} correlation: '{}' and '{}' (r={:.2f})".format(
+                    corr["strength"].title(), corr["direction"],
+                    corr["col_a"], corr["col_b"], corr["r"]),
+                why="Statistically significant — not random (p={:.4f})".format(corr["p"]),
+                action="Use in predictive modeling. Investigate causation vs correlation",
+                impact="Strong predictors can improve model accuracy by 10-30%"))
 
-    actions.append("Investigate columns with high outlier rates before modeling.")
-    actions.append("Use median instead of mean for skewed columns in reporting.")
+    actions.extend([
+        "Validate all outliers before analysis or modeling",
+        "Use median for skewed distributions in executive reports",
+        "Segment analysis — subgroups may tell a different story than the whole",
+    ])
+    return {"findings": findings, "risks": risks, "opportunities": opps, "actions": actions}
 
-    return {"findings": findings, "risks": risks,
-            "opportunities": opps, "actions": actions}
 
 
 # ══════════════════════════════════════════════════════════
@@ -665,4 +706,3 @@ def generate_story(df: pd.DataFrame) -> StoryReport:
         data_quality_verdict=quality_verdict,
         analysis_confidence=confidence_label,
     )
-
