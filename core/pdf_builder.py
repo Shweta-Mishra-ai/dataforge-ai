@@ -22,6 +22,7 @@ SAME public API — zero changes needed in 8_Reports.py:
 """
 
 import io
+import os
 from datetime import datetime
 
 import numpy as np
@@ -285,6 +286,20 @@ def _build_cover(T: dict, config: dict, kpis_preview: list) -> bytes:
     cv.drawString(20*mm, H - 40*mm, "Advanced Analytics Platform")
     cv.setFillColor(_c(T["cover_accent"]))
     cv.rect(20*mm, H - 44*mm, 55*mm, 1.2*mm, fill=1, stroke=0)
+
+    # ── Client / Company Logo (top-right of cover) ────────
+    logo_path = config.get("logo_path", "")
+    if logo_path and os.path.exists(logo_path):
+        try:
+            cv.drawImage(
+                logo_path,
+                W - 68*mm, H - 45*mm,
+                width=48*mm, height=20*mm,
+                preserveAspectRatio=True,
+                mask="auto",
+            )
+        except Exception:
+            pass  # logo fails gracefully — PDF still builds
 
     # Domain badge
     cv.setFillColor(_c(T["domain_badge"]))
