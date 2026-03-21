@@ -1,22 +1,19 @@
 """
-ai/report_narrator.py — Elite consultant narratives via Groq.
-FIXED VERSION:
-  ✅ Correlation chart uses REAL r-values from df — never hallucinates
-  ✅ All chart prompts inject pre-computed statistics
-  ✅ Domain-aware: no wrong-domain text (no "Sales Revenue" in HR reports)
-  ✅ Fallback narratives are factually grounded
+ai/report_narrator.py — DataForge AI FINAL
+Uses llm_client.py for Groq + Gemini routing.
+Anti-hallucination: JSON schema + stat injection + validation + fallback.
 """
 
-import os
+from __future__ import annotations
+import re
+import json
 import numpy as np
 import pandas as pd
 from typing import Optional
 
+from ai.llm_client import get_client
 
-# ══════════════════════════════════════════════════════════
-#  COLUMN NAME CLEANER
-# ══════════════════════════════════════════════════════════
-
+# ── Column cleaner ────────────────────────────────────────
 COL_MAP = {
     "satisfaction_level":    "Employee Satisfaction Score",
     "last_evaluation":       "Last Performance Evaluation",
@@ -24,7 +21,7 @@ COL_MAP = {
     "average_montly_hours":  "Average Monthly Hours Worked",
     "average_monthly_hours": "Average Monthly Hours Worked",
     "time_spend_company":    "Employee Tenure (Years)",
-    "work_accident":         "Work Accident Incidence",
+    "work_accident":         "Work Accident Rate",
     "left":                  "Employee Attrition",
     "attrition":             "Employee Attrition Rate",
     "promotion_last_5years": "Recent Promotions (Last 5 Years)",
@@ -46,389 +43,384 @@ COL_MAP = {
     "region":                "Sales Region",
 }
 
+# Phrases that mean Groq hallucinated
+FAKE_PHRASES = [
+    "customer satisfaction and sales revenue",
+    "sales revenue tends to increase",
+    "marketing spend", "website traffic",
+    "operational costs and employee turnover",
+    "top-line growth", "sales targeted",
+    "customer-centric", "churn rate",
+    "net promoter", "as customer satisfaction increases",
+]
+
 
 def clean_col(col: str) -> str:
     low = col.lower().strip()
     if low in COL_MAP:
         return COL_MAP[low]
-    name = col.replace("_", " ").strip()
-    name = name.replace("montly", "Monthly").replace("accidnet", "Accident")
-    return " ".join(w.capitalize() for w in name.split())
+    return " ".join(
+        w.capitalize()
+        for w in col.replace("_", " ").replace("montly", "Monthly").split()
+    )
 
 
-def clean_text(text: str) -> str:
+def _is_hallucinated(text: str, df: pd.DataFrame) -> bool:
+    tl = text.lower()
+    if any(p in tl for p in FAKE_PHRASES):
+        return True
+    real = [c.lower().replace("_", "") for c in df.columns]
+    invented = ["salesrevenue", "customerrevenue", "websitetraffic",
+                "marketingspend", "operationalcost", "churnrate"]
+    for inv in invented:
+        if inv in tl.replace(" ", "").replace("_", ""):
+            if not any(inv in r for r in real):
+                return True
+    return False
+
+
+def _clean(text: str) -> str:
+    text = re.sub(r"\bSales Targeted\b",      "targeted",       text, flags=re.IGNORECASE)
+    text = re.sub(r"\bSales Representative\b","representative",  text, flags=re.IGNORECASE)
     for raw, clean in COL_MAP.items():
-        text = text.replace("'" + raw + "'", clean)
-        text = text.replace('"' + raw + '"', clean)
-    return text
+        text = text.replace(f"'{raw}'", clean).replace(f'"{raw}"', clean)
+    return text.strip()
 
 
 # ══════════════════════════════════════════════════════════
-#  REAL STATS EXTRACTORS  (LLM narrates, never calculates)
+#  STAT COMPUTERS — Python computes, LLM only narrates
 # ══════════════════════════════════════════════════════════
 
-def _bar_stats(df: pd.DataFrame, x_col: str, y_col: str) -> str:
+def _bar_stats(df: pd.DataFrame, x: str, y: str) -> dict:
     try:
-        grp = df.groupby(x_col)[y_col].mean().sort_values(ascending=False)
-        org_avg = float(df[y_col].mean())
-        top = grp.index[0]; top_v = float(grp.iloc[0])
-        bot = grp.index[-1]; bot_v = float(grp.iloc[-1])
-        gap = abs(top_v - bot_v) / max(abs(bot_v), 0.001) * 100
-        above = int((grp > org_avg).sum())
-        return (f"Groups: {len(grp)} | Top: '{top}' ({top_v:.3f}) | "
-                f"Worst: '{bot}' ({bot_v:.3f}) | Gap: {gap:.1f}% | "
-                f"Org avg: {org_avg:.3f} | Above avg: {above}/{len(grp)}")
-    except Exception:
-        return "Bar chart data unavailable"
-
-
-def _hist_stats(df: pd.DataFrame, col: str) -> str:
-    try:
-        s = pd.to_numeric(df[col], errors="coerce").dropna()
-        s = s[np.isfinite(s)]
-        skew = float(s.skew())
-        shape = ("right-skewed (high values are outliers)" if skew > 0.5
-                 else "left-skewed (low values are outliers)" if skew < -0.5
-                 else "approximately symmetric")
-        return (f"Mean: {s.mean():.3f} | Median: {s.median():.3f} | "
-                f"Std: {s.std():.3f} | Min: {s.min():.3f} | Max: {s.max():.3f} | "
-                f"Shape: {shape} (skew={skew:.2f}) | "
-                f"Middle 50%: {s.quantile(0.25):.3f}–{s.quantile(0.75):.3f}")
-    except Exception:
-        return "Distribution data unavailable"
-
-
-def _pie_stats(df: pd.DataFrame, x_col: str, y_col: str) -> str:
-    try:
-        grp   = df.groupby(x_col)[y_col].mean()
-        total = grp.sum()
-        top   = grp.idxmax(); top_p = grp.max() / total * 100
-        top2  = grp.nlargest(2).sum() / total * 100
-        shares = " | ".join([f"'{k}': {v/total*100:.1f}%"
-                              for k, v in grp.sort_values(ascending=False).head(5).items()])
-        return (f"Shares: {shares} | "
-                f"Dominant: '{top}' at {top_p:.1f}% | "
-                f"Top 2 combined: {top2:.1f}% | "
-                f"Pareto holds: {'YES — concentrated' if top2 > 65 else 'NO — balanced'}")
-    except Exception:
-        return "Pie chart data unavailable"
-
-
-def _correlation_stats(df: pd.DataFrame) -> str:
-    """
-    FIXED: Computes REAL Spearman correlations from actual df.
-    Never invents metrics. Domain-aware labeling.
-    """
-    try:
-        num_cols = df.select_dtypes(include="number").columns.tolist()
-        if len(num_cols) < 2:
-            return "Insufficient numeric columns for correlation"
-
-        use_cols = num_cols[:8]
-        corr     = df[use_cols].corr(method="spearman")
-
-        pairs = []
-        for i in range(len(use_cols)):
-            for j in range(i + 1, len(use_cols)):
-                a, b = use_cols[i], use_cols[j]
-                r    = float(corr.loc[a, b])
-                if abs(r) >= 0.15:
-                    pairs.append((a, b, r))
-        pairs.sort(key=lambda x: abs(x[2]), reverse=True)
-
-        if not pairs:
-            return "No significant correlations found (all |r| < 0.15)"
-
-        lines = []
-        for a, b, r in pairs[:6]:
-            strength = ("Strong" if abs(r) >= 0.6 else
-                        "Moderate" if abs(r) >= 0.40 else "Weak")
-            direction = "positive" if r > 0 else "negative"
-            lines.append(
-                f"{clean_col(a)} & {clean_col(b)}: r={r:.3f} "
-                f"({strength} {direction}, r²={r**2:.3f})"
-            )
-
-        top_a, top_b, top_r = pairs[0]
-        top_meaning = (
-            f"Most important: {clean_col(top_a)} and {clean_col(top_b)} "
-            f"(r={top_r:.3f}) — "
-            + ("higher values tend to occur together"
-               if top_r > 0 else
-               "as one increases, the other tends to decrease")
-        )
-        return (f"Significant correlations ({len(pairs)} found):\n"
-                + "\n".join(lines)
-                + f"\n{top_meaning}"
-                + f"\nIMPORTANT: r²={top_r**2:.3f} — only {top_r**2*100:.1f}% of variance shared. Association only, NOT causation.")
+        grp = df.groupby(x)[y].mean().sort_values(ascending=False)
+        avg = float(df[y].mean())
+        return {
+            "chart":       "bar",
+            "metric":      clean_col(y),
+            "group_by":    clean_col(x),
+            "n_groups":    len(grp),
+            "top":         str(grp.index[0]),
+            "top_val":     round(float(grp.iloc[0]), 3),
+            "worst":       str(grp.index[-1]),
+            "worst_val":   round(float(grp.iloc[-1]), 3),
+            "gap_pct":     round(abs(float(grp.iloc[0]) - float(grp.iloc[-1])) /
+                                 max(abs(float(grp.iloc[-1])), 0.001) * 100, 1),
+            "org_avg":     round(avg, 3),
+            "above_avg":   int((grp > avg).sum()),
+            "all_vals":    {str(k): round(float(v), 3) for k, v in grp.items()},
+        }
     except Exception as e:
-        return f"Correlation computation error: {e}"
+        return {"chart": "bar", "error": str(e),
+                "metric": clean_col(y), "group_by": clean_col(x)}
 
 
-def _trend_stats(df: pd.DataFrame, y_col: str) -> str:
-    try:
-        s = pd.to_numeric(df[y_col], errors="coerce").dropna()
-        cv = s.std() / abs(s.mean()) * 100 if s.mean() != 0 else 0
-        return (f"Mean: {s.mean():.3f} | Range: {s.min():.3f}–{s.max():.3f} | "
-                f"Variability (CV): {cv:.1f}% | "
-                f"Trend: {'High variability' if cv > 30 else 'Relatively stable'}")
-    except Exception:
-        return "Trend data unavailable"
-
-
-# ══════════════════════════════════════════════════════════
-#  PROMPTS  (stats injected — LLM narrates only)
-# ══════════════════════════════════════════════════════════
-
-_SYSTEM = """You are a Senior Data Analyst with 25+ years of experience.
-
-RULES (MUST FOLLOW):
-1. Use ONLY the statistics provided. NEVER invent metrics not in the data.
-2. NEVER output snake_case column names — use the clean names provided.
-3. Write in plain business English. No jargon (no p-value, skewness, IQR).
-4. For correlation charts: NEVER say "r means X% change". It means association only.
-5. Maximum 4 sentences. End with one clear business action.
-6. Match the chart type — bar charts: rankings; pie: composition; correlation: relationships.
-"""
-
-
-def _chart_prompt(chart_type: str, x_clean: str, y_clean: str,
-                  stats_str: str, domain: str) -> str:
-    domain_context = {
-        "hr":        "HR / People Analytics dataset (employees, satisfaction, attrition)",
-        "ecommerce": "E-Commerce dataset (products, ratings, prices, discounts)",
-        "sales":     "Sales Performance dataset (revenue, targets, regions, reps)",
-        "general":   "Business Analytics dataset",
-    }.get(domain, "Business Analytics dataset")
-
-    corr_extra = ""
-    if chart_type.lower() in ("correlation", "heatmap"):
-        corr_extra = (
-            "\n\nCRITICAL FOR CORRELATION CHARTS:"
-            "\n- Use ONLY the r-values listed in the stats above."
-            "\n- NEVER invent metrics like 'Sales Revenue' or 'Customer Satisfaction' if not in stats."
-            "\n- NEVER say r=-0.35 means '35% reduction'. Say 'associated with lower X'."
-            "\n- Explain what the STRONGEST correlation means operationally for this specific domain."
-        )
-
-    return f"""Dataset domain: {domain_context}
-Chart type: {chart_type}
-X-axis / Groups: {x_clean}
-Y-axis / Metric: {y_clean}
-
-PRE-COMPUTED STATISTICS (use only these, never invent):
-{stats_str}
-
-{corr_extra}
-
-Write exactly ONE paragraph (3–4 sentences) of sharp business analysis.
-Start directly with the insight — no preamble like "The chart shows..."
-End with one specific Strategic Action sentence.
-"""
-
-
-# ══════════════════════════════════════════════════════════
-#  GROQ CALLER
-# ══════════════════════════════════════════════════════════
-
-def _call_groq(system: str, user: str,
-               api_key: str, max_tokens: int = 350) -> Optional[str]:
-    if not api_key:
-        return None
-    try:
-        from groq import Groq
-        client   = Groq(api_key=api_key)
-        response = client.chat.completions.create(
-            model    = "llama-3.3-70b-versatile",
-            messages = [{"role": "system", "content": system},
-                        {"role": "user",   "content": user}],
-            max_tokens  = max_tokens,
-            temperature = 0.25,
-        )
-        return clean_text(response.choices[0].message.content.strip())
-    except Exception:
-        return None
-
-
-# ══════════════════════════════════════════════════════════
-#  RULE-BASED FALLBACKS  (factually grounded)
-# ══════════════════════════════════════════════════════════
-
-def _fallback_bar(df, x_col, y_col):
-    try:
-        grp = df.groupby(x_col)[y_col].mean().sort_values(ascending=False)
-        top = grp.index[0]; top_v = grp.iloc[0]
-        bot = grp.index[-1]; bot_v = grp.iloc[-1]
-        gap = abs(top_v - bot_v) / max(abs(bot_v), 0.001) * 100
-        avg = float(df[y_col].mean())
-        above = int((grp > avg).sum())
-        return (
-            f"{clean_col(y_col)} across {len(grp)} {clean_col(x_col)} groups reveals a clear performance hierarchy. "
-            f"'{top}' leads with {top_v:.3f} while '{bot}' trails at {bot_v:.3f} — "
-            f"a {gap:.0f}% gap that demands operational attention. "
-            f"{above} out of {len(grp)} groups perform above the overall average of {avg:.3f}. "
-            f"Strategic Action: Conduct a root-cause review of '{bot}' practices and "
-            f"replicate what '{top}' does differently."
-        )
-    except Exception:
-        return f"Analysis of {clean_col(y_col)} by group reveals patterns requiring attention."
-
-
-def _fallback_hist(df, col):
+def _hist_stats(df: pd.DataFrame, col: str) -> dict:
     try:
         s    = pd.to_numeric(df[col], errors="coerce").dropna()
+        s    = s[np.isfinite(s)]
         skew = float(s.skew())
-        use  = "median" if abs(skew) > 0.5 else "mean"
-        val  = s.median() if abs(skew) > 0.5 else s.mean()
-        return (
-            f"{clean_col(col)} has a typical value of {val:.3f} "
-            f"(range: {s.min():.3f}–{s.max():.3f}). "
-            f"The distribution is {'right-skewed' if skew>0.5 else 'left-skewed' if skew<-0.5 else 'symmetric'}, "
-            f"meaning the {use} ({val:.3f}) is the most reliable central measure. "
-            f"Scores as low as {s.min():.3f} signal employees at high dissatisfaction risk. "
-            f"Strategic Action: Focus retention interventions on employees in the bottom quartile "
-            f"(below {s.quantile(0.25):.3f})."
-        )
-    except Exception:
-        return f"Distribution analysis of {clean_col(col)} reveals key patterns for strategic planning."
+        return {
+            "chart":      "histogram",
+            "metric":     clean_col(col),
+            "mean":       round(float(s.mean()), 3),
+            "median":     round(float(s.median()), 3),
+            "std":        round(float(s.std()), 3),
+            "min":        round(float(s.min()), 3),
+            "max":        round(float(s.max()), 3),
+            "q1":         round(float(s.quantile(0.25)), 3),
+            "q3":         round(float(s.quantile(0.75)), 3),
+            "skew":       round(skew, 2),
+            "shape":      ("right-skewed" if skew > 0.5
+                           else "left-skewed" if skew < -0.5
+                           else "symmetric"),
+            "use_stat":   "median" if abs(skew) > 0.5 else "mean",
+            "use_val":    round(float(s.median()) if abs(skew) > 0.5
+                               else float(s.mean()), 3),
+        }
+    except Exception as e:
+        return {"chart": "histogram", "error": str(e), "metric": clean_col(col)}
 
 
-def _fallback_correlation(df):
-    """FIXED: Uses real df correlations, never invents."""
+def _corr_stats(df: pd.DataFrame) -> dict:
     try:
-        num_cols = df.select_dtypes(include="number").columns.tolist()
-        if len(num_cols) < 2:
-            return "Insufficient numeric columns for correlation analysis."
-
-        corr  = df[num_cols[:8]].corr(method="spearman")
+        num  = df.select_dtypes(include="number").columns.tolist()[:8]
+        corr = df[num].corr(method="spearman")
         pairs = []
-        for i in range(len(num_cols[:8])):
-            for j in range(i + 1, len(num_cols[:8])):
-                a, b = num_cols[i], num_cols[j]
+        for i in range(len(num)):
+            for j in range(i + 1, len(num)):
+                a, b = num[i], num[j]
                 r    = float(corr.loc[a, b])
                 if abs(r) >= 0.15:
-                    pairs.append((a, b, r))
-        pairs.sort(key=lambda x: abs(x[2]), reverse=True)
-
-        if not pairs:
-            return ("The correlation matrix shows no meaningful relationships between variables "
-                    "(all |r| < 0.15). This indicates the dataset's metrics operate independently — "
-                    "single-variable interventions may have limited spillover effects. "
-                    "Strategic Action: Focus on each metric independently rather than "
-                    "expecting cross-metric improvements.")
-
-        a, b, r = pairs[0]
-        direction = "positive" if r > 0 else "negative"
-        meaning   = ("both tend to be high or low together"
-                     if r > 0 else
-                     "as one increases, the other tends to decrease")
-
-        second = ""
-        if len(pairs) > 1:
-            a2, b2, r2 = pairs[1]
-            second = (f" The second strongest relationship is between "
-                      f"{clean_col(a2)} and {clean_col(b2)} (r={r2:.3f}). ")
-
-        return (
-            f"The correlation matrix reveals {len(pairs)} meaningful relationships across "
-            f"{len(num_cols[:8])} variables. "
-            f"The strongest is between {clean_col(a)} and {clean_col(b)} "
-            f"(r={r:.3f}, {direction}) — {meaning}. "
-            f"This means only {r**2*100:.1f}% of variance is shared (r²={r**2:.3f}) — "
-            f"a statistical association, not a causal relationship.{second}"
-            f"Strategic Action: Use the {clean_col(a)}–{clean_col(b)} relationship to inform "
-            f"targeted interventions, but test causality before committing resources."
-        )
-    except Exception:
-        return ("Correlation analysis reveals relationships between key metrics. "
-                "Note: correlation indicates association only — not causation. "
-                "Strategic Action: Investigate the strongest correlations through "
-                "controlled experiments before assuming causal links.")
+                    pairs.append({
+                        "a":   clean_col(a), "b": clean_col(b),
+                        "r":   round(r, 3),
+                        "r2":  round(r ** 2, 3),
+                        "dir": "positive" if r > 0 else "negative",
+                        "str": ("strong"   if abs(r) >= 0.6 else
+                                "moderate" if abs(r) >= 0.4 else "weak"),
+                    })
+        pairs.sort(key=lambda x: abs(x["r"]), reverse=True)
+        return {
+            "chart":    "correlation",
+            "cols":     [clean_col(c) for c in num],
+            "raw_cols": num,
+            "n_sig":    len(pairs),
+            "pairs":    pairs[:6],
+            "top":      pairs[0] if pairs else None,
+        }
+    except Exception as e:
+        return {"chart": "correlation", "error": str(e)}
 
 
-def _fallback_pie(df, x_col, y_col):
+def _trend_stats(df: pd.DataFrame, col: str) -> dict:
     try:
-        grp   = df.groupby(x_col)[y_col].mean().sort_values(ascending=False)
+        s   = pd.to_numeric(df[col], errors="coerce").dropna()
+        s   = s[np.isfinite(s)]
+        cv  = s.std() / abs(s.mean()) * 100 if s.mean() != 0 else 0
+        mid = len(s) // 2
+        f, sc = float(s.iloc[:mid].mean()), float(s.iloc[mid:].mean())
+        pct   = (sc - f) / max(abs(f), 0.001) * 100
+        return {
+            "chart":      "trend",
+            "metric":     clean_col(col),
+            "mean":       round(float(s.mean()), 3),
+            "min":        round(float(s.min()), 3),
+            "max":        round(float(s.max()), 3),
+            "cv":         round(cv, 1),
+            "first_half": round(f, 3),
+            "sec_half":   round(sc, 3),
+            "trend_pct":  round(pct, 1),
+            "trend_dir":  ("improved" if pct > 2
+                           else "declined" if pct < -2
+                           else "stable"),
+        }
+    except Exception as e:
+        return {"chart": "trend", "error": str(e), "metric": clean_col(col)}
+
+
+def _pie_stats(df: pd.DataFrame, x: str, y: str) -> dict:
+    try:
+        grp   = df.groupby(x)[y].mean().sort_values(ascending=False)
         total = grp.sum()
-        top   = grp.index[0]; top_p = grp.iloc[0] / total * 100
-        top2  = grp.nlargest(2).sum() / total * 100
-        return (
-            f"{clean_col(y_col)} composition across {len(grp)} {clean_col(x_col)} segments. "
-            f"'{top}' holds the largest share at {top_p:.1f}%. "
-            f"Top 2 segments account for {top2:.1f}% — "
-            + ("indicating concentration risk." if top2 > 65
-               else "suggesting a well-balanced distribution across segments.") +
-            f" Strategic Action: {'Investigate over-reliance on the top segment' if top2 > 65 else 'Maintain balanced resource allocation across segments'}."
+        return {
+            "chart":     "pie",
+            "metric":    clean_col(y),
+            "group_by":  clean_col(x),
+            "n":         len(grp),
+            "top_seg":   str(grp.index[0]),
+            "top_pct":   round(grp.max() / total * 100, 1),
+            "top2_pct":  round(grp.nlargest(2).sum() / total * 100, 1),
+            "shares":    {str(k): round(v / total * 100, 1) for k, v in grp.items()},
+            "balanced":  bool(grp.max() / total * 100 < 40),
+        }
+    except Exception as e:
+        return {"chart": "pie", "error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════
+#  PROMPT BUILDER — JSON schema forces structure
+# ══════════════════════════════════════════════════════════
+
+def _build_prompt(stats: dict, df) -> tuple:
+    """Returns (system, user) prompts using JSON schema."""
+    col_list = [clean_col(c) for c in df.columns]
+    ctype    = stats.get("chart", "unknown")
+    d        = json.dumps(stats, indent=2)
+
+    system = (
+        "Senior Data Analyst. Dataset columns (ONLY these): "
+        + str(col_list) + ". "
+        "Only reference listed columns. "
+        "FORBIDDEN: Sales Revenue, Customer Satisfaction, Marketing Spend, "
+        "Website Traffic, churn rate, Sales Targeted. "
+        "Return ONLY valid JSON. No markdown. No extra text."
+    )
+
+    if ctype == "bar":
+        gap = str(round(stats.get("gap_pct", 0), 0))
+        schema = (
+            '{"finding":"<top group leads, worst group trails, exact values>",'
+            '"gap_impact":"<what ' + gap + '% gap means for business>",'
+            '"root_cause":"<likely reason>",'
+            '"action":"<Strategic Action: one step>","ok":true}'
         )
-    except Exception:
-        return f"Composition analysis of {clean_col(y_col)} reveals segment distribution patterns."
+    elif ctype == "histogram":
+        uv = str(stats.get("use_val", 0))
+        us = str(stats.get("use_stat", "median"))
+        sh = str(stats.get("shape", "symmetric"))
+        mn = str(stats.get("min", 0))
+        schema = (
+            '{"typical":"<what ' + uv + ' ' + us + ' means>",'
+            '"shape_meaning":"<what ' + sh + ' shape means>",'
+            '"risk":"<what scores near ' + mn + ' indicate>",'
+            '"action":"<Strategic Action: one step>","ok":true}'
+        )
+    elif ctype == "correlation":
+        top = stats.get("top") or {}
+        a   = str(top.get("a", "N/A"))
+        b   = str(top.get("b", "N/A"))
+        r   = str(top.get("r", 0))
+        r2  = str(top.get("r2", 0))
+        ns  = str(stats.get("n_sig", 0))
+        schema = (
+            '{"n_found":"' + ns + ' relationships",'
+            '"strongest":"<exact names: ' + a + ' and ' + b + '>",'
+            '"correct_meaning":"<r=' + r + ' means association only, NOT a % effect>",'
+            '"business_implication":"<operational meaning>",'
+            '"action":"<Strategic Action: one step>","ok":true}'
+        )
+        d = d + "\n\nSTRONGEST PAIR: " + a + " & " + b + " r=" + r + " r2=" + r2
+        d = d + "\nCRITICAL: r is NOT a % effect. Association only."
+    elif ctype == "trend":
+        metric = str(stats.get("metric", "metric"))
+        td     = str(stats.get("trend_dir", "stable"))
+        tp     = str(round(abs(stats.get("trend_pct", 0)), 1))
+        cv     = str(stats.get("cv", 0))
+        schema = (
+            '{"trend_summary":"<' + metric + ' ' + td + ' by ' + tp + '% - meaning>",'
+            '"variability":"<CV=' + cv + '% consistency meaning>",'
+            '"implication":"<key business implication>",'
+            '"action":"<Strategic Action: one step>","ok":true}'
+        )
+        d = d + "\nCRITICAL: TREND chart only. Analyse progression. NO department comparisons."
+    elif ctype == "pie":
+        ts  = str(stats.get("top_seg", ""))
+        tp  = str(stats.get("top_pct", 0))
+        t2p = str(stats.get("top2_pct", 0))
+        schema = (
+            '{"dominant":"<' + ts + ' at ' + tp + '% - meaning>",'
+            '"balance":"<top 2 at ' + t2p + '% - risk or health>",'
+            '"implication":"<business implication>",'
+            '"action":"<Strategic Action: one step>","ok":true}'
+        )
+    else:
+        schema = '{"finding":"","action":"","ok":true}'
+
+    user = "DATA:\n" + d + "\n\nReturn JSON:\n" + schema
+    return system, user
 
 
-def _fallback_trend(df, y_col):
+
+
+def _json_to_text(raw: str, stats: dict, df: pd.DataFrame) -> Optional[str]:
+    """Parse JSON → narrative text. Returns None if invalid/hallucinated."""
     try:
-        s  = pd.to_numeric(df[y_col], errors="coerce").dropna()
-        cv = s.std() / abs(s.mean()) * 100 if s.mean() != 0 else 0
-        return (
-            f"{clean_col(y_col)} shows an average of {s.mean():.3f} "
-            f"(range: {s.min():.3f}–{s.max():.3f}). "
-            f"Variability is {'high' if cv > 30 else 'moderate' if cv > 15 else 'low'} "
-            f"({cv:.0f}% coefficient of variation), "
-            + ("suggesting inconsistent performance requiring investigation." if cv > 30
-               else "indicating a relatively stable pattern.") +
-            f" Strategic Action: Monitor the {cv:.0f}% variation across segments "
-            f"and identify root causes of the most extreme values."
-        )
+        clean = re.sub(r"^```json\s*", "", raw.strip())
+        clean = re.sub(r"^```\s*",     "", clean)
+        clean = re.sub(r"```$",        "", clean).strip()
+        data  = json.loads(clean)
+
+        if not data.get("ok"):
+            return None
+
+        # All values as string for hallucination check
+        all_vals = " ".join(str(v) for v in data.values())
+        if _is_hallucinated(all_vals, df):
+            return None
+
+        # Build narrative from JSON fields
+        order = [
+            "finding", "gap_impact", "root_cause",   # bar
+            "typical", "shape_meaning", "risk",       # hist
+            "n_found", "strongest", "correct_meaning",# corr
+            "business_implication",
+            "trend_summary", "variability", "implication",  # trend
+            "dominant", "balance",                    # pie
+        ]
+        parts = [str(data[k]) for k in order if k in data and str(data[k]).strip()]
+        parts.append(str(data.get("action", "")))
+        narrative = " ".join(p for p in parts if p.strip())
+        return _clean(narrative) if narrative.strip() else None
+
     except Exception:
-        return f"Trend analysis of {clean_col(y_col)} reveals performance patterns over time."
+        return None
 
 
 # ══════════════════════════════════════════════════════════
-#  EXECUTIVE SUMMARY
+#  RULE-BASED FALLBACKS — 100% reliable, no LLM
 # ══════════════════════════════════════════════════════════
 
-def _exec_prompt(df, domain, story_obj):
-    num_cols = df.select_dtypes(include="number").columns.tolist()
-    cat_cols = df.select_dtypes(include="object").columns.tolist()
-
-    lines = [f"Dataset: {len(df):,} rows, {len(df.columns)} columns, {domain.upper()} domain"]
-
-    for col in num_cols[:5]:
-        try:
-            s = pd.to_numeric(df[col], errors="coerce").dropna()
-            lines.append(f"{clean_col(col)}: mean={s.mean():.3f}, "
-                         f"median={s.median():.3f}, range={s.min():.3f}–{s.max():.3f}")
-        except Exception:
-            continue
-
-    for col in cat_cols[:2]:
-        try:
-            vc = df[col].value_counts(normalize=True).head(3)
-            lines.append(clean_col(col) + ": " +
-                         " | ".join([f"{k}: {v*100:.0f}%" for k, v in vc.items()]))
-        except Exception:
-            continue
-
-    # Attrition
-    atr_col = next((c for c in df.columns
-                    if c.lower() in ("left","attrition","churned")), None)
-    if atr_col:
-        rate = float(df[atr_col].mean()) * 100
-        lines.append(f"ATTRITION: {rate:.1f}% ({int(df[atr_col].sum()):,} employees left)")
-
-    return "\n".join(lines)
+def _fb_bar(df, x, y):
+    s = _bar_stats(df, x, y)
+    if "error" in s:
+        return f"Analysis of {clean_col(y)} by group reveals performance patterns."
+    return (
+        f"{s['metric']} across {s['n_groups']} {s['group_by']} groups: "
+        f"'{s['top']}' leads at {s['top_val']} while '{s['worst']}' trails "
+        f"at {s['worst_val']} — a {s['gap_pct']:.0f}% gap. "
+        f"{s['above_avg']} of {s['n_groups']} groups exceed the "
+        f"organisation average of {s['org_avg']}. "
+        f"Strategic Action: Conduct root-cause review in '{s['worst']}' "
+        f"and replicate '{s['top']}' practices to close the gap."
+    )
 
 
-def _exec_system_prompt(domain: str) -> str:
-    return f"""You are a Senior Data Analyst with 25+ years of experience in {domain} analytics.
-Write a 3-sentence C-suite executive summary.
+def _fb_hist(df, col):
+    s = _hist_stats(df, col)
+    if "error" in s:
+        return f"Distribution of {clean_col(col)} reveals key patterns."
+    return (
+        f"{s['metric']} typical value is {s['use_val']} "
+        f"(range: {s['min']}–{s['max']}). "
+        f"{'Skewed — use ' + s['use_stat'] + ' for accurate reporting.' if s['shape'] != 'symmetric' else 'Symmetric — mean is reliable.'} "
+        f"Bottom quartile (below {s['q1']}) represents highest-risk employees. "
+        f"Strategic Action: Focus retention programs on employees "
+        f"below {s['q1']} to address most at-risk group first."
+    )
 
-RULES:
-1. State the most critical business risk with specific numbers.
-2. Name the #1 actionable lever identified in this data.
-3. End with urgency — what must happen in the next 30 days.
-4. NO snake_case column names. NO jargon. Plain business English.
-5. Use ONLY numbers from the provided statistics. Never invent figures.
-"""
+
+def _fb_corr(df):
+    s = _corr_stats(df)
+    if "error" in s or not s.get("pairs"):
+        return (
+            "No meaningful correlations found (all |r| < 0.15). "
+            "Variables operate independently — single-variable interventions "
+            "will have limited cross-metric effects. "
+            "Strategic Action: Design targeted interventions per metric."
+        )
+    top = s["pairs"][0]
+    second = ""
+    if len(s["pairs"]) > 1:
+        t2 = s["pairs"][1]
+        second = f" Second: {t2['a']} & {t2['b']} (r={t2['r']}, r²={t2['r2']})."
+    return (
+        f"Correlation matrix: {s['n_sig']} meaningful relationships found. "
+        f"Strongest: {top['a']} & {top['b']} (r={top['r']}, {top['dir']}) — "
+        f"r²={top['r2']} means {top['r2']*100:.1f}% variance shared "
+        f"(association only, not causation).{second} "
+        f"Strategic Action: Test the {top['a']}–{top['b']} relationship "
+        f"through controlled analysis before acting on it."
+    )
+
+
+def _fb_pie(df, x, y):
+    s = _pie_stats(df, x, y)
+    if "error" in s:
+        return f"Composition of {clean_col(y)} shows segment patterns."
+    return (
+        f"{s['metric']} across {s['n']} {s['group_by']} segments: "
+        f"'{s['top_seg']}' holds {s['top_pct']}%, top 2 combined: {s['top2_pct']}%. "
+        f"{'Concentration risk — over-reliance on dominant segments.' if not s['balanced'] else 'Well-balanced — no segment dominates.'} "
+        f"Strategic Action: "
+        f"{'Diversify away from dominant segments to reduce risk.' if not s['balanced'] else 'Maintain balance and monitor for emerging concentration.'}"
+    )
+
+
+def _fb_trend(df, col):
+    s = _trend_stats(df, col)
+    if "error" in s:
+        return f"Trend of {clean_col(col)} shows performance over time."
+    return (
+        f"{s['metric']} trend: average {s['mean']} (range {s['min']}–{s['max']}). "
+        f"Values {s['trend_dir']} by {abs(s['trend_pct']):.1f}% "
+        f"from first to second half — "
+        f"{'positive signal.' if s['trend_dir'] == 'improved' else 'declining — investigate immediately.' if s['trend_dir'] == 'declined' else 'stable pattern.'} "
+        f"Variability: {s['cv']}% "
+        f"({'high — inconsistent' if s['cv'] > 30 else 'stable'}). "
+        f"Strategic Action: "
+        f"{'Identify decline root causes and implement corrective measures.' if s['trend_dir'] == 'declined' else 'Monitor monthly for early warning signals.'}"
+    )
 
 
 # ══════════════════════════════════════════════════════════
@@ -436,128 +428,175 @@ RULES:
 # ══════════════════════════════════════════════════════════
 
 def generate_chart_narrative(
-    df: pd.DataFrame,
-    chart_title: str,
-    groq_api_key: str = "",
-    domain: str = "general",
+    df:            pd.DataFrame,
+    chart_title:   str,
+    groq_api_key:  str = "",   # kept for backward compatibility
+    domain:        str = "general",
 ) -> str:
     """
-    Generate factually grounded chart narrative.
-    Computes real stats → passes to LLM → fallback if LLM unavailable.
-    FIXED: Correlation chart never hallucinates domain-wrong metrics.
+    Generate chart narrative.
+    Uses llm_client (Groq primary → Gemini fallback).
+    Anti-hallucination: JSON schema + validation + rule-based fallback.
     """
-    title_lower = chart_title.lower()
+    title = chart_title.lower()
+    num   = df.select_dtypes(include="number").columns.tolist()
+    cat   = df.select_dtypes(include="object").columns.tolist()
 
-    # ── Detect chart type and extract columns ─────────────────────────────────
-    num_cols = df.select_dtypes(include="number").columns.tolist()
-    cat_cols = df.select_dtypes(include="object").columns.tolist()
+    # ── Detect chart type + compute stats ────────────────
+    if "correlation" in title or "heatmap" in title:
+        stats    = _corr_stats(df)
+        fallback = _fb_corr(df)
 
-    if "correlation" in title_lower or "heatmap" in title_lower:
-        chart_type = "Correlation Heatmap"
-        x_clean    = "All numeric variables"
-        y_clean    = "Correlation strength (r)"
-        stats_str  = _correlation_stats(df)
-        fallback   = _fallback_correlation(df)
+    elif "distribution" in title or "histogram" in title:
+        col = next((c for c in num if c.lower() in title), num[0] if num else None)
+        if not col:
+            return "Distribution chart generated."
+        stats    = _hist_stats(df, col)
+        fallback = _fb_hist(df, col)
 
-    elif "distribution" in title_lower or "histogram" in title_lower:
-        chart_type = "Histogram / Distribution"
-        y_col      = next((c for c in num_cols
-                           if c.lower() in title_lower), num_cols[0] if num_cols else None)
-        if not y_col:
-            return "Distribution chart generated from dataset analysis."
-        x_clean   = clean_col(y_col)
-        y_clean   = "Frequency"
-        stats_str = _hist_stats(df, y_col)
-        fallback  = _fallback_hist(df, y_col)
+    elif "pie" in title or "share" in title:
+        parts = title.split(" by ")
+        x = next((c for c in cat
+                  if c.lower() in (parts[1] if len(parts) > 1 else "")),
+                 cat[0] if cat else None)
+        y = next((c for c in num if c.lower() in parts[0]),
+                 num[0] if num else None)
+        if not x or not y:
+            return "Pie chart generated."
+        stats    = _pie_stats(df, x, y)
+        fallback = _fb_pie(df, x, y)
 
-    elif "pie" in title_lower or "share" in title_lower or "composition" in title_lower:
-        chart_type = "Pie / Composition Chart"
-        parts      = title_lower.split(" by ")
-        x_col      = next((c for c in cat_cols
-                           if c.lower() in (parts[1] if len(parts) > 1 else "")),
-                          cat_cols[0] if cat_cols else None)
-        y_col      = next((c for c in num_cols
-                           if c.lower() in parts[0]),
-                          num_cols[0] if num_cols else None)
-        if not x_col or not y_col:
-            return "Composition chart generated from dataset analysis."
-        x_clean   = clean_col(x_col)
-        y_clean   = clean_col(y_col)
-        stats_str = _pie_stats(df, x_col, y_col)
-        fallback  = _fallback_pie(df, x_col, y_col)
+    elif "trend" in title or "line" in title:
+        col = next((c for c in num
+                    if c.lower().replace("_", "") in
+                    title.replace("_", "").replace(" ", "")),
+                   num[0] if num else None)
+        if not col:
+            return "Trend chart generated."
+        stats    = _trend_stats(df, col)
+        fallback = _fb_trend(df, col)
 
-    elif "trend" in title_lower or "over" in title_lower or "line" in title_lower:
-        chart_type = "Trend / Line Chart"
-        y_col      = next((c for c in num_cols
-                           if c.lower() in title_lower), num_cols[0] if num_cols else None)
-        if not y_col:
-            return "Trend chart generated from dataset analysis."
-        x_clean   = "Data progression"
-        y_clean   = clean_col(y_col)
-        stats_str = _trend_stats(df, y_col)
-        fallback  = _fallback_trend(df, y_col)
-
-    elif " by " in title_lower:
-        chart_type = "Bar Chart"
-        parts      = title_lower.replace("avg ", "").replace("total ", "").split(" by ")
-        y_col      = next((c for c in num_cols if c.lower() in parts[0]),
-                          num_cols[0] if num_cols else None)
-        x_col      = next((c for c in cat_cols
-                           if c.lower() in (parts[1] if len(parts) > 1 else "")),
-                          cat_cols[0] if cat_cols else None)
-        if not y_col or not x_col:
-            return "Bar chart generated from dataset analysis."
-        x_clean   = clean_col(x_col)
-        y_clean   = clean_col(y_col)
-        stats_str = _bar_stats(df, x_col, y_col)
-        fallback  = _fallback_bar(df, x_col, y_col)
+    elif " by " in title:
+        parts = title.replace("avg ", "").replace("total ", "").split(" by ")
+        y = next((c for c in num
+                  if c.lower().replace("_", "") in parts[0].replace(" ", "")),
+                 num[0] if num else None)
+        x = next((c for c in cat
+                  if c.lower() in (parts[1] if len(parts) > 1 else "")),
+                 cat[0] if cat else None)
+        if not y or not x:
+            return "Bar chart generated."
+        stats    = _bar_stats(df, x, y)
+        fallback = _fb_bar(df, x, y)
 
     else:
-        # Generic fallback
-        if num_cols and cat_cols:
-            chart_type = "Bar Chart"
-            x_clean   = clean_col(cat_cols[0])
-            y_clean   = clean_col(num_cols[0])
-            stats_str = _bar_stats(df, cat_cols[0], num_cols[0])
-            fallback  = _fallback_bar(df, cat_cols[0], num_cols[0])
-        elif num_cols:
-            chart_type = "Distribution"
-            x_clean   = clean_col(num_cols[0])
-            y_clean   = "Frequency"
-            stats_str = _hist_stats(df, num_cols[0])
-            fallback  = _fallback_hist(df, num_cols[0])
+        if cat and num:
+            stats = _bar_stats(df, cat[0], num[0]); fallback = _fb_bar(df, cat[0], num[0])
+        elif num:
+            stats = _hist_stats(df, num[0]);        fallback = _fb_hist(df, num[0])
         else:
-            return "Chart analysis not available for this dataset."
+            return "Chart analysis not available."
 
-    # ── Try Groq, fallback to rule-based ─────────────────────────────────────
-    user_prompt = _chart_prompt(chart_type, x_clean, y_clean, stats_str, domain)
-    result = _call_groq(_SYSTEM, user_prompt, groq_api_key, max_tokens=320)
-    return result if result else fallback
+    # ── Build prompt + call LLM ───────────────────────────
+    system, user = _build_prompt(stats, df)
+    client       = get_client()
+    raw          = client.chat(system, user, task="chart_analysis",
+                               max_tokens=400)
+
+    # ── Validate → fallback ───────────────────────────────
+    if raw:
+        narrative = _json_to_text(raw, stats, df)
+        if narrative:
+            return narrative
+
+    return fallback   # guaranteed correct
 
 
 def generate_executive_summary(
-    df: pd.DataFrame,
-    domain: str = "general",
-    story_report=None,
-    groq_api_key: str = "",
+    df:           pd.DataFrame,
+    domain:       str = "general",
+    story_report  = None,
+    groq_api_key: str = "",   # kept for backward compatibility
 ) -> str:
-    """Generate executive summary. Groq if available, rule-based fallback."""
-    stats_summary = _exec_prompt(df, domain, story_report)
-    system_prompt = _exec_system_prompt(domain)
-    result = _call_groq(system_prompt, stats_summary, groq_api_key, max_tokens=250)
-    if result:
-        return result
+    """
+    Executive summary via Gemini (best reasoning) → Groq fallback.
+    """
+    num = df.select_dtypes(include="number").columns.tolist()
+    atr = next((c for c in df.columns
+                if c.lower() in ("left", "attrition", "churned", "exited")), None)
+
+    # Pre-compute facts
+    facts: dict = {
+        "domain":  domain,
+        "rows":    len(df),
+        "columns": len(df.columns),
+    }
+    if atr:
+        rate = float(df[atr].mean()) * 100
+        facts["attrition_pct"]  = round(rate, 1)
+        facts["n_left"]         = int(df[atr].sum())
+        facts["above_shrm"]     = rate > 15
+        facts["gap_pp"]         = round(max(0, rate - 15), 1)
+
+    sat = next((c for c in num if "satisfaction" in c.lower()), None)
+    if sat:
+        facts["avg_satisfaction"]   = round(float(df[sat].mean()), 3)
+        facts["below_industry_norm"] = facts["avg_satisfaction"] < 0.70
+
+    col_list = [clean_col(c) for c in df.columns]
+    system   = (
+        f"Senior Data Analyst writing a C-suite executive summary. "
+        f"Dataset columns: {col_list}. "
+        f"ONLY use metrics listed. FORBIDDEN: Sales Revenue, Customer Satisfaction, "
+        f"Marketing Spend, Website Traffic. Return ONLY JSON, no other text."
+    )
+    user = (
+        f"PRE-COMPUTED FACTS:\n{json.dumps(facts, indent=2)}\n\n"
+        f"Return JSON:\n"
+        f'{{"risk": "<most urgent risk with specific number>",'
+        f'"lever": "<#1 actionable change>",'
+        f'"urgency": "<what must happen in 30 days>",'
+        f'"ok": true}}'
+    )
+
+    client = get_client()
+    # Try Gemini first for executive summary (better reasoning)
+    raw    = client.chat(system, user, task="executive_summary",
+                         max_tokens=300, force="gemini")
+    # Fallback to Groq
+    if not raw:
+        raw = client.chat(system, user, task="executive_summary",
+                          max_tokens=300, force="groq")
+
+    if raw:
+        try:
+            clean = re.sub(r"^```json\s*", "", raw.strip())
+            clean = re.sub(r"^```\s*",     "", clean)
+            clean = re.sub(r"```$",        "", clean).strip()
+            data  = json.loads(clean)
+            if (data.get("ok") and
+                    not _is_hallucinated(
+                        data.get("risk", "") + data.get("lever", ""), df)):
+                return (f"{data.get('risk','')} "
+                        f"{data.get('lever','')} "
+                        f"{data.get('urgency','')}").strip()
+        except Exception:
+            pass
 
     # Rule-based fallback
-    atr_col = next((c for c in df.columns
-                    if c.lower() in ("left","attrition","churned")), None)
-    parts   = [f"This {domain.upper()} dataset ({len(df):,} records) reveals "
-               "critical patterns requiring executive attention."]
-    if atr_col:
-        rate   = float(df[atr_col].mean()) * 100
-        n_left = int(df[atr_col].sum())
-        parts.append(f"Attrition stands at {rate:.1f}% with {n_left:,} employees having left — "
-                     f"{'above' if rate > 15 else 'at'} the SHRM 15% healthy benchmark.")
-    parts.append("Immediate action is required on the critical findings below "
-                 "to prevent further financial and operational impact.")
+    parts = [
+        f"This {domain.upper()} dataset ({len(df):,} records) "
+        "reveals critical patterns requiring executive attention."
+    ]
+    if atr:
+        rate   = float(df[atr].mean()) * 100
+        n_left = int(df[atr].sum())
+        parts.append(
+            f"Attrition is {rate:.1f}% ({n_left:,} left) — "
+            f"{'above' if rate > 15 else 'at'} the SHRM 15% benchmark."
+        )
+    parts.append(
+        "Immediate action on critical findings below is required "
+        "to prevent further financial and operational impact."
+    )
     return " ".join(parts)
