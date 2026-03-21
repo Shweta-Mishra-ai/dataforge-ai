@@ -1,7 +1,7 @@
 """
-pages/1_Data_Upload.py
+pages/1_🏠_Data_Upload.py
 Upload page — handles original dirty data.
-Shows warnings, full dataset, quality profile.
+FIXED: use_container_width → width="stretch"
 """
 import streamlit as st
 import pandas as pd
@@ -13,8 +13,7 @@ st.set_page_config(
     layout="wide"
 )
 
-from core.data_loader import load_file
-SAMPLE_THRESHOLD = 100_000
+from core.data_loader   import load_file
 from core.data_profiler import profile_dataset
 from core.session_manager import init_session, set_dataframe
 
@@ -65,9 +64,9 @@ if result.warnings:
 
 # ── Save to session ────────────────────────────────────────
 set_dataframe(df, result.filename, result.file_size_mb)
-st.session_state["profile"]  = None  # will compute below
+st.session_state["profile"] = None
 
-# ── Profile (sampled for speed on large files) ─────────────
+# ── Profile ────────────────────────────────────────────────
 with st.spinner("Analysing data quality..."):
     try:
         df_profile = (df.sample(n=min(10000, len(df)), random_state=42)
@@ -83,17 +82,17 @@ st.divider()
 st.markdown("### Dataset Overview")
 
 c1, c2, c3, c4, c5 = st.columns(5)
-c1.metric("Rows",       "{:,}".format(len(df)),      "records")
-c2.metric("Columns",    str(len(df.columns)),          "features")
-c3.metric("File Size",  "{:.1f} MB".format(result.file_size_mb))
+c1.metric("Rows",      "{:,}".format(len(df)),         "records")
+c2.metric("Columns",   str(len(df.columns)),            "features")
+c3.metric("File Size", "{:.1f} MB".format(result.file_size_mb))
 if profile:
-    c4.metric("Missing",    "{:.1f}%".format(profile.missing_pct),
+    c4.metric("Missing",  "{:.1f}%".format(profile.missing_pct),
               "{:,} cells".format(profile.missing_cells))
-    c5.metric("Quality",    "{}/100".format(profile.overall_quality_score),
-              "Grade {}".format(getattr(profile,"data_quality_grade","?")))
+    c5.metric("Quality",  "{}/100".format(profile.overall_quality_score),
+              "Grade {}".format(getattr(profile, "data_quality_grade", "?")))
 else:
     c4.metric("Missing",
-              "{:.1f}%".format(df.isna().sum().sum()/max(df.size,1)*100))
+              "{:.1f}%".format(df.isna().sum().sum() / max(df.size, 1) * 100))
     c5.metric("Duplicates", "{:,}".format(int(df.duplicated().sum())))
 
 # ── Quality Recommendations ────────────────────────────────
@@ -116,21 +115,22 @@ tab1, tab2, tab3 = st.tabs(["Raw Data", "Column Info", "Missing Values"])
 
 with tab1:
     st.caption("Showing first 100 rows of {:,} total rows".format(len(df)))
-    st.dataframe(df.head(100), use_container_width=True, height=400)
+    # FIXED: use_container_width=True → width="stretch"
+    st.dataframe(df.head(100), width="stretch", height=400)
 
 with tab2:
     info_rows = []
     for col in df.columns:
         s = df[col]
         info_rows.append({
-            "Column":    col,
-            "Type":      str(s.dtype),
-            "Missing":   "{:.1f}%".format(s.isna().mean()*100),
-            "Unique":    "{:,}".format(int(s.nunique())),
-            "Sample":    str(s.dropna().iloc[0])[:40] if len(s.dropna())>0 else "—",
+            "Column":  col,
+            "Type":    str(s.dtype),
+            "Missing": "{:.1f}%".format(s.isna().mean() * 100),
+            "Unique":  "{:,}".format(int(s.nunique())),
+            "Sample":  str(s.dropna().iloc[0])[:40] if len(s.dropna()) > 0 else "—",
         })
     info_df = pd.DataFrame(info_rows)
-    st.dataframe(info_df, use_container_width=True, height=400)
+    st.dataframe(info_df, width="stretch", height=400)
 
 with tab3:
     miss = df.isna().sum()
@@ -143,7 +143,7 @@ with tab3:
             "Missing":   miss.values,
             "Missing %": (miss.values / len(df) * 100).round(1),
         })
-        st.dataframe(miss_df, use_container_width=True, height=400)
+        st.dataframe(miss_df, width="stretch", height=400)
 
 # ── Numeric Stats ──────────────────────────────────────────
 num_cols = df.select_dtypes(include="number").columns.tolist()
@@ -152,10 +152,11 @@ if num_cols:
     st.markdown("### Descriptive Statistics")
     st.dataframe(
         df[num_cols].describe().round(3),
-        use_container_width=True)
+        width="stretch")
 
-# ── Navigation ─────────────────────────────────────────────
+# ── Navigation hint ────────────────────────────────────────
 st.divider()
 st.success(
     "File loaded — {:,} rows, {} columns. "
-    "Use the sidebar to navigate.".format(len(df), len(df.columns)))
+    "Use the sidebar to navigate.".format(len(df), len(df.columns))
+)
