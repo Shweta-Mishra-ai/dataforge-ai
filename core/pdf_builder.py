@@ -430,6 +430,258 @@ def _exec_summary(story, ST, theme, summary_text, findings, risks,
             story.append(Paragraph("* {}".format(o), ST["opportunity"]))
 
 
+
+def _top_insights_page(story, ST, theme, insights, CW):
+    """
+    Top Insights — one clear card per insight.
+    Format: Title | Problem | Cause | Evidence | Action | Impact
+    """
+    if not insights:
+        return
+    _page_h(story, ST, theme, "Top Insights — Key Findings at a Glance")
+    story.append(Paragraph(
+        "Each insight follows: PROBLEM → CAUSE → EVIDENCE → ACTION → IMPACT",
+        ST["caption"]))
+    story.append(Spacer(1, 3*mm))
+
+    T = theme
+    sev_colors = {
+        "critical": T["negative"],
+        "warning":  T["warning"],
+        "positive": T["positive"],
+        "info":     T["accent"],
+    }
+
+    for i, ins in enumerate(insights[:6], 1):
+        color = sev_colors.get(ins.severity, T["accent"])
+
+        # Severity badge + title
+        badge_style = ParagraphStyle(
+            "badge_{}".format(i),
+            fontName="Helvetica-Bold", fontSize=8,
+            textColor=_rgb(color), spaceAfter=1*mm,
+        )
+        title_style = ParagraphStyle(
+            "ins_title_{}".format(i),
+            fontName="Helvetica-Bold", fontSize=10,
+            textColor=_rgb(T["text"]), spaceAfter=2*mm,
+        )
+        row_label = ParagraphStyle(
+            "row_label_{}".format(i),
+            fontName="Helvetica-Bold", fontSize=8,
+            textColor=_rgb(color),
+        )
+        row_val = ParagraphStyle(
+            "row_val_{}".format(i),
+            fontName="Helvetica", fontSize=8,
+            textColor=_rgb(T["text"]), leading=11,
+        )
+
+        card_rows = [
+            [Paragraph("[{}]  {}. {}".format(
+                ins.severity.upper(), i, ins.title), title_style)],
+        ]
+        for label, value in [
+            ("PROBLEM",  ins.problem),
+            ("CAUSE",    ins.cause),
+            ("EVIDENCE", ins.evidence),
+            ("ACTION",   ins.action),
+            ("IMPACT",   ins.impact),
+        ]:
+            if value and value != "N/A":
+                card_rows.append([Table(
+                    [[Paragraph(label, row_label),
+                      Paragraph(value, row_val)]],
+                    colWidths=[CW*0.13, CW*0.87]
+                )])
+
+        card = Table([[row] for row in card_rows], colWidths=[CW])
+        card.setStyle(TableStyle([
+            ("BACKGROUND",    (0,0), (-1,-1), _rgb(T["bg_card"])),
+            ("LINEBEFORE",    (0,0), (0,-1),  3, _rgb(color)),
+            ("BOX",           (0,0), (-1,-1), 0.5, _rgb(T["border"])),
+            ("TOPPADDING",    (0,0), (-1,-1), 5),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 5),
+            ("LEFTPADDING",   (0,0), (-1,-1), 8),
+            ("RIGHTPADDING",  (0,0), (-1,-1), 6),
+        ]))
+        story.append(card)
+        story.append(Spacer(1, 3*mm))
+
+
+def _attrition_page(story, ST, theme, attrition, CW):
+    """
+    Deep attrition analysis page.
+    Rate, drivers, segment breakdown, flight risk, cost.
+    """
+    if attrition is None:
+        return
+    _page_h(story, ST, theme, "Attrition Analysis")
+    T = theme
+
+    sev_color = {
+        "critical": T["negative"],
+        "high":     T["warning"],
+        "warning":  T["warning"],
+        "normal":   T["positive"],
+        "low":      T["positive"],
+    }.get(attrition.severity, T["accent"])
+
+    # KPI row
+    _kpi_row(story, ST, theme, [
+        {"label": "ATTRITION RATE", "value": "{:.1f}%".format(attrition.rate),
+         "sub": "{:,} of {:,} employees".format(attrition.n_left, attrition.n_total)},
+        {"label": "SEVERITY",       "value": attrition.severity.upper(),
+         "sub": "Benchmark: 10-15%"},
+        {"label": "FLIGHT RISK",    "value": "{:,}".format(attrition.n_flight_risk),
+         "sub": "{:.0f}% of remaining staff".format(attrition.flight_risk_pct)},
+        {"label": "COST ESTIMATE",  "value": "HIGH" if attrition.n_left > 50 else "MED",
+         "sub": "Replacement cost risk"},
+    ], CW)
+
+    story.append(Paragraph(attrition.interpretation, ST["body"]))
+    story.append(Paragraph(attrition.cost_estimate, ST["risk"]))
+    story.append(Spacer(1, 3*mm))
+
+    # Top drivers table
+    if attrition.top_drivers:
+        story.append(Paragraph("Attrition Drivers (Statistically Significant)", ST["sub_h"]))
+        rows = [[
+            Paragraph("Factor",    ST["body_bold"]),
+            Paragraph("Type",      ST["body_bold"]),
+            Paragraph("Impact",    ST["body_bold"]),
+            Paragraph("Detail",    ST["body_bold"]),
+        ]]
+        for d in attrition.top_drivers[:6]:
+            rows.append([
+                Paragraph(d["factor"], ST["body"]),
+                Paragraph(d["type"].title(), ST["body"]),
+                Paragraph("{:.0f}% diff".format(d["impact"]), ST["body"]),
+                Paragraph(d["detail"][:70], ST["body"]),
+            ])
+        _table(story, theme, rows, [CW*0.22, CW*0.13, CW*0.15, CW*0.50])
+
+    # Segment breakdown
+    two_col_data = []
+    if attrition.dept_attrition:
+        story.append(Paragraph("Attrition by Department", ST["sub_h"]))
+        sorted_dept = sorted(attrition.dept_attrition.items(),
+                             key=lambda x: x[1], reverse=True)
+        rows = [[Paragraph("Department", ST["body_bold"]),
+                 Paragraph("Attrition Rate", ST["body_bold"]),
+                 Paragraph("Status", ST["body_bold"])]]
+        for dept, rate in sorted_dept:
+            status = "CRITICAL" if rate > 25 else "HIGH" if rate > 18 else "OK"
+            rows.append([
+                Paragraph(str(dept), ST["body"]),
+                Paragraph("{:.1f}%".format(rate), ST["body"]),
+                Paragraph(status, ST["body"]),
+            ])
+        _table(story, theme, rows, [CW*0.45, CW*0.30, CW*0.25])
+
+    if attrition.salary_attrition:
+        story.append(Paragraph("Attrition by Salary Band", ST["sub_h"]))
+        sorted_sal = sorted(attrition.salary_attrition.items(),
+                            key=lambda x: x[1], reverse=True)
+        rows = [[Paragraph("Salary Band", ST["body_bold"]),
+                 Paragraph("Attrition Rate", ST["body_bold"])]]
+        for sal, rate in sorted_sal:
+            rows.append([Paragraph(str(sal), ST["body"]),
+                         Paragraph("{:.1f}%".format(rate), ST["body"])])
+        _table(story, theme, rows, [CW*0.5, CW*0.5])
+
+
+
+def _build_insight_cards(story, ST, theme, findings, risks, opportunities, CW):
+    """
+    Structured insight cards — Problem → Cause → Action → Impact.
+    Parsed from finding strings or raw insight objects.
+    """
+    _page_h(story, ST, theme, "Top Insights — Decision Summary")
+    story.append(Paragraph(
+        "Each card shows: WHAT is the problem, WHY it is happening, "
+        "WHAT ACTION to take, and WHAT IMPACT to expect.",
+        ST["caption"]
+    ))
+    story.append(Spacer(1, 3*mm))
+    T = theme
+
+    all_items = []
+    for r in risks[:4]:
+        all_items.append(("critical", r))
+    for f in findings[:3]:
+        all_items.append(("info", f))
+    for o in opportunities[:2]:
+        all_items.append(("positive", o))
+
+    sev_colors = {
+        "critical": T["negative"],
+        "warning":  T["warning"],
+        "positive": T["positive"],
+        "info":     T["accent"],
+    }
+
+    for i, (sev, text) in enumerate(all_items[:7], 1):
+        color = sev_colors.get(sev, T["accent"])
+
+        # Parse WHAT/WHY/ACTION/IMPACT from text
+        lines = []
+        if "| " in text:
+            # Structured format from story_engine
+            parts = text.split(" | ")
+            for part in parts:
+                if ":" in part:
+                    label, value = part.split(":", 1)
+                    lines.append((label.strip(), value.strip()))
+                else:
+                    lines.append(("NOTE", part.strip()))
+        else:
+            lines.append(("FINDING", text))
+
+        title_text = lines[0][1] if lines else text[:60]
+        detail_lines = lines[1:] if len(lines) > 1 else []
+
+        title_s = ParagraphStyle(
+            "ct{}".format(i), fontName="Helvetica-Bold", fontSize=10,
+            textColor=_rgb(T["text"]), spaceAfter=1*mm, leading=13,
+        )
+        lbl_s = ParagraphStyle(
+            "cl{}".format(i), fontName="Helvetica-Bold", fontSize=7,
+            textColor=_rgb(color),
+        )
+        val_s = ParagraphStyle(
+            "cv{}".format(i), fontName="Helvetica", fontSize=8,
+            textColor=_rgb(T["text"]), leading=11,
+        )
+        badge_s = ParagraphStyle(
+            "cb{}".format(i), fontName="Helvetica-Bold", fontSize=7,
+            textColor=_rgb(color), spaceAfter=1*mm,
+        )
+
+        inner = [
+            [Paragraph("[{}] Finding {}".format(sev.upper(), i), badge_s)],
+            [Paragraph(title_text[:100], title_s)],
+        ]
+        for label, value in detail_lines[:5]:
+            inner.append([Table(
+                [[Paragraph(label[:12], lbl_s),
+                  Paragraph(value[:140], val_s)]],
+                colWidths=[CW*0.14, CW*0.84],
+            )])
+
+        card = Table([[row] for row in inner], colWidths=[CW])
+        card.setStyle(TableStyle([
+            ("BACKGROUND",    (0,0), (-1,-1), _rgb(T["bg_card"])),
+            ("LINEBEFORE",    (0,0), (0,-1),  3, _rgb(color)),
+            ("BOX",           (0,0), (-1,-1), 0.5, _rgb(T["border"])),
+            ("TOPPADDING",    (0,0), (-1,-1), 4),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 4),
+            ("LEFTPADDING",   (0,0), (-1,-1), 7),
+            ("RIGHTPADDING",  (0,0), (-1,-1), 6),
+        ]))
+        story.append(KeepTogether([card, Spacer(1, 3*mm)]))
+
+
 def _dataset_overview(story, ST, theme, df, profile, cleaning_summary, CW):
     """Dataset overview with KPI cards + before/after cleaning."""
     _page_h(story, ST, theme, "Dataset Overview")
@@ -905,6 +1157,7 @@ def build_pdf(
         page_num += 1
 
     _toc_add("Executive Summary")
+    _toc_add("Top Insights — Decision Summary")
     _toc_add("Dataset Overview")
     if stats_report:
         _toc_add("Statistical Analysis")
@@ -928,11 +1181,23 @@ def build_pdf(
                   findings, risks, opportunities, CW)
     story.append(PageBreak())
 
+    # Top Insights — structured cards
+    _build_insight_cards(story, ST, theme, findings, risks, opportunities, CW)
+    story.append(PageBreak())
+
     _dataset_overview(story, ST, theme, df, profile, cleaning_summary, CW)
     story.append(PageBreak())
 
     if stats_report:
         _statistical_analysis(story, ST, theme, stats_report, CW)
+        story.append(PageBreak())
+
+    # Attrition deep dive — from story report
+    attrition_data = getattr(
+        type('_', (object,), {})(), 'attrition', None)
+    # Passed as extra kwarg if available
+    if bi_report and hasattr(bi_report, 'attrition'):
+        _attrition_page(story, ST, theme, bi_report.attrition, CW)
         story.append(PageBreak())
 
     if bi_report:
