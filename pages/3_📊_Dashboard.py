@@ -1,3 +1,12 @@
+"""
+pages/3_📊_Dashboard.py
+FIXED:
+  - pd.read_json(df_json) → pd.read_json(io.StringIO(df_json))
+  - use_container_width=True → width="stretch"
+  - Arrow serialization: stats table uses .astype(str)
+  - st.plotly_chart keeps use_container_width (plotly needs it)
+"""
+import io
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -29,22 +38,23 @@ PLOTLY_THEME = dict(
 # ── Cache ──────────────────────────────────────────────────
 @st.cache_data(show_spinner=False)
 def get_stats(df_json: str):
-    df = pd.read_json(df_json)
+    # FIXED: pd.read_json(df_json) → pd.read_json(io.StringIO(df_json))
+    df = pd.read_json(io.StringIO(df_json))
     return analyze(df), df
 
 # ── Load data ─────────────────────────────────────────────
 df_master = get_df()
-stats, _   = get_stats(df_master.to_json(date_format="iso"))
+stats, _  = get_stats(df_master.to_json(date_format="iso"))
 
-num_cols  = stats.numeric_cols
-cat_cols  = [c for c in stats.categorical_cols
-             if df_master[c].nunique() <= 50]   # exclude ID-like
-id_cols   = [c for c in stats.categorical_cols
-             if df_master[c].nunique() > 50]
-dt_cols   = stats.datetime_cols
+num_cols = stats.numeric_cols
+cat_cols = [c for c in stats.categorical_cols
+            if df_master[c].nunique() <= 50]
+id_cols  = [c for c in stats.categorical_cols
+            if df_master[c].nunique() > 50]
+dt_cols  = stats.datetime_cols
 
 # ══════════════════════════════════════════════════════════
-#  SIDEBAR FILTERS — Power BI style
+#  SIDEBAR FILTERS
 # ══════════════════════════════════════════════════════════
 with st.sidebar:
     st.markdown("### 🎛️ Filters")
@@ -52,7 +62,6 @@ with st.sidebar:
 
     df_filtered = df_master.copy()
 
-    # Categorical filters
     active_cat_filters = {}
     for col in cat_cols[:4]:
         unique_vals = sorted(df_master[col].dropna().unique().tolist())
@@ -66,15 +75,12 @@ with st.sidebar:
             if selected:
                 df_filtered = df_filtered[df_filtered[col].isin(selected)]
 
-    # Numeric range filters
     for col in num_cols[:2]:
         s = df_master[col].dropna()
         lo, hi = float(s.min()), float(s.max())
         if lo < hi:
-            rng = st.slider(
-                col, lo, hi, (lo, hi),
-                key="range_{}".format(col)
-            )
+            rng = st.slider(col, lo, hi, (lo, hi),
+                            key="range_{}".format(col))
             df_filtered = df_filtered[
                 (df_filtered[col] >= rng[0]) &
                 (df_filtered[col] <= rng[1])
@@ -83,7 +89,8 @@ with st.sidebar:
     st.divider()
     st.caption("Showing {:,} of {:,} rows".format(
         len(df_filtered), len(df_master)))
-    if st.button("Reset Filters", use_container_width=True):
+    # FIXED: use_container_width=True → width="stretch"
+    if st.button("Reset Filters", width="stretch"):
         st.rerun()
 
 # ══════════════════════════════════════════════════════════
@@ -96,7 +103,7 @@ st.caption("Real-time analysis · {:,} rows · {} columns · {} filtered".format
 st.divider()
 
 # ══════════════════════════════════════════════════════════
-#  SECTION 1 — KPI CARDS with context
+#  SECTION 1 — KPI CARDS
 # ══════════════════════════════════════════════════════════
 if num_cols:
     st.markdown("### 📌 Key Performance Indicators")
@@ -127,7 +134,6 @@ if num_cols:
                     s_filter.sum(), s_filter.min(), s_filter.max())
             )
 
-    # Skewed warning
     skewed_cols = [c for c in kpi_cols
                    if stats.column_stats.get(c) and
                    stats.column_stats[c].skewness and
@@ -138,11 +144,10 @@ if num_cols:
             "Median shown in brackets is more reliable than mean.".format(
                 ", ".join(skewed_cols))
         )
-
     st.divider()
 
 # ══════════════════════════════════════════════════════════
-#  SECTION 2 — SMART CHART GRID
+#  SECTION 2 — CHARTS
 # ══════════════════════════════════════════════════════════
 st.markdown("### 📈 Visual Analysis")
 
@@ -150,10 +155,10 @@ chart_tab_labels = ["Overview", "Distribution", "Relationships", "Deep Dive"]
 if dt_cols:
     chart_tab_labels.insert(1, "Trends")
 
-tabs = st.tabs(chart_tab_labels)
+tabs    = st.tabs(chart_tab_labels)
 tab_idx = 0
 
-# ── Tab: Overview ─────────────────────────────────────────
+# ── Overview ──────────────────────────────────────────────
 with tabs[tab_idx]:
     tab_idx += 1
     if cat_cols and num_cols:
@@ -201,7 +206,6 @@ with tabs[tab_idx]:
                 fig2.update_layout(**PLOTLY_THEME)
                 st.plotly_chart(fig2, use_container_width=True)
     elif num_cols:
-        # No categorical — show top numeric overview
         fig = px.bar(
             x=num_cols[:8],
             y=[df_filtered[c].mean() for c in num_cols[:8]],
@@ -215,7 +219,7 @@ with tabs[tab_idx]:
     else:
         st.info("No numeric + categorical columns available for overview charts.")
 
-# ── Tab: Trends (only if datetime) ────────────────────────
+# ── Trends ────────────────────────────────────────────────
 if dt_cols and "Trends" in chart_tab_labels:
     with tabs[tab_idx]:
         tab_idx += 1
@@ -225,9 +229,8 @@ if dt_cols and "Trends" in chart_tab_labels:
                            ["Day", "Week", "Month", "Quarter"],
                            horizontal=True, key="trend_agg")
 
-        freq_map = {"Day": "D", "Week": "W", "Month": "M", "Quarter": "Q"}
-        freq = freq_map[agg_by]
-
+        freq_map = {"Day": "D", "Week": "W", "Month": "ME", "Quarter": "QE"}
+        freq  = freq_map[agg_by]
         trend = (df_filtered.set_index(dt_col)[val_col]
                  .resample(freq).mean().reset_index())
 
@@ -248,17 +251,17 @@ if dt_cols and "Trends" in chart_tab_labels:
         fig.update_layout(**PLOTLY_THEME)
         st.plotly_chart(fig, use_container_width=True)
 
-# ── Tab: Distribution ─────────────────────────────────────
+# ── Distribution ──────────────────────────────────────────
 with tabs[tab_idx]:
     tab_idx += 1
     if not num_cols:
         st.info("No numeric columns for distribution analysis.")
     else:
         col_sel = st.selectbox("Select column", num_cols, key="dist_col")
-        c1, c2 = st.columns(2)
+        c1, c2  = st.columns(2)
 
         with c1:
-            cs = stats.column_stats.get(col_sel)
+            cs  = stats.column_stats.get(col_sel)
             fig = px.histogram(
                 df_filtered, x=col_sel,
                 nbins=30,
@@ -279,15 +282,26 @@ with tabs[tab_idx]:
         with c2:
             if cs:
                 st.markdown("**Statistical Summary**")
+                # FIXED: All values → str to avoid Arrow serialization error
+                # "Non-Normal" string mixed with floats caused the crash
                 stat_data = {
-                    "Metric": ["Mean", "Median", "Std Dev", "Variance",
-                               "Min", "Max", "IQR", "Skewness",
-                               "Kurtosis", "Normality", "Outliers (IQR)"],
+                    "Metric": [
+                        "Mean", "Median", "Std Dev", "Variance",
+                        "Min", "Max", "IQR", "Skewness",
+                        "Kurtosis", "Normality", "Outliers (IQR)",
+                    ],
                     "Value": [
-                        cs.mean, cs.median, cs.std, cs.variance,
-                        cs.min_val, cs.max_val, cs.iqr, cs.skewness,
-                        cs.kurtosis, cs.normality_label,
-                        cs.outlier_count_iqr,
+                        str(round(cs.mean,   4)) if cs.mean   is not None else "—",
+                        str(round(cs.median, 4)) if cs.median is not None else "—",
+                        str(round(cs.std,    4)) if cs.std    is not None else "—",
+                        str(round(cs.variance, 4)) if cs.variance is not None else "—",
+                        str(round(cs.min_val, 4)) if cs.min_val is not None else "—",
+                        str(round(cs.max_val, 4)) if cs.max_val is not None else "—",
+                        str(round(cs.iqr,    4)) if cs.iqr    is not None else "—",
+                        str(round(cs.skewness, 4)) if cs.skewness is not None else "—",
+                        str(round(cs.kurtosis, 4)) if cs.kurtosis is not None else "—",
+                        str(cs.normality_label) if cs.normality_label else "—",
+                        str(cs.outlier_count_iqr) if cs.outlier_count_iqr is not None else "—",
                     ],
                     "Interpretation": [
                         "Average value",
@@ -297,20 +311,24 @@ with tabs[tab_idx]:
                         "Smallest value",
                         "Largest value",
                         "Middle 50% range",
-                        cs.skew_label or "-",
-                        cs.kurtosis_label or "-",
+                        str(cs.skew_label)     if cs.skew_label     else "-",
+                        str(cs.kurtosis_label) if cs.kurtosis_label else "-",
                         "p={:.4f} ({})".format(
                             cs.normality_pvalue or 0,
-                            cs.normality_test or "") if cs.normality_pvalue else "-",
-                        cs.outlier_method_recommended,
-                    ]
+                            cs.normality_test   or "")
+                        if cs.normality_pvalue else "-",
+                        str(cs.outlier_method_recommended)
+                        if cs.outlier_method_recommended else "-",
+                    ],
                 }
+                # All columns are str — no Arrow conversion issue
                 st.dataframe(
                     pd.DataFrame(stat_data),
-                    use_container_width=True, hide_index=True
+                    width="stretch",
+                    hide_index=True,
                 )
 
-# ── Tab: Relationships ────────────────────────────────────
+# ── Relationships ─────────────────────────────────────────
 with tabs[tab_idx]:
     tab_idx += 1
     if len(num_cols) < 2:
@@ -319,9 +337,8 @@ with tabs[tab_idx]:
         c1, c2 = st.columns(2)
 
         with c1:
-            # Correlation heatmap
             corr = df_filtered[num_cols[:10]].corr().round(2)
-            fig = px.imshow(
+            fig  = px.imshow(
                 corr,
                 color_continuous_scale="RdBu_r",
                 zmin=-1, zmax=1,
@@ -333,16 +350,17 @@ with tabs[tab_idx]:
             st.plotly_chart(fig, use_container_width=True)
 
         with c2:
-            # Scatter with trend line
-            x_col = st.selectbox("X axis", num_cols, key="scatter_x")
-            y_col = st.selectbox("Y axis", num_cols,
-                                 index=min(1, len(num_cols)-1), key="scatter_y")
+            x_col    = st.selectbox("X axis", num_cols, key="scatter_x")
+            y_col    = st.selectbox("Y axis", num_cols,
+                                    index=min(1, len(num_cols)-1),
+                                    key="scatter_y")
             color_by = st.selectbox("Color by (optional)",
-                                    ["None"] + cat_cols[:5], key="scatter_c")
+                                    ["None"] + cat_cols[:5],
+                                    key="scatter_c")
 
-            sample_df = df_filtered.sample(
-                min(2000, len(df_filtered)), random_state=42
-            ).dropna(subset=[x_col, y_col])
+            sample_df = (df_filtered
+                         .sample(min(2000, len(df_filtered)), random_state=42)
+                         .dropna(subset=[x_col, y_col]))
 
             fig = px.scatter(
                 sample_df,
@@ -352,7 +370,6 @@ with tabs[tab_idx]:
                 color_discrete_sequence=COLORS,
                 opacity=0.6,
             )
-            # Manual trendline using numpy — no statsmodels needed
             try:
                 x_vals = sample_df[x_col].values
                 y_vals = sample_df[y_col].values
@@ -370,14 +387,13 @@ with tabs[tab_idx]:
             fig.update_layout(**PLOTLY_THEME)
             st.plotly_chart(fig, use_container_width=True)
 
-        # Significant correlations callout
         if stats.top_correlations:
             st.markdown("**Statistically Significant Relationships (p < 0.05)**")
             for c in stats.top_correlations[:5]:
                 icon = "🔴" if c.strength == "strong" else "🟡"
                 st.markdown("{} {}".format(icon, c.label))
 
-# ── Tab: Deep Dive ────────────────────────────────────────
+# ── Deep Dive ─────────────────────────────────────────────
 with tabs[tab_idx]:
     tab_idx += 1
     st.markdown("#### Custom Analysis")
@@ -415,12 +431,13 @@ with tabs[tab_idx]:
                                 color=x_ax, box=True,
                                 color_discrete_sequence=COLORS)
             elif chart_type == "Scatter":
-                fig = px.scatter(df_filtered.sample(min(2000, len(df_filtered))),
-                                 x=x_ax, y=y_ax, 
-                                 title="{} vs {}".format(x_ax, y_ax),
-                                 opacity=0.6,
-                                 color_discrete_sequence=[COLORS[0]])
-            else:  # Histogram
+                fig = px.scatter(
+                    df_filtered.sample(min(2000, len(df_filtered))),
+                    x=x_ax, y=y_ax,
+                    title="{} vs {}".format(x_ax, y_ax),
+                    opacity=0.6,
+                    color_discrete_sequence=[COLORS[0]])
+            else:
                 fig = px.histogram(df_filtered, x=y_ax, nbins=30,
                                    title="Distribution: {}".format(y_ax),
                                    color_discrete_sequence=[COLORS[0]])
@@ -434,18 +451,18 @@ with tabs[tab_idx]:
 st.divider()
 
 # ══════════════════════════════════════════════════════════
-#  SECTION 3 — STATISTICAL INSIGHTS PANEL
+#  SECTION 3 — STATISTICAL INSIGHTS
 # ══════════════════════════════════════════════════════════
 st.markdown("### 💡 Statistical Insights")
 
 if stats.dataset_insights:
     c1, c2 = st.columns(2)
-    mid = len(stats.dataset_insights) // 2
+    mid    = len(stats.dataset_insights) // 2
     with c1:
-        for insight in stats.dataset_insights[:mid+1]:
+        for insight in stats.dataset_insights[:mid + 1]:
             st.info("📌 " + insight)
     with c2:
-        for insight in stats.dataset_insights[mid+1:]:
+        for insight in stats.dataset_insights[mid + 1:]:
             st.info("📌 " + insight)
 else:
     st.success("✅ No major statistical concerns detected in this dataset.")
