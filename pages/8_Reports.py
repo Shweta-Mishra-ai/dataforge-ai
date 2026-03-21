@@ -299,7 +299,12 @@ if gen_btn:
             charts = generate_all_charts(df, theme_name, max_charts=5)
             for title, img_bytes in charts:
                 if img_bytes:
-                    narrative = _chart_narrative(df, title, groq_key, domain_name)
+                    try:
+                        from ai.report_narrator import generate_chart_narrative
+                        narrative = generate_chart_narrative(
+                            df, title, groq_key, domain_name)
+                    except Exception:
+                        narrative = _chart_narrative(df, title)
                     chart_data.append((title, img_bytes, narrative))
             st.info("{} charts generated — AI narratives applied.".format(len(chart_data)))
         except Exception as e:
