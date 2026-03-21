@@ -1,5 +1,7 @@
 """
 DataForge AI — Entry Point
+Streamlit will automatically show first page from pages/ folder.
+No switch_page needed — avoids filename mismatch.
 """
 import streamlit as st
 
@@ -10,6 +12,5 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Auto-redirect to first page
-# Streamlit will show the first page in pages/ automatically
-# No explicit switch_page needed — avoids filename mismatch errors
+st.markdown("## DataForge AI")
+st.markdown("Loading...")
