@@ -1,481 +1,481 @@
 """
-report_narrator.py — McKinsey/BCG style AI narrative generator.
-Real stats in → polished executive language out.
+report_narrator.py — Elite consultant narratives via Groq.
+Two prompts: Executive Summary + Chart Analysis.
+Real stats in → polished business English out.
 No jargon, no snake_case, no academic terms.
 """
 import os
-import re
 import pandas as pd
 import numpy as np
-from typing import Optional
+from typing import Optional, Dict
 
 
 # ══════════════════════════════════════════════════════════
 #  COLUMN NAME CLEANER
 # ══════════════════════════════════════════════════════════
 
-# Common typos and abbreviations in HR/Ecommerce datasets
-COLUMN_NAME_MAP = {
+COL_MAP = {
     # HR
-    "satisfaction_level":       "Employee Satisfaction Score",
-    "last_evaluation":          "Last Performance Evaluation",
-    "number_project":           "Number of Projects",
-    "average_montly_hours":     "Average Monthly Hours",
-    "average_monthly_hours":    "Average Monthly Hours",
-    "time_spend_company":       "Employee Tenure (Years)",
-    "work_accident":            "Work Accident Incidence",
-    "left":                     "Employee Attrition",
-    "attrition":                "Employee Attrition",
-    "promotion_last_5years":    "Promotion in Last 5 Years",
-    "dept":                     "Department",
-    "department":               "Department",
-    "salary":                   "Salary Band",
+    "satisfaction_level":      "Employee Satisfaction Score",
+    "last_evaluation":         "Last Performance Evaluation",
+    "number_project":          "Number of Active Projects",
+    "average_montly_hours":    "Average Monthly Hours Worked",
+    "average_monthly_hours":   "Average Monthly Hours Worked",
+    "time_spend_company":      "Employee Tenure (Years)",
+    "work_accident":           "Work Accident Incidence",
+    "left":                    "Employee Attrition",
+    "attrition":               "Employee Attrition Rate",
+    "promotion_last_5years":   "Recent Promotions (Last 5 Years)",
+    "dept":                    "Department",
+    "department":              "Department",
+    "salary":                  "Salary Band",
     # Ecommerce
-    "discounted_price":         "Discounted Price",
-    "actual_price":             "Original Price",
-    "discount_percentage":      "Discount Percentage",
-    "discount_pct":             "Discount Percentage",
-    "rating_count":             "Number of Reviews",
-    "product_id":               "Product ID",
-    "product_name":             "Product Name",
-    "category":                 "Product Category",
-    "about_product":            "Product Description",
-    "img_link":                 "Product Image",
-    "product_link":             "Product Link",
+    "discounted_price":        "Selling Price",
+    "actual_price":            "Original Price (MRP)",
+    "discount_percentage":     "Discount Percentage",
+    "discount_pct":            "Discount Percentage",
+    "rating_count":            "Number of Customer Reviews",
+    "rating":                  "Customer Rating",
+    "product_id":              "Product ID",
+    "product_name":            "Product Name",
+    "category":                "Product Category",
+    # Sales
+    "revenue":                 "Revenue",
+    "sales":                   "Sales Amount",
+    "target":                  "Sales Target",
+    "quota":                   "Sales Quota",
+    "profit":                  "Profit",
+    "margin":                  "Profit Margin",
+    "region":                  "Sales Region",
+    "territory":               "Sales Territory",
+    "rep":                     "Sales Representative",
 }
 
 
-def clean_col_name(col: str) -> str:
-    """
-    Convert snake_case column names to polished English.
-    Fixes typos, capitalizes properly.
-    """
-    col_lower = col.lower().strip()
-
-    # Direct mapping first
-    if col_lower in COLUMN_NAME_MAP:
-        return COLUMN_NAME_MAP[col_lower]
-
-    # Generic cleaning
+def clean_col(col: str) -> str:
+    low = col.lower().strip()
+    if low in COL_MAP:
+        return COL_MAP[low]
+    # Generic: snake_case → Title Case, fix typos
     name = col.replace("_", " ").strip()
-    # Fix common typos
     name = name.replace("montly", "Monthly").replace("accidnet", "Accident")
-    # Title case
-    name = " ".join(w.capitalize() for w in name.split())
-    return name
+    return " ".join(w.capitalize() for w in name.split())
 
 
-def clean_feature_name(feature: str) -> str:
-    """Clean 'col1 by col2' or 'Distribution: col1' style strings."""
+def clean_feature(feature: str) -> str:
     if " by " in feature:
         parts = feature.split(" by ")
-        return "{} by {}".format(clean_col_name(parts[0]), clean_col_name(parts[1]))
-    elif ":" in feature:
+        return "{} by {}".format(clean_col(parts[0]), clean_col(parts[1]))
+    if ":" in feature:
         parts = feature.split(":", 1)
-        return "{}: {}".format(parts[0], clean_col_name(parts[1].strip()))
-    return clean_col_name(feature)
+        return "{}: {}".format(parts[0], clean_col(parts[1].strip()))
+    return clean_col(feature)
+
+
+def clean_text(text: str) -> str:
+    """Post-process: remove any remaining snake_case."""
+    for raw, clean in COL_MAP.items():
+        text = text.replace("'"+raw+"'", clean)
+        text = text.replace('"'+raw+'"', clean)
+        text = text.replace(raw.replace("_"," "), clean)
+    return text
 
 
 # ══════════════════════════════════════════════════════════
-#  STATS BUILDER — Real numbers for LLM
+#  REAL STATS BUILDER
 # ══════════════════════════════════════════════════════════
 
-def _build_raw_statistics(
+def _build_raw_data_summary(
     df: pd.DataFrame,
-    chart_title: str,
-    chart_type: str,
+    domain: str = "general",
+    story_report=None,
 ) -> str:
     """
-    Build real computed statistics string to pass to LLM.
+    Build structured data summary for executive prompt.
     LLM only narrates — never calculates.
     """
+    parts = []
     num_cols = df.select_dtypes(include="number").columns.tolist()
     cat_cols = df.select_dtypes(include="object").columns.tolist()
-    stats_parts = []
 
-    title_lower = chart_title.lower()
+    parts.append("Dataset: {:,} rows, {} columns, {} domain".format(
+        len(df), len(df.columns), domain.upper()))
 
-    # Bar chart — group means
-    if "bar" in chart_type.lower() or "by" in title_lower:
-        cat_col = next((c for c in cat_cols
-                        if c.lower() in title_lower
-                        or clean_col_name(c).lower() in title_lower), None)
-        num_col = next((c for c in num_cols
-                        if c.lower() in title_lower
-                        or clean_col_name(c).lower() in title_lower), None)
-        if not cat_col and cat_cols: cat_col = cat_cols[0]
-        if not num_col and num_cols: num_col = num_cols[0]
+    # Key numeric stats
+    for col in num_cols[:6]:
+        try:
+            arr = pd.to_numeric(df[col], errors="coerce").dropna().values
+            arr = arr[np.isfinite(arr)]
+            if len(arr) < 3: continue
+            q1  = float(np.percentile(arr, 25))
+            q3  = float(np.percentile(arr, 75))
+            parts.append("{}: average={:.2f}, typical={:.2f}, range={:.2f}-{:.2f}".format(
+                clean_col(col), float(np.mean(arr)), float(np.median(arr)),
+                float(np.min(arr)), float(np.max(arr))))
+        except Exception:
+            continue
 
-        if cat_col and num_col:
-            grp = df.groupby(cat_col)[num_col].mean().sort_values(ascending=False)
-            stats_parts.append("Metric: {} by {}".format(
-                clean_col_name(num_col), clean_col_name(cat_col)))
-            stats_parts.append("Overall average: {:.2f}".format(float(df[num_col].mean())))
-            stats_parts.append("Top performer: '{}' at {:.2f}".format(grp.index[0], grp.iloc[0]))
-            stats_parts.append("Worst performer: '{}' at {:.2f}".format(grp.index[-1], grp.iloc[-1]))
-            stats_parts.append("Performance gap: {:.1f}% between best and worst".format(
-                abs(grp.iloc[0]-grp.iloc[-1])/abs(grp.iloc[-1])*100 if grp.iloc[-1]!=0 else 0))
-            above_avg = (grp > grp.mean()).sum()
-            stats_parts.append("{} out of {} groups are above average".format(above_avg, len(grp)))
+    # Categorical breakdowns
+    for col in cat_cols[:3]:
+        try:
+            vc = df[col].value_counts(normalize=True).head(4)
+            breakdown = " | ".join(["{}: {:.0f}%".format(k, v*100) for k,v in vc.items()])
+            parts.append("{}: {}".format(clean_col(col), breakdown))
+        except Exception:
+            continue
 
-    # Distribution/histogram
-    elif "distribution" in chart_type.lower() or "histogram" in chart_type.lower():
-        col = next((c for c in num_cols if c.lower() in title_lower), None)
-        if not col and num_cols: col = num_cols[0]
-        if col:
-            s = df[col].dropna()
-            q1, q3 = s.quantile(0.25), s.quantile(0.75)
-            iqr = q3 - q1
-            outliers = int(((s < q1-1.5*iqr) | (s > q3+1.5*iqr)).sum())
-            skew = s.skew()
-            stats_parts.append("Metric: {}".format(clean_col_name(col)))
-            stats_parts.append("Average value: {:.2f}".format(float(s.mean())))
-            stats_parts.append("Most typical value: {:.2f}".format(float(s.median())))
-            stats_parts.append("Range: {:.2f} to {:.2f}".format(float(s.min()), float(s.max())))
-            stats_parts.append("Middle 50% of values: {:.2f} to {:.2f}".format(float(q1), float(q3)))
-            stats_parts.append("Distribution shape: {}".format(
-                "concentrated in high values (right-skewed)" if skew < -0.5
-                else "concentrated in low values (left-skewed)" if skew > 0.5
+    # Story report findings if available
+    if story_report:
+        attrition = getattr(story_report, "attrition", None)
+        if attrition:
+            parts.append("CRITICAL — Attrition Rate: {:.1f}% (benchmark: 10-15%). "
+                         "{:,} employees left. Flight risk: {:,} remaining.".format(
+                attrition.rate, attrition.n_left, attrition.n_flight_risk))
+        for risk in getattr(story_report, "business_risks", [])[:3]:
+            parts.append("Risk: " + risk[:100])
+
+    return "\n".join(parts)
+
+
+def _build_chart_data(
+    df: pd.DataFrame,
+    chart_type: str,
+    x_axis: str,
+    y_axis: str,
+) -> str:
+    """Build chart data dict as string for LLM."""
+    try:
+        if chart_type.lower() in ("bar chart", "bar"):
+            grp = df.groupby(x_axis)[y_axis].mean().sort_values(ascending=False)
+            data = {str(k): round(float(v), 3) for k,v in grp.items()}
+            overall = float(df[y_axis].mean())
+            return "Data: {} | Overall average: {:.3f}".format(str(data), overall)
+
+        elif chart_type.lower() in ("pie chart", "pie"):
+            grp   = df.groupby(x_axis)[y_axis].mean()
+            total = grp.sum()
+            data  = {str(k): "{:.1f}%".format(v/total*100) for k,v in grp.items()}
+            top   = max(grp.items(), key=lambda x: x[1])
+            return "Shares: {} | Largest: '{}' at {:.1f}%".format(
+                str(data), top[0], top[1]/total*100)
+
+        elif chart_type.lower() in ("histogram", "distribution"):
+            arr    = pd.to_numeric(df[y_axis], errors="coerce").dropna().values
+            arr    = arr[np.isfinite(arr)]
+            return ("Distribution: avg={:.2f}, typical={:.2f}, "
+                    "range={:.2f}-{:.2f}, shape={}".format(
+                float(np.mean(arr)), float(np.median(arr)),
+                float(np.min(arr)), float(np.max(arr)),
+                "concentrated in high values" if float(pd.Series(arr).skew())<-0.5
+                else "concentrated in low values" if float(pd.Series(arr).skew())>0.5
                 else "evenly spread"))
-            stats_parts.append("Unusual values detected: {} ({:.1f}% of data)".format(
-                outliers, outliers/len(s)*100))
 
-    # Correlation heatmap
-    elif "correlation" in chart_type.lower():
-        if len(num_cols) >= 2:
-            corr = df[num_cols[:8]].corr()
-            pairs = []
+        elif chart_type.lower() in ("correlation", "heatmap"):
+            num_cols = df.select_dtypes(include="number").columns.tolist()
+            corr     = df[num_cols[:6]].corr()
+            pairs    = []
             for i in range(len(corr.columns)):
                 for j in range(i+1, len(corr.columns)):
                     a, b = corr.columns[i], corr.columns[j]
-                    r = float(corr.loc[a,b])
-                    pairs.append((clean_col_name(a), clean_col_name(b), r))
-            pairs.sort(key=lambda x: abs(x[2]), reverse=True)
-            stats_parts.append("Number of metrics analyzed: {}".format(len(num_cols[:8])))
-            if pairs:
-                a, b, r = pairs[0]
-                stats_parts.append("Strongest relationship: {} and {} (strength: {:.0f}%)".format(
-                    a, b, abs(r)*100))
-                stats_parts.append("Direction: {} tends to {} when {} increases".format(
-                    b, "increase" if r>0 else "decrease", a))
-            strong = [(a,b,r) for a,b,r in pairs if abs(r)>=0.5]
-            weak   = [(a,b,r) for a,b,r in pairs if abs(r)<0.2]
-            stats_parts.append("Strong relationships found: {}".format(len(strong)))
-            stats_parts.append("No meaningful relationships: {}".format(len(weak)))
+                    r    = float(corr.loc[a,b])
+                    if abs(r) >= 0.3:
+                        pairs.append("{} & {}: {:.2f}".format(
+                            clean_col(a), clean_col(b), r))
+            return "Significant relationships: " + " | ".join(pairs[:5]) if pairs else "No strong relationships"
 
-    # Pie chart
-    elif "pie" in chart_type.lower() or "share" in title_lower:
-        cat_col = next((c for c in cat_cols if c.lower() in title_lower), None)
-        num_col = next((c for c in num_cols if c.lower() in title_lower), None)
-        if not cat_col and cat_cols: cat_col = cat_cols[0]
-        if not num_col and num_cols: num_col = num_cols[0]
-        if cat_col and num_col:
-            grp = df.groupby(cat_col)[num_col].mean().sort_values(ascending=False)
-            total = grp.sum()
-            stats_parts.append("Composition metric: {} by {}".format(
-                clean_col_name(num_col), clean_col_name(cat_col)))
-            stats_parts.append("Number of segments: {}".format(len(grp)))
-            stats_parts.append("Largest segment: '{}' holds {:.1f}% of total".format(
-                grp.index[0], grp.iloc[0]/total*100))
-            stats_parts.append("Smallest segment: '{}' holds {:.1f}% of total".format(
-                grp.index[-1], grp.iloc[-1]/total*100))
-            top2_pct = grp.iloc[:2].sum()/total*100
-            stats_parts.append("Top 2 segments combined: {:.1f}% of total".format(top2_pct))
-            stats_parts.append("Distribution type: {}".format(
-                "Highly concentrated (Pareto effect)" if top2_pct > 60
-                else "Evenly distributed across segments"))
+    except Exception:
+        pass
 
-    # Fallback
-    if not stats_parts and num_cols:
-        col = num_cols[0]
-        s = df[col].dropna()
-        stats_parts.append("Metric: {}".format(clean_col_name(col)))
-        stats_parts.append("Average: {:.2f}".format(float(s.mean())))
-        stats_parts.append("Range: {:.2f} to {:.2f}".format(float(s.min()), float(s.max())))
-
-    return "\n".join(stats_parts)
+    return "Chart data unavailable"
 
 
 # ══════════════════════════════════════════════════════════
-#  CHART TYPE DETECTOR
+#  EXECUTIVE SUMMARY PROMPT
 # ══════════════════════════════════════════════════════════
 
-def detect_chart_type(title: str) -> str:
-    title_lower = title.lower()
-    if "correlation" in title_lower or "heatmap" in title_lower:
-        return "Correlation Heatmap"
-    elif "distribution" in title_lower or "histogram" in title_lower:
-        return "Distribution Histogram"
-    elif "share" in title_lower or "pie" in title_lower:
-        return "Pie Chart"
-    elif "trend" in title_lower or "over time" in title_lower:
-        return "Trend Line Chart"
-    elif "by" in title_lower:
-        return "Bar Chart"
-    return "Bar Chart"
+def _executive_prompt(raw_data_summary: str) -> str:
+    return """You are an Elite Business Consultant writing an Executive Summary and Action Plan for a company Director.
 
+RAW DATA SUMMARY:
+{raw_data_summary}
 
-# ══════════════════════════════════════════════════════════
-#  MASTER PROMPT — McKinsey/BCG Style
-# ══════════════════════════════════════════════════════════
+Your task is to analyze this data and provide 3 major business risks and 3 strategic business actions.
 
-def _build_master_prompt(
-    chart_type: str,
-    feature_name: str,
-    raw_statistics: str,
-    domain: str = "general",
-) -> str:
-    domain_context = {
-        "hr":        "HR Director or Chief People Officer making workforce decisions",
-        "ecommerce": "E-commerce Director or Category Manager optimizing product performance",
-        "finance":   "CFO or Finance Director reviewing financial performance",
-        "marketing": "CMO or Marketing Director optimizing campaign performance",
-        "general":   "C-level executive or business owner making strategic decisions",
-    }.get(domain, "C-level executive making strategic decisions")
-
-    return """You are a Senior Executive Consultant at a top-tier management consulting firm (McKinsey, BCG, Bain level). Your audience is: {audience}.
-
-CHART BEING ANALYZED:
-- Chart Type: {chart_type}
-- Metric: {feature_name}
-- Computed Statistics:
-{raw_statistics}
-
-STRICT RULES — VIOLATION IS NOT ACCEPTABLE:
-
-1. NO SNAKE_CASE OR RAW COLUMN NAMES. Never output database-style names.
-   - WRONG: "the satisfaction_level column shows..."
-   - RIGHT: "Employee Satisfaction Score reveals..."
-
-2. NO STATISTICAL JARGON. Translate everything into business language.
-   - WRONG: "p-value, Kruskal-Wallis, Pearson r, IQR, skewness, standard deviation"
-   - RIGHT: "mathematically proven relationship", "most employees", "unusually high variation"
-
-3. NO DATA ENGINEERING ADVICE. Only business strategy.
-   - WRONG: "remove outliers", "log-transform", "handle missing values"
-   - RIGHT: "conduct exit interviews", "audit workloads", "review salary bands"
-
-4. CHART-SPECIFIC ANALYSIS:
-   - Bar Chart: Focus on ranking, the gap between #1 and last, what this disparity means operationally.
-   - Pie Chart: Focus on market share, whether distribution is dangerously concentrated or balanced.
-   - Histogram: Focus on what the typical employee/customer looks like and what the extremes mean.
-   - Correlation Heatmap: Focus on which business levers move together and strategic implications.
-   - Trend Line: Focus on trajectory, momentum, and whether intervention is needed.
-
-5. SPECIFICITY REQUIRED: You MUST reference the actual numbers from the statistics provided. Generic statements are unacceptable.
+CRITICAL RULES (YOU WILL BE PENALIZED FOR VIOLATING THESE):
+1. INFER THE DOMAIN: Look at the variable names. Are they HR, E-Commerce, or Finance? Adopt the persona of a consultant in that specific industry.
+2. TRANSLATE RAW VARIABLES: You are STRICTLY FORBIDDEN from outputting raw database column names. You MUST convert snake_case to polished English.
+   - Example: Change 'time_spend_company' to 'Employee Tenure'.
+   - Example: Change 'promotion_last_5years' to 'Recent Promotions'.
+3. NO ACADEMIC JARGON: You are STRICTLY FORBIDDEN from using terms like: Kruskal-Wallis, p-value, Pearson, skewness, median, IQR, or standard deviation. Translate math into business English (e.g., "There is a mathematically proven performance gap").
+4. NO DATA ENGINEERING ADVICE: Do NOT suggest log-transforms, machine learning models, handling missing values, or outlier removal. Recommend pure business actions like "Conduct exit interviews" or "Audit workloads".
 
 OUTPUT FORMAT:
-Write exactly ONE punchy executive paragraph (3-4 sentences). Then write exactly ONE "Strategic Action:" line. Be authoritative, specific, and direct. No bullet points. No headers. Just the paragraph and the action.
+Write ONE powerful opening sentence summarizing the business situation.
+Then provide exactly 3 bullet points of business risks (start each with RISK:).
+Then provide exactly 3 bullet points of immediate strategic actions (start each with ACTION:).
+Be direct, authoritative, and specific with numbers from the data.""".format(
+        raw_data_summary=raw_data_summary)
 
-Example of correct output:
-"Employee Tenure data reveals a critical retention pattern: the majority of the workforce has served between 3-5 years, yet a concerning 8% of employees have tenure exceeding 8 years without receiving promotions — a group at acute flight risk. The 2-year tenure cohort shows the highest attrition concentration, suggesting onboarding and early career support are failing to create lasting engagement. This distribution signals an organization that is losing employees precisely when they become most productive.
 
-Strategic Action: Immediately implement a structured 18-month career development programme targeting employees in their second year, and conduct skip-level retention conversations with all tenured employees above 7 years who have not been promoted in the last 3 years."
-""".format(
-        audience=domain_context,
+# ══════════════════════════════════════════════════════════
+#  CHART ANALYSIS PROMPT
+# ══════════════════════════════════════════════════════════
+
+def _chart_prompt(chart_type: str, x_axis: str, y_axis: str,
+                  chart_data_str: str) -> str:
+    x_clean = clean_col(x_axis)
+    y_clean = clean_col(y_axis)
+
+    return """You are a Data Storyteller presenting a {chart_type} to a client.
+The chart compares {x_clean} against {y_clean}.
+Chart Data: {chart_data}
+
+CRITICAL RULES:
+1. TRANSLATE VARIABLES: Never use raw snake_case names. '{x_axis}' = '{x_clean}', '{y_axis}' = '{y_clean}'.
+2. NO ACADEMIC JARGON: Do not use terms like Kruskal-Wallis, p-value, or standard deviation.
+
+STRICT CHART-SPECIFIC INSTRUCTIONS:
+- IF THIS IS A BAR CHART: Focus strictly on rankings and disparities. Identify highest and lowest performers. Explain what this operational gap means for the business.
+- IF THIS IS A PIE CHART: Do NOT discuss performance gaps. Focus strictly on market share and composition. Identify which category holds the largest slice and explain if the business is dangerously concentrated or well-balanced.
+- IF THIS IS A TREND/LINE CHART: Focus strictly on momentum and trajectory. Is the situation improving or degrading?
+- IF THIS IS A HISTOGRAM/DISTRIBUTION: Focus on what the typical value means for business and what the extremes indicate about risk.
+- IF THIS IS A CORRELATION/HEATMAP: Focus on which business levers move together and what this means operationally.
+
+OUTPUT FORMAT:
+Write exactly ONE paragraph (3-4 sentences maximum) of high-impact business analysis. Do not repeat general dataset averages. Be specific with numbers from the chart data. End with one clear business implication.""".format(
         chart_type=chart_type,
-        feature_name=feature_name,
-        raw_statistics=raw_statistics,
-    )
+        x_clean=x_clean, y_clean=y_clean,
+        chart_data=chart_data_str,
+        x_axis=x_axis, y_axis=y_axis)
 
 
 # ══════════════════════════════════════════════════════════
-#  MAIN FUNCTION — Called from PDF builder
+#  GROQ CALLER
 # ══════════════════════════════════════════════════════════
+
+def _call_groq(prompt: str, api_key: str, max_tokens: int = 400) -> Optional[str]:
+    """Call Groq API. Returns None if unavailable."""
+    if not api_key:
+        return None
+    try:
+        from groq import Groq
+        client   = Groq(api_key=api_key)
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role":"user","content":prompt}],
+            max_tokens=max_tokens,
+            temperature=0.3,
+        )
+        return clean_text(response.choices[0].message.content.strip())
+    except Exception:
+        return None
+
+
+# ══════════════════════════════════════════════════════════
+#  RULE-BASED FALLBACKS
+# ══════════════════════════════════════════════════════════
+
+def _fallback_executive(df: pd.DataFrame, domain: str,
+                        story_report=None) -> str:
+    """Rule-based executive summary when Groq unavailable."""
+    num_cols = df.select_dtypes(include="number").columns.tolist()
+    cat_cols = df.select_dtypes(include="object").columns.tolist()
+
+    attrition = getattr(story_report, "attrition", None) if story_report else None
+    risks = getattr(story_report, "business_risks", []) if story_report else []
+    actions = getattr(story_report, "recommended_actions", []) if story_report else []
+
+    parts = []
+
+    if domain == "hr" and attrition:
+        parts.append(
+            "This workforce dataset reveals a significant retention challenge "
+            "requiring immediate leadership attention.\n\n"
+            "RISK: Employee attrition at {:.1f}% exceeds the healthy 10-15% industry benchmark, "
+            "with {:,} employees having departed.".format(attrition.rate, attrition.n_left))
+        if attrition.dept_attrition:
+            worst = max(attrition.dept_attrition.items(), key=lambda x:x[1])
+            parts.append("RISK: {} department shows {:.0f}% attrition — the highest in the organization.".format(
+                worst[0], worst[1]))
+        parts.append("RISK: {:,} remaining employees estimated at flight risk ({:.0f}% of workforce).".format(
+            attrition.n_flight_risk, attrition.flight_risk_pct))
+        parts.append("\nACTION: Conduct exit interviews with all departed employees within 2 weeks to identify root causes.")
+        parts.append("ACTION: Benchmark salaries against market rates — compensation is the #1 attrition driver.")
+        parts.append("ACTION: Launch quarterly employee pulse surveys to monitor satisfaction in real time.")
+
+    elif domain == "ecommerce":
+        rating_col = next((c for c in num_cols if "rating" in c.lower()
+                           and "count" not in c.lower()), None)
+        parts.append("This e-commerce dataset reveals product performance patterns requiring strategic attention.\n")
+        if rating_col:
+            mean_r = float(df[rating_col].mean())
+            low_n  = int((df[rating_col]<3.0).sum())
+            parts.append("RISK: Average customer rating of {:.2f}/5 {'is below the 4.0 industry benchmark' if mean_r<4.0 else 'is competitive but requires maintenance'}, with {:,} products rated critically low.".format(mean_r, low_n))
+        if risks:
+            for r in risks[:2]:
+                parts.append("RISK: " + r[:100])
+        parts.append("\nACTION: Audit all products rated below 3.0 and either improve quality or remove from catalog.")
+        parts.append("ACTION: A/B test a 5% price increase on all products rated above 4.3.")
+        parts.append("ACTION: Implement post-purchase customer surveys to identify quality gaps before reviews are posted.")
+
+    elif domain == "sales":
+        rev_col = next((c for c in num_cols
+                        if any(k in c.lower() for k in ["revenue","sales","amount"])), None)
+        parts.append("This sales dataset reveals performance patterns with significant revenue implications.\n")
+        if rev_col:
+            mean_r = float(df[rev_col].mean())
+            parts.append("RISK: Revenue distribution shows high variability — average {:.0f} may mask significant underperformers.".format(mean_r))
+        if risks:
+            for r in risks[:2]:
+                parts.append("RISK: " + r[:100])
+        parts.append("\nACTION: Weekly revenue vs target review by region and representative.")
+        parts.append("ACTION: Identify top 20% revenue drivers and replicate their approach across the team.")
+        parts.append("ACTION: Conduct pipeline quality audit to identify stalled deals and conversion blockers.")
+
+    else:
+        parts.append("Dataset analysis complete — key patterns identified for strategic action.\n")
+        for r in risks[:3]:
+            parts.append("RISK: " + r[:100])
+        for a in actions[:3]:
+            parts.append("ACTION: " + a.replace("[CRITICAL] ","").replace("[SHORT TERM] ","")
+                         .replace("[LONG TERM] ","")[:100])
+
+    return "\n".join(parts)
+
+
+def _fallback_chart(df: pd.DataFrame, chart_type: str,
+                    x_axis: str, y_axis: str) -> str:
+    """Rule-based chart narrative when Groq unavailable."""
+    x_clean = clean_col(x_axis)
+    y_clean = clean_col(y_axis)
+
+    try:
+        if chart_type.lower() in ("bar chart","bar") and x_axis in df.columns and y_axis in df.columns:
+            grp   = df.groupby(x_axis)[y_axis].mean().sort_values(ascending=False)
+            top   = grp.index[0];   top_v  = grp.iloc[0]
+            bot   = grp.index[-1];  bot_v  = grp.iloc[-1]
+            avg   = float(df[y_axis].mean())
+            gap   = abs(top_v-bot_v)/max(bot_v,0.001)*100
+            above = (grp>avg).sum()
+            return (
+                "Analysis of {} across {} categories reveals a clear performance hierarchy. "
+                "'{}' leads with {:.2f} while '{}' trails at {:.2f} — a {:.0f}% performance gap that "
+                "demands immediate operational attention. "
+                "{} out of {} categories perform above the overall average of {:.2f}. "
+                "Closing this gap represents a significant untapped performance opportunity.".format(
+                    y_clean, len(grp), top, top_v, bot, bot_v, gap,
+                    above, len(grp), avg))
+
+        elif chart_type.lower() in ("pie chart","pie") and x_axis in df.columns and y_axis in df.columns:
+            grp   = df.groupby(x_axis)[y_axis].mean()
+            total = grp.sum()
+            top   = grp.idxmax()
+            top_p = grp.max()/total*100
+            top2  = grp.nlargest(2).sum()/total*100
+            return (
+                "The composition of {} across {} segments reveals {}. "
+                "'{}' dominates with {:.1f}% share. "
+                "The top 2 segments combined hold {:.1f}% — indicating {}. "
+                "This concentration pattern has significant implications for risk and resource allocation.".format(
+                    y_clean, len(grp),
+                    "a highly concentrated distribution" if top_p>40 else "a balanced distribution",
+                    top, top_p, top2,
+                    "dangerous dependency" if top2>70 else "moderate balance"))
+
+        elif y_axis in df.columns:
+            arr = pd.to_numeric(df[y_axis], errors="coerce").dropna().values
+            arr = arr[np.isfinite(arr)]
+            if len(arr)>3:
+                skew = float(pd.Series(arr).skew())
+                return (
+                    "{} shows an average of {:.2f} with a typical value of {:.2f}. "
+                    "Values range from {:.2f} to {:.2f}, indicating {}. "
+                    "The {} distribution suggests decision-makers should focus on {} for accurate planning.".format(
+                        y_clean, float(np.mean(arr)), float(np.median(arr)),
+                        float(np.min(arr)), float(np.max(arr)),
+                        "high variability requiring segmented analysis" if float(np.std(arr))/abs(float(np.mean(arr)))>0.5 else "consistent performance",
+                        "skewed" if abs(skew)>0.5 else "symmetric",
+                        "the typical value ({:.2f})".format(float(np.median(arr))) if abs(skew)>0.5 else "the average ({:.2f})".format(float(np.mean(arr)))))
+    except Exception:
+        pass
+
+    return ("Analysis of {} reveals patterns with strategic business implications. "
+            "Review the chart for specific values and consult with department heads "
+            "to develop targeted action plans.".format(y_clean))
+
+
+# ══════════════════════════════════════════════════════════
+#  MAIN PUBLIC FUNCTIONS
+# ══════════════════════════════════════════════════════════
+
+def generate_executive_summary(
+    df: pd.DataFrame,
+    domain: str = "general",
+    story_report=None,
+    groq_api_key: str = "",
+) -> str:
+    """
+    Generate elite consultant executive summary.
+    Groq LLM if available, rule-based fallback otherwise.
+    """
+    raw_summary = _build_raw_data_summary(df, domain, story_report)
+    prompt      = _executive_prompt(raw_summary)
+
+    result = _call_groq(prompt, groq_api_key, max_tokens=500)
+    if result:
+        return result
+
+    return _fallback_executive(df, domain, story_report)
+
 
 def generate_chart_narrative(
     df: pd.DataFrame,
     chart_title: str,
-    groq_api_key: Optional[str] = None,
+    groq_api_key: str = "",
     domain: str = "general",
 ) -> str:
     """
-    Generate McKinsey-style executive narrative for a chart.
-    Uses real computed statistics — LLM only narrates.
-    Falls back to rule-based if Groq unavailable.
+    Generate elite data storyteller narrative for a chart.
+    Auto-detects chart type from title.
     """
-    chart_type   = detect_chart_type(chart_title)
-    feature_name = clean_feature_name(chart_title)
-    raw_stats    = _build_raw_statistics(df, chart_title, chart_type)
+    # Detect chart type
+    title_lower = chart_title.lower()
+    if "correlation" in title_lower or "heatmap" in title_lower:
+        chart_type = "Correlation Heatmap"
+        x_axis     = "metrics"
+        y_axis     = "metrics"
+    elif "distribution" in title_lower or "histogram" in title_lower:
+        chart_type = "Histogram"
+        # Extract column from title
+        num_cols   = df.select_dtypes(include="number").columns.tolist()
+        y_axis     = next((c for c in num_cols if c.lower() in title_lower), num_cols[0] if num_cols else "value")
+        x_axis     = y_axis
+    elif "pie" in title_lower or "share" in title_lower:
+        chart_type = "Pie Chart"
+        cat_cols   = df.select_dtypes(include="object").columns.tolist()
+        num_cols   = df.select_dtypes(include="number").columns.tolist()
+        x_axis     = next((c for c in cat_cols if c.lower() in title_lower), cat_cols[0] if cat_cols else "category")
+        y_axis     = next((c for c in num_cols if c.lower() in title_lower), num_cols[0] if num_cols else "value")
+    elif "by" in title_lower:
+        chart_type = "Bar Chart"
+        parts      = chart_title.lower().replace("avg ","").replace("total ","").split(" by ")
+        num_cols   = df.select_dtypes(include="number").columns.tolist()
+        cat_cols   = df.select_dtypes(include="object").columns.tolist()
+        y_axis     = next((c for c in num_cols if c.lower() in parts[0]), num_cols[0] if num_cols else "value")
+        x_axis     = next((c for c in cat_cols if c.lower() in (parts[1] if len(parts)>1 else "")),
+                          cat_cols[0] if cat_cols else "category")
+    else:
+        chart_type = "Bar Chart"
+        num_cols   = df.select_dtypes(include="number").columns.tolist()
+        cat_cols   = df.select_dtypes(include="object").columns.tolist()
+        y_axis     = num_cols[0] if num_cols else "value"
+        x_axis     = cat_cols[0] if cat_cols else "category"
 
-    # Try Groq LLM
-    api_key = groq_api_key or os.environ.get("GROQ_API_KEY", "")
-    if api_key:
-        try:
-            from groq import Groq
-            client = Groq(api_key=api_key)
-            prompt = _build_master_prompt(chart_type, feature_name, raw_stats, domain)
-            response = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=[{"role":"user","content":prompt}],
-                max_tokens=400,
-                temperature=0.3,
-            )
-            narrative = response.choices[0].message.content.strip()
-            # Clean any remaining snake_case
-            narrative = _clean_snake_case(narrative)
-            return narrative
-        except Exception:
-            pass
+    chart_data_str = _build_chart_data(df, chart_type, x_axis, y_axis)
+    prompt         = _chart_prompt(chart_type, x_axis, y_axis, chart_data_str)
 
-    # Fallback — rule-based narrative (no LLM)
-    return _rule_based_narrative(df, chart_title, chart_type, feature_name, raw_stats)
+    result = _call_groq(prompt, groq_api_key, max_tokens=300)
+    if result:
+        return result
 
-
-def _clean_snake_case(text: str) -> str:
-    """Post-process: replace any remaining snake_case with clean names."""
-    for raw, clean in COLUMN_NAME_MAP.items():
-        text = text.replace(raw, clean)
-        text = text.replace("'{}'" .format(raw), clean)
-        text = text.replace('"{}"'.format(raw), clean)
-    return text
-
-
-def _rule_based_narrative(
-    df: pd.DataFrame,
-    title: str,
-    chart_type: str,
-    feature_name: str,
-    raw_stats: str,
-) -> str:
-    """Fallback narrative when Groq is unavailable."""
-    num_cols = df.select_dtypes(include="number").columns.tolist()
-    cat_cols = df.select_dtypes(include="object").columns.tolist()
-    lines    = raw_stats.split("\n")
-
-    def _get(prefix):
-        for l in lines:
-            if l.startswith(prefix):
-                return l.split(":", 1)[1].strip() if ":" in l else ""
-        return ""
-
-    if "Bar Chart" in chart_type:
-        top  = _get("Top performer")
-        worst= _get("Worst performer")
-        gap  = _get("Performance gap")
-        avg  = _get("Overall average")
-        return (
-            "Performance analysis of {} reveals a clear hierarchy across segments. "
-            "{} leads performance while {} trails significantly — a {} difference "
-            "that demands immediate strategic attention. "
-            "With an overall average of {}, organizations should concentrate resources "
-            "on closing this performance gap through targeted interventions.\n\n"
-            "Strategic Action: Conduct a structured review of the lowest-performing segment "
-            "to identify root causes, and replicate the practices driving the top performer's success."
-        ).format(feature_name, top, worst, gap, avg)
-
-    elif "Distribution" in chart_type:
-        avg    = _get("Average value")
-        typical= _get("Most typical value")
-        range_ = _get("Range")
-        shape  = _get("Distribution shape")
-        return (
-            "The distribution of {} shows that the most typical value is {}, "
-            "though the average of {} suggests {}. "
-            "Values range from {} — indicating considerable variation across the population. "
-            "Decision-makers should focus on the typical value rather than the average "
-            "for more representative planning.\n\n"
-            "Strategic Action: Segment the analysis into high, medium, and low performers "
-            "to design targeted interventions for each group."
-        ).format(feature_name, typical, avg, shape, range_)
-
-    elif "Pie Chart" in chart_type:
-        largest = _get("Largest segment")
-        dist    = _get("Distribution type")
-        top2    = _get("Top 2 segments combined")
-        return (
-            "The composition of {} reveals that {}. "
-            "The top two segments together account for {}, indicating {}. "
-            "This concentration pattern has significant implications for resource allocation "
-            "and strategic risk management.\n\n"
-            "Strategic Action: Review whether the current segment concentration "
-            "represents strategic intent or an unplanned imbalance requiring rebalancing."
-        ).format(feature_name, largest, top2, dist)
-
-    elif "Correlation" in chart_type:
-        strongest = _get("Strongest relationship")
-        direction = _get("Direction")
-        return (
-            "Relationship analysis across key metrics reveals important operational linkages. "
-            "{}. {} — a finding with direct implications for management strategy. "
-            "Understanding these interdependencies enables more informed decision-making "
-            "across the organization.\n\n"
-            "Strategic Action: Prioritize improving the leading metric identified, "
-            "as improvements will propagate to linked outcomes across the business."
-        ).format(strongest, direction)
-
-    return (
-        "Analysis of {} provides actionable intelligence for strategic decision-making. "
-        "The data reveals meaningful patterns that warrant leadership attention and "
-        "structured intervention.\n\n"
-        "Strategic Action: Review the detailed findings with department heads and "
-        "develop a 30-60-90 day action plan."
-    ).format(feature_name)
-
-
-def generate_executive_summary(
-    df: pd.DataFrame,
-    story_report,
-    groq_api_key: Optional[str] = None,
-) -> str:
-    """
-    Generate polished executive summary using LLM.
-    Passes pre-computed story findings to LLM for narration only.
-    """
-    api_key = groq_api_key or os.environ.get("GROQ_API_KEY", "")
-
-    # Build structured summary from story report
-    domain   = getattr(story_report, "domain", "general")
-    findings = getattr(story_report, "key_findings", [])
-    risks    = getattr(story_report, "business_risks", [])
-    attrition= getattr(story_report, "attrition", None)
-
-    context_parts = [
-        "Dataset: {:,} rows, {} columns, {} domain".format(
-            len(df), len(df.columns), domain),
-    ]
-    if attrition:
-        context_parts.append("Attrition Rate: {:.1f}% ({} severity)".format(
-            attrition.rate, attrition.severity))
-        context_parts.append("Flight Risk Employees: {:,}".format(attrition.n_flight_risk))
-    for f in findings[:3]:
-        context_parts.append("Finding: " + f[:100])
-    for r in risks[:2]:
-        context_parts.append("Risk: " + r[:100])
-
-    context = "\n".join(context_parts)
-
-    if api_key:
-        try:
-            from groq import Groq
-            client = Groq(api_key=api_key)
-            prompt = """You are a Senior Management Consultant writing an executive summary for a board-level report.
-
-COMPUTED FINDINGS (DO NOT INVENT NEW NUMBERS):
-{context}
-
-RULES:
-1. Use ONLY the numbers and facts provided above
-2. NO snake_case column names — translate to polished English
-3. NO statistical jargon
-4. Write for a C-suite executive who has 30 seconds to read this
-5. 4-5 sentences maximum
-6. Start with the most critical finding
-7. End with confidence in the analysis
-
-Write the executive summary now:""".format(context=context)
-
-            response = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=[{"role":"user","content":prompt}],
-                max_tokens=300,
-                temperature=0.2,
-            )
-            summary = response.choices[0].message.content.strip()
-            return _clean_snake_case(summary)
-        except Exception:
-            pass
-
-    # Fallback
-    return _clean_snake_case(getattr(story_report, "executive_summary",
-                                     "Analysis completed by DataForge AI."))
+    return _fallback_chart(df, chart_type, x_axis, y_axis)
