@@ -100,6 +100,7 @@ with col2:
     st.markdown("**Column Types**")
     type_df = df.dtypes.reset_index()
     type_df.columns = ["Column", "Type"]
+    type_df["Type"] = type_df["Type"].astype(str)  # fix Arrow serialization
     st.dataframe(type_df, use_container_width=True, height=400)
 
 st.divider()
