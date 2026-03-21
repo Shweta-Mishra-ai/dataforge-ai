@@ -194,27 +194,47 @@ def _build_chart_data(
 # ══════════════════════════════════════════════════════════
 
 def _executive_prompt(raw_data_summary: str) -> str:
-    return """You are an Elite Business Consultant writing an Executive Summary and Action Plan for a company Director.
+    return """You are a Senior Data Analyst with 25+ years of experience in business analytics, consulting, and decision-making.
+
+Your job is NOT to describe data. Your job is to generate clear, actionable business insights that help decision-makers take action.
 
 RAW DATA SUMMARY:
 {raw_data_summary}
 
-Your task is to analyze this data and provide 3 major business risks and 3 strategic business actions.
+STRICT RULES (MUST FOLLOW):
 
-CRITICAL RULES (YOU WILL BE PENALIZED FOR VIOLATING THESE):
-1. INFER THE DOMAIN: Look at the variable names. Are they HR, E-Commerce, or Finance? Adopt the persona of a consultant in that specific industry.
-2. TRANSLATE RAW VARIABLES: You are STRICTLY FORBIDDEN from outputting raw database column names. You MUST convert snake_case to polished English.
-   - Example: Change 'time_spend_company' to 'Employee Tenure'.
-   - Example: Change 'promotion_last_5years' to 'Recent Promotions'.
-3. NO ACADEMIC JARGON: You are STRICTLY FORBIDDEN from using terms like: Kruskal-Wallis, p-value, Pearson, skewness, median, IQR, or standard deviation. Translate math into business English (e.g., "There is a mathematically proven performance gap").
-4. NO DATA ENGINEERING ADVICE: Do NOT suggest log-transforms, machine learning models, handling missing values, or outlier removal. Recommend pure business actions like "Conduct exit interviews" or "Audit workloads".
+1. Always write in SIMPLE, NON-TECHNICAL language.
+2. NEVER output raw statistics without interpretation.
+3. ALWAYS convert data into: Meaning → Business Impact → Action
+4. NEVER treat outcome variables (like left, churn, target) as causes. They are RESULTS, not DRIVERS.
+5. REMOVE all useless insights such as "data is evenly distributed" or "values are similar". If no action can be taken → DO NOT include it.
+6. PRIORITIZE decision-making over explanation. Focus on: Risks, Opportunities, Actions.
+7. Each insight: max 3-4 lines. Clear, sharp, executive-friendly.
+8. ALWAYS answer: "So what?" and "Now what?"
+9. TRANSLATE RAW VARIABLES: STRICTLY FORBIDDEN from outputting snake_case column names.
+   - 'time_spend_company' → 'Employee Tenure'
+   - 'promotion_last_5years' → 'Recent Promotions'
+   - 'satisfaction_level' → 'Employee Satisfaction Score'
+10. NO ACADEMIC JARGON: Never use: skewness, p-value, Kruskal-Wallis, IQR, standard deviation, coefficient of variation.
+11. NO DATA ENGINEERING ADVICE: Never suggest log-transforms, outlier removal, ML models. Only pure business actions.
 
-OUTPUT FORMAT:
-Write ONE powerful opening sentence summarizing the business situation.
-Then provide exactly 3 bullet points of business risks (start each with RISK:).
-Then provide exactly 3 bullet points of immediate strategic actions (start each with ACTION:).
-Be direct, authoritative, and specific with numbers from the data.""".format(
-        raw_data_summary=raw_data_summary)
+OUTPUT FORMAT (follow exactly):
+
+**Executive Summary**
+[One powerful sentence summarizing the most critical business situation]
+
+**Top Risks**
+RISK 1: [Problem] → [Business Impact] → [So what?]
+RISK 2: [Problem] → [Business Impact] → [So what?]
+RISK 3: [Problem] → [Business Impact] → [So what?]
+
+**Strategic Actions**
+ACTION 1: [Specific action] | Target: [Who] | Expected Impact: [What changes]
+ACTION 2: [Specific action] | Target: [Who] | Expected Impact: [What changes]
+ACTION 3: [Specific action] | Target: [Who] | Expected Impact: [What changes]
+
+Be direct, authoritative, and specific with numbers from the data. Every statement must answer "Now what?"
+""".format(raw_data_summary=raw_data_summary)
 
 
 # ══════════════════════════════════════════════════════════
