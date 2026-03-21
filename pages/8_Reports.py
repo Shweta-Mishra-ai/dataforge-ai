@@ -6,6 +6,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import io
+import os
 
 from core.session_manager import (
     require_data, get_df, get_filename,
@@ -34,11 +35,19 @@ def _clean_fname(name: str) -> str:
     return name.strip("_- ").replace("_", " ")
 
 
-def _chart_narrative(df: pd.DataFrame, title: str) -> str:
+def _chart_narrative(df: pd.DataFrame, title: str,
+                     groq_key: str = "", domain: str = "general") -> str:
     """
-    Real data-driven narrative for each chart.
-    Uses actual computed stats — no LLM hallucination.
+    McKinsey-style chart narrative.
+    Real stats computed first → LLM narrates only.
     """
+    try:
+        from ai.report_narrator import generate_chart_narrative
+        return generate_chart_narrative(df, title, groq_key, domain)
+    except Exception:
+        pass
+
+    # Fallback rule-based
     num_cols = df.select_dtypes(include="number").columns.tolist()
     cat_cols = df.select_dtypes(include="object").columns.tolist()
 
@@ -279,12 +288,20 @@ if gen_btn:
         progress.progress(65, text="Generating charts...")
         chart_data = []
         try:
+            from core.story_engine import detect_domain
+            domain_name, _ = detect_domain(df)
+            groq_key = ""
+            try:
+                groq_key = st.secrets.get("GROQ_API_KEY","")
+            except Exception:
+                groq_key = os.environ.get("GROQ_API_KEY","")
+
             charts = generate_all_charts(df, theme_name, max_charts=5)
             for title, img_bytes in charts:
                 if img_bytes:
-                    narrative = _chart_narrative(df, title)
+                    narrative = _chart_narrative(df, title, groq_key, domain_name)
                     chart_data.append((title, img_bytes, narrative))
-            st.info("{} charts generated successfully.".format(len(chart_data)))
+            st.info("{} charts generated — AI narratives applied.".format(len(chart_data)))
         except Exception as e:
             st.warning("Charts skipped: {}".format(str(e)))
 
