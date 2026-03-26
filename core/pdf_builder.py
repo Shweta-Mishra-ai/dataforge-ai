@@ -697,7 +697,7 @@ def _dq_note(story, s, T, df: pd.DataFrame, profile, CW):
 #  INDUSTRY BENCHMARKS (HR domain)
 # ══════════════════════════════════════════════════════════
 
-def _benchmark_section(story, s, T, domain, CW):
+def _benchmark_section(story, s, T, domain, CW, df=None):
     if domain not in ("hr", "ecommerce", "sales"): return
     _sec(story, s, T, "Industry Benchmark Context",
          "Sources: SHRM · Gallup · Mercer · Deloitte (2024–2026)")
@@ -708,25 +708,60 @@ def _benchmark_section(story, s, T, domain, CW):
         "to distinguish 'acceptable' from 'urgent.'", s["body"]))
     story.append(Spacer(1, 3*mm))
 
+    # ── Compute real "This Org" values from df ────────────
+    org = {}
+    if df is not None:
+        import numpy as np
+        # Attrition
+        atr_col = next((c for c in df.columns
+                        if c.lower() in ("left","attrition","churned","exited")), None)
+        if atr_col:
+            org["attrition"] = f"{float(df[atr_col].mean())*100:.1f}%"
+
+        # Satisfaction
+        sat_col = next((c for c in df.columns
+                        if "satisfaction" in c.lower()), None)
+        if sat_col:
+            org["satisfaction"] = f"{float(df[sat_col].mean()):.2f}"
+
+        # Rating (ecommerce)
+        rat_col = next((c for c in df.columns
+                        if "rating" in c.lower()
+                        and "count" not in c.lower()), None)
+        if rat_col:
+            org["rating"] = f"{float(df[rat_col].mean()):.2f}/5"
+
     if domain == "hr":
-        rows = HR_BENCHMARKS
+        rows = [
+            ["Attrition Rate",         org.get("attrition","—"),
+             "10–15%", "<10%", "SHRM 2024"],
+            ["Employee Satisfaction",  org.get("satisfaction","—"),
+             "0.70 (70%+)", "0.80+", "Gallup/Mercer"],
+            ["Replacement Cost/EE",    "—",
+             "50–200% sal", "6–9 mo salary", "SHRM/Gallup"],
+            ["Mgr-Driven Satisfaction","—",
+             "70%", "Manager train", "Gallup 2024"],
+            ["Preventable Exits",      "—",
+             "52%", "Proactive 1:1", "Gallup 2024"],
+        ]
         note = ("SHRM 2024 State of Workplace · "
                 "Gallup State of Global Workplace 2024 · "
                 "Mercer Global Talent Trends 2024")
     elif domain == "ecommerce":
         rows = [
-            ["Customer Rating",    "—", "4.0+",     "4.5+",     "Amazon/G2 2024"],
-            ["Return Rate",        "—", "< 20%",    "< 10%",    "Shopify 2024"],
-            ["Repeat Purchase",    "—", "30%+",     "40%+",     "Klaviyo 2024"],
-            ["Conversion Rate",    "—", "2–4%",     "5%+",      "BigCommerce 2024"],
+            ["Customer Rating",  org.get("rating","—"),
+             "4.0+", "4.5+", "Amazon/G2 2024"],
+            ["Return Rate",      "—", "< 20%",  "< 10%", "Shopify 2024"],
+            ["Repeat Purchase",  "—", "30%+",   "40%+",  "Klaviyo 2024"],
+            ["Conversion Rate",  "—", "2–4%",   "5%+",   "BigCommerce 2024"],
         ]
         note = "Amazon Seller Reports 2024 · Shopify Commerce Trends 2024"
     else:  # sales
         rows = [
-            ["Win Rate",           "—", "20–30%",   "40%+",     "Salesforce 2024"],
-            ["Quota Attainment",   "—", "60–70%",   "80%+",     "Gartner 2024"],
-            ["Pipeline Coverage",  "—", "3–4×",     "5×+",      "HubSpot 2024"],
-            ["Avg Deal Cycle",     "—", "< 90 days","< 60 days","Forrester 2024"],
+            ["Win Rate",        "—", "20–30%",   "40%+",      "Salesforce 2024"],
+            ["Quota Attainment","—", "60–70%",   "80%+",      "Gartner 2024"],
+            ["Pipeline Coverage","—","3–4×",     "5×+",       "HubSpot 2024"],
+            ["Avg Deal Cycle",  "—", "< 90 days","< 60 days", "Forrester 2024"],
         ]
         note = "Salesforce State of Sales 2024 · Gartner Sales Benchmark 2024"
 
@@ -1209,7 +1244,7 @@ def build_pdf(
     story.append(PageBreak())
 
     if domain in ("hr", "ecommerce", "sales"):
-        _benchmark_section(story, s, T, domain, CW)
+        _benchmark_section(story, s, T, domain, CW, df=df)
         story.append(PageBreak())
 
     _top_insights(story, s, T, top_insights, CW)
