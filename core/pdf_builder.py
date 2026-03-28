@@ -243,7 +243,18 @@ class _ReportCanvas(CV.Canvas):
         self.setFillColor(HexColor("#FFFFFF"))
         self.setFont("Helvetica", 6.5)
         self.drawString(18*mm, 4.5*mm,
-            "Benchmarks: SHRM · Gallup · Mercer · Deloitte — verify with domain experts before action")
+            _domain_footer_text(getattr(self, "_domain", "general")))
+
+def _domain_footer_text(domain: str) -> str:
+    """FIX-054: Domain-specific footer — no HR benchmarks in sales reports."""
+    _map = {
+        "hr":        "Benchmarks are indicative — verify with qualified HR professionals before action",
+        "ecommerce": "Benchmarks are indicative — verify with e-commerce specialists before action",
+        "sales":     "Benchmarks are indicative — verify with sales leadership before action",
+        "finance":   "Benchmarks are indicative — verify with qualified finance professionals before action",
+        "general":   "Findings based on provided dataset — verify with domain experts before action",
+    }
+    return _map.get(domain, _map["general"])
         self.drawRightString(W - 18*mm, 4.5*mm,
             "Page {} of {}".format(self._pageNumber, tot))
 
@@ -700,8 +711,15 @@ def _dq_note(story, s, T, df: pd.DataFrame, profile, CW):
 
 def _benchmark_section(story, s, T, domain, CW, df=None):
     if domain not in ("hr", "ecommerce", "sales"): return
-    _sec(story, s, T, "Industry Benchmark Context",
-         "Sources: SHRM · Gallup · Mercer · Deloitte (2024–2026)")
+    # FIX-057: Domain-specific subtitle
+    _bench_subtitles = {
+        "hr":        "Sources: SHRM · Gallup · Mercer (2024–2026) — HR domain only",
+        "ecommerce": "Sources: Amazon Seller Reports · Shopify · Klaviyo (2024–2026)",
+        "sales":     "Sources: Salesforce · Gartner · HubSpot (2024–2026)",
+        "finance":   "Sources: PwC · McKinsey · Deloitte Finance (2024–2026)",
+    }
+    _bench_sub = _bench_subtitles.get(domain, "Benchmarks are indicative — verify with domain experts")
+    _sec(story, s, T, "Industry Benchmark Context", _bench_sub)
 
     story.append(Paragraph(
         "Senior analysts do not interpret data in isolation. "
@@ -1083,13 +1101,39 @@ def _appendix(story, s, T, config, CW):
              ["Column Health", "10%", "Avg per-column quality score"]],
             [CW*0.25, CW*0.15, CW*0.60])
 
+    # FIX-055: Domain-isolated appendix sources
     story.append(Paragraph("C. Industry Sources", s["h3"]))
-    for src in [
-        "SHRM 2024 State of the Workplace — attrition benchmarks, replacement cost $4,700 direct avg.",
-        "Gallup State of the Global Workplace 2024 — 52% exits preventable, 50-200% salary replacement.",
-        "Mercer Global Talent Trends 2024 — career growth = #1 voluntary attrition driver.",
-        "Deloitte Human Capital Trends 2025 — 70%+ firms use HR analytics.",
-    ]:
+    _domain_sources = {
+        "hr": [
+            "SHRM 2024 State of the Workplace — attrition benchmarks and replacement cost norms.",
+            "Gallup State of the Global Workplace 2024 — employee engagement and exit research.",
+            "Mercer Global Talent Trends 2024 — career growth as primary attrition driver.",
+            "Deloitte Human Capital Trends 2025 — HR analytics adoption and workforce insights.",
+        ],
+        "ecommerce": [
+            "Amazon Seller Reports 2024 — marketplace performance benchmarks.",
+            "Shopify Commerce Trends 2024 — cancellation, return, and conversion norms.",
+            "Klaviyo 2024 E-Commerce Benchmarks — repeat purchase and customer retention rates.",
+            "BigCommerce 2024 — conversion rate industry standards.",
+        ],
+        "sales": [
+            "Salesforce State of Sales 2024 — win rate and quota attainment benchmarks.",
+            "Gartner Sales Benchmark 2024 — pipeline coverage and deal cycle norms.",
+            "HubSpot Sales Trends 2024 — pipeline velocity and conversion benchmarks.",
+            "Forrester B2B Sales Research 2024 — deal cycle and sales productivity norms.",
+        ],
+        "finance": [
+            "PwC Global CFO Survey 2024 — finance benchmarks and cost management norms.",
+            "McKinsey Global Institute 2024 — profit margin and operational efficiency data.",
+            "Deloitte Finance Trends 2025 — cost structure and financial planning insights.",
+            "KPMG Financial Performance Benchmarks 2024 — industry-specific financial norms.",
+        ],
+    }
+    _sources = _domain_sources.get(domain, [
+        "Analysis based on dataset provided. Industry benchmarks are indicative.",
+        "Verify all findings with qualified domain experts before taking action.",
+    ])
+    for src in _sources:
         story.append(Paragraph("• " + src, s["bl"]))
 
     story.append(Spacer(1, 4*mm))
