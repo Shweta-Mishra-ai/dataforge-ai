@@ -478,13 +478,46 @@ def _insights_hr(df: pd.DataFrame, stats: Dict,
                         dept_eval.index[0], dept_eval.iloc[0],
                         dept_eval.index[-1], dept_eval.iloc[-1], gap/dept_eval.iloc[0]*100))
 
-    actions.extend([
-        "Quarterly satisfaction pulse surveys — track trend monthly not annually",
-        "Identify flight-risk profile: low satisfaction + high tenure + below-market pay",
-        "Salary benchmarking against market — competitive pay is #1 retention factor",
-        "Career development paths for all levels — lack of growth is top exit reason",
-        "Manager effectiveness training — 70% of satisfaction is driven by direct manager",
-    ])
+    # FIX-011b: Column-gated HR actions
+    # Only recommend actions for columns that exist in this dataset
+    _hr_cols = [c.lower() for c in df.columns]
+
+    # Always valid — applies to any HR dataset
+    actions.append(
+        "Quarterly satisfaction pulse surveys — track trend monthly not annually"
+    )
+
+    # Only if attrition column exists
+    _atr_present = any(k in _hr_cols for k in ["left", "attrition", "churned", "resigned"])
+    if _atr_present:
+        actions.append(
+            "Identify flight-risk profile: low satisfaction + high tenure + "
+            "no recent promotion — target this segment for retention conversations first"
+        )
+
+    # Only if salary column exists
+    _sal_present = any(k in _hr_cols for k in ["salary", "salary_band", "compensation"])
+    if _sal_present:
+        actions.append(
+            "Salary benchmarking against market — run within 30 days. "
+            "SHRM: 38% of exits cite below-market pay as primary reason"
+        )
+
+    # Only if promotion column exists
+    _promo_present = any(k in _hr_cols for k in ["promotion", "promoted", "promotion_last_5years"])
+    if _promo_present:
+        actions.append(
+            "Career development paths for all levels — Mercer 2024: "
+            "career growth is the #1 driver of voluntary attrition"
+        )
+
+    # Only if satisfaction or evaluation column exists
+    _sat_present = any(k in _hr_cols for k in ["satisfaction", "satisfaction_level", "engagement"])
+    if _sat_present:
+        actions.append(
+            "Manager effectiveness training — Gallup 2024: "
+            "70% of employee satisfaction is driven by direct manager quality"
+        )
 
     return {"findings":findings, "risks":risks, "opportunities":opps,
             "actions":actions, "insights":insights}
@@ -656,13 +689,21 @@ def _insights_ecommerce(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
                     "Higher-priced products have HIGHER ratings (r={:.2f}) — "
                     "quality-price alignment confirmed. Safe to test premium pricing.".format(corr["r"]))
 
-    actions.extend([
-        "Weekly rating monitoring — alert if any product drops below 3.5",
-        "A/B test 5% price increase on all products rated 4.3+",
-        "Remove products with <3.0 rating and <50 reviews — they damage brand",
-        "Customer feedback loop — auto-survey buyers 7 days post-delivery",
-        "Category manager review — monthly performance vs target",
-    ])
+    # FIX-011: Column-gated actions — only recommend for columns that exist in dataset
+    # Never generate recommendations for columns that are not present
+    _ec_cols = [c.lower() for c in df.columns]
+
+    if rating_col:
+        actions.append("Weekly rating monitoring — alert if any product drops below 3.5")
+        actions.append("Remove products with <3.0 rating and <50 reviews — they damage brand perception")
+        if price_col:
+            actions.append("A/B test 5% price increase on products with rating above 4.3 — high ratings justify premium")
+    if rev_col or any(k in _ec_cols for k in ["amount","sales","revenue"]):
+        actions.append("Customer feedback loop — auto-survey buyers 7 days post-delivery to track satisfaction vs revenue")
+    if cat_col:
+        actions.append("Category manager review — monthly revenue and rating performance vs category target")
+    else:
+        actions.append("Segment your data by product type or channel — subgroup performance often tells a different story than averages")
 
     return {"findings":findings, "risks":risks, "opportunities":opps,
             "actions":actions, "insights":insights}
