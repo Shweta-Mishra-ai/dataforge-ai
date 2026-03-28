@@ -396,19 +396,55 @@ def _build_chart_prompt(ctype: str, stats: dict, domain: str) -> str:
 
 
 def _build_exec_prompt(df: pd.DataFrame, domain: str) -> str:
-    """Build executive summary prompt using prompt_builder if available."""
+    """
+    Build executive summary prompt using domain-isolated prompts.
+    FIX-031: Each domain has its own isolated prompt — no cross-contamination.
+    """
     try:
         from ai.prompt_builder import (
             HR_EXECUTIVE_PROMPT, ECOMMERCE_EXECUTIVE_PROMPT,
             SALES_EXECUTIVE_PROMPT, FINANCE_EXECUTIVE_PROMPT,
         )
+        # FIX-031: Strict domain mapping — no fallback to HR for unknown domains
         prompts = {
-            "hr": HR_EXECUTIVE_PROMPT,
+            "hr":        HR_EXECUTIVE_PROMPT,
             "ecommerce": ECOMMERCE_EXECUTIVE_PROMPT,
-            "sales": SALES_EXECUTIVE_PROMPT,
-            "finance": FINANCE_EXECUTIVE_PROMPT,
+            "sales":     SALES_EXECUTIVE_PROMPT,
+            "finance":   FINANCE_EXECUTIVE_PROMPT,
         }
-        template = prompts.get(domain, HR_EXECUTIVE_PROMPT)
+        template = prompts.get(domain.lower())
+        if not template:
+            # Unknown domain gets generic business prompt, not HR
+            return ""
+    except ImportError:
+        return ""
+
+    summary = _build_raw_summary(df, domain)
+    try:
+        return template.format(raw_data_summary=summary)
+    except Exception:
+        return ""
+
+
+def _build_insight_prompt(df: pd.DataFrame, domain: str) -> str:
+    """
+    FIX-035: Build deep insight prompt for 3-5 structured insights.
+    Domain isolated — HR insights never appear in ecommerce report.
+    """
+    try:
+        from ai.prompt_builder import (
+            HR_INSIGHT_PROMPT, ECOMMERCE_INSIGHT_PROMPT,
+            SALES_INSIGHT_PROMPT, FINANCE_INSIGHT_PROMPT,
+        )
+        prompts = {
+            "hr":        HR_INSIGHT_PROMPT,
+            "ecommerce": ECOMMERCE_INSIGHT_PROMPT,
+            "sales":     SALES_INSIGHT_PROMPT,
+            "finance":   FINANCE_INSIGHT_PROMPT,
+        }
+        template = prompts.get(domain.lower())
+        if not template:
+            return ""
     except ImportError:
         return ""
 
@@ -489,23 +525,87 @@ def _build_raw_summary(df: pd.DataFrame, domain: str) -> str:
 #  LLM CALLER
 # ══════════════════════════════════════════════════════════
 
+
+# ── FIX-033: Validation phrases to catch and reject ──────
+_INVALID_OUTPUTS = [
+    "nan%", " nan ", "nan\n",
+    "0% gap requiring attention",
+    "0.0% gap requiring attention",
+    "chart generated from dataset",
+    "evenly distributed — no single group dominates",
+    "powered by groq",
+    "groq llama",
+    "this is an important metric",
+    "data shows patterns",
+    "analysis complete",
+]
+
+# ── FIX-034: Human language phrases that MUST be present ─
+_HUMAN_PHRASES = [
+    "suggests", "seems", "appears", "indicates",
+    "worth", "notably", "reveals", "points to",
+    "one possible", "this pattern", "closer look",
+]
+
+
+def _validate_output(text: str, domain: str) -> bool:
+    """
+    Returns True if output passes quality checks.
+    Blocks: nan values, 0% gaps, generic fillers, AI branding, wrong domain language.
+    """
+    if not text or len(text.strip()) < 40:
+        return False
+
+    text_lower = text.lower()
+
+    # Block invalid patterns
+    for bad in _INVALID_OUTPUTS:
+        if bad.lower() in text_lower:
+            logger.warning(f"Blocked output — contains: '{bad}'")
+            return False
+
+    # Block domain language contamination
+    _DOMAIN_BLOCKS = {
+        "ecommerce": ["employee attrition", "satisfaction score", "workforce left",
+                      "employees left", "salary band", "hr department"],
+        "sales":     ["employee attrition", "satisfaction_level", "work accident"],
+        "finance":   ["employee attrition", "satisfaction_level", "order quantity"],
+    }
+    for blocked_phrase in _DOMAIN_BLOCKS.get(domain, []):
+        if blocked_phrase in text_lower:
+            logger.warning(f"Blocked — domain contamination: '{blocked_phrase}' in {domain} output")
+            return False
+
+    return True
+
+
 def _llm_call(prompt: str, groq_api_key: str = "",
               task: str = "chart_analysis",
-              max_tokens: int = 350) -> Optional[str]:
-    """Call LLM. Returns None silently on any failure."""
+              max_tokens: int = 350,
+              domain: str = "general") -> Optional[str]:
+    """
+    Call LLM with validation layer.
+    FIX-033: Validates output before returning — blocks nan%, fake data, domain contamination.
+    Returns None if output fails validation — caller uses fallback.
+    """
     if not prompt:
         return None
     try:
         from ai.llm_client import get_client
         client = get_client(groq_api_key)
-        return client.chat_task(
+        raw = client.chat_task(
             system     = ("Follow the exact format and rules specified. "
                           "Only cite numbers from the provided data. "
-                          "Never invent figures or external company names."),
+                          "Never invent figures or external company names. "
+                          "Never mention AI models, Groq, or benchmark sources."),
             user       = prompt,
             task       = task,
             max_tokens = max_tokens,
         )
+        if raw and _validate_output(raw, domain):
+            return raw
+        logger.warning(f"LLM output failed validation [{task}] — using fallback")
+        return None
     except Exception as e:
         logger.warning(f"LLM call failed [{task}]: {e}")
         return None
@@ -544,7 +644,7 @@ def generate_chart_narrative(
                 return f"Distribution analysis of {title}."
             s       = _hist_stats(df, col)
             prompt  = _build_chart_prompt("hist", s, domain)
-            raw     = _llm_call(prompt, groq_api_key, "chart_analysis", 280)
+            raw     = _llm_call(prompt, groq_api_key, "chart_analysis", 280, domain=domain)
             if raw:
                 cleaned = _clean_output(raw)
                 if not _is_hallucinated(cleaned, df) and len(cleaned) > 50:
@@ -563,7 +663,7 @@ def generate_chart_narrative(
                 return "Pie chart composition analysis."
             s       = _pie_stats(df, x, y)
             prompt  = _build_chart_prompt("pie", s, domain)
-            raw     = _llm_call(prompt, groq_api_key, "chart_analysis", 280)
+            raw     = _llm_call(prompt, groq_api_key, "chart_analysis", 280, domain=domain)
             if raw:
                 cleaned = _clean_output(raw)
                 if not _is_hallucinated(cleaned, df) and len(cleaned) > 50:
@@ -580,7 +680,7 @@ def generate_chart_narrative(
                 return "Trend analysis chart."
             s       = _trend_stats(df, col)
             prompt  = _build_chart_prompt("trend", s, domain)
-            raw     = _llm_call(prompt, groq_api_key, "chart_analysis", 280)
+            raw     = _llm_call(prompt, groq_api_key, "chart_analysis", 280, domain=domain)
             if raw:
                 cleaned = _clean_output(raw)
                 if not _is_hallucinated(cleaned, df) and len(cleaned) > 50:
@@ -600,7 +700,7 @@ def generate_chart_narrative(
                 return "Bar chart analysis."
             s       = _bar_stats(df, x, y)
             prompt  = _build_chart_prompt("bar", s, domain)
-            raw     = _llm_call(prompt, groq_api_key, "chart_analysis", 280)
+            raw     = _llm_call(prompt, groq_api_key, "chart_analysis", 280, domain=domain)
             if raw:
                 cleaned = _clean_output(raw)
                 if not _is_hallucinated(cleaned, df) and len(cleaned) > 50:
@@ -648,7 +748,7 @@ def generate_executive_summary(
         prompt = _build_exec_prompt(df, domain)
         if prompt:
             raw = _llm_call(prompt, groq_api_key,
-                            task="executive_summary", max_tokens=700)
+                            task="executive_summary", max_tokens=700, domain=domain)
             if raw:
                 cleaned = _clean_output(raw)
                 if not _is_hallucinated(cleaned, df) and len(cleaned) > 80:
