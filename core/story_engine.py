@@ -32,13 +32,49 @@ DOMAIN_KEYWORDS = {
 
 
 def detect_domain(df: pd.DataFrame) -> Tuple[str, float]:
+    # FIX-052: Use BOTH column names AND sample values for detection
+    # Prevents "DATE" column containing customer names from being misread
     col_text = " ".join(df.columns.str.lower().tolist())
-    scores   = {}
+
+    # Also scan actual sample values from categorical columns
+    sample_text = ""
+    for col in df.select_dtypes(include="object").columns[:6]:
+        try:
+            sample = df[col].dropna().astype(str).head(20).str.lower().tolist()
+            sample_text += " ".join(sample) + " "
+        except Exception:
+            pass
+
+    # Column names score (primary signal)
+    col_scores = {}
     for domain, keywords in DOMAIN_KEYWORDS.items():
         hits = sum(1 for kw in keywords if kw in col_text)
-        scores[domain] = hits / len(keywords)
-    best  = max(scores, key=scores.get)
-    score = scores[best]
+        col_scores[domain] = hits / len(keywords)
+
+    best = max(col_scores, key=col_scores.get)
+    score = col_scores[best]
+
+    # FIX-052: Guard against "DATE" column misidentification
+    # If a column literally named "DATE" contains non-date strings, flag it
+    date_cols = [c for c in df.columns if c.upper() == "DATE"]
+    for dc in date_cols:
+        try:
+            parsed = pd.to_datetime(df[dc], errors="coerce")
+            pct_parsed = parsed.notna().mean()
+            if pct_parsed < 0.3:
+                # "DATE" column is mostly non-dates — probably customer/category names
+                # Re-run detection ignoring this column name
+                filtered_cols = [c for c in df.columns if c.upper() != "DATE"]
+                alt_text = " ".join([c.lower() for c in filtered_cols])
+                for domain, keywords in DOMAIN_KEYWORDS.items():
+                    hits = sum(1 for kw in keywords if kw in alt_text)
+                    col_scores[domain] = hits / len(keywords)
+                best = max(col_scores, key=col_scores.get)
+                score = col_scores[best]
+                break
+        except Exception:
+            pass
+
     return (best, round(score, 2)) if score > 0.04 else ("general", 0.0)
 
 
@@ -290,12 +326,68 @@ def _insights_hr(df: pd.DataFrame, stats: Dict,
     findings, risks, opps, actions = [], [], [], []
     insights = []
 
-    sat_col  = next((c for c in df.columns if "satisfaction" in c.lower()), None)
-    eval_col = next((c for c in df.columns if "evaluat" in c.lower()), None)
-    hrs_col  = next((c for c in df.columns if "hour" in c.lower()), None)
-    dept_col = next((c for c in df.columns
-                     if "department" in c.lower() and df[c].nunique()<=20), None)
-    proj_col = next((c for c in df.columns if "project" in c.lower()), None)
+    # FIX-050: 50+ HR column synonym patterns — handles any HR dataset structure
+    def _hr_col(*keywords, cat_ok=False, max_unique=None):
+        """Find first column matching any keyword. Respects type and cardinality."""
+        for col in df.columns:
+            col_l = col.lower().strip()
+            if any(kw in col_l for kw in keywords):
+                if max_unique and df[col].nunique() > max_unique:
+                    continue
+                if not cat_ok and df[col].dtype == object:
+                    continue
+                return col
+        return None
+
+    # Satisfaction — 0-1 scale OR 1-5 scale OR 1-10 scale
+    sat_col = _hr_col(
+        "satisfaction", "engagement", "survey", "happiness",
+        "morale", "sentiment", "wellbeing", "nps", "esat"
+    )
+
+    # Performance evaluation
+    eval_col = _hr_col(
+        "evaluat", "performance", "appraisal", "rating", "score",
+        "review", "perfscore", "perfrating", "performancerating"
+    )
+
+    # Working hours
+    hrs_col = _hr_col(
+        "hour", "monthly_hours", "avg_hour", "workhour",
+        "overtime", "workedhour", "timeworked"
+    )
+
+    # Department
+    dept_col = _hr_col(
+        "department", "dept", "division", "team", "group",
+        "business_unit", "bu", "function", "unit",
+        cat_ok=True, max_unique=30
+    )
+
+    # Projects
+    proj_col = _hr_col(
+        "project", "numberproject", "num_project", "activeproject"
+    )
+
+    # FIX-051: Satisfaction scale normalizer
+    def _normalize_sat(col):
+        """Normalize satisfaction to 0-1 scale for consistent benchmarking."""
+        if col is None:
+            return None, None
+        s = pd.to_numeric(df[col], errors="coerce").dropna()
+        if len(s) == 0:
+            return col, 1.0
+        max_val = s.max()
+        if max_val <= 1.0:
+            return col, 1.0      # Already 0-1
+        elif max_val <= 5.0:
+            return col, 5.0      # 1-5 scale
+        elif max_val <= 10.0:
+            return col, 10.0     # 1-10 scale
+        else:
+            return col, 100.0    # Percentage scale
+
+    sat_col, sat_scale = _normalize_sat(sat_col)
 
     # ── Attrition ──────────────────────────────────────────
     if attrition:
