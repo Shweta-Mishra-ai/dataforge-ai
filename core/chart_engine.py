@@ -1,13 +1,190 @@
+"""
+core/chart_engine.py — DataForge AI
+=====================================
+FIX v2.0 — Column Intelligence + Smart Chart Selection
+
+CHANGES FROM v1:
+  FIX-001: Column role detection — index/ID columns NEVER used as metrics
+  FIX-002: Chart aggregation uses .mean() for scores, .sum() for revenue/qty
+  FIX-003: Pie chart only for genuine part-of-whole (headcount, revenue share)
+  FIX-004: Bar chart for averaged scores (satisfaction, rating) — never pie
+  FIX-005: Time series only when real datetime column exists
+  FIX-006: Sanity check — percentage outputs capped, absurd gaps flagged
+  FIX-007: Domain-aware metric selection per domain contract
+  FIX-008: Correlation matrix excludes ID columns
+
+NO Streamlit imports — core layer rule.
+"""
+
+import re
 import pandas as pd
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict
 
-PALETTE  = ["#4f8ef7","#22d3a5","#f7934f","#a78bfa","#f77070","#ffd43b","#38bdf8","#fb7185"]
+PALETTE  = ["#4f8ef7", "#22d3a5", "#f7934f", "#a78bfa",
+            "#f77070", "#ffd43b", "#38bdf8", "#fb7185"]
 TEMPLATE = "plotly_dark"
 
 
-def _style(fig):
+# ══════════════════════════════════════════════════════════
+#  FIX-001: COLUMN ROLE DETECTION
+# ══════════════════════════════════════════════════════════
+
+_IDENTIFIER_NAMES = {
+    "index", "idx", "id", "row", "rowid", "row_id", "row_num",
+    "rownum", "serial", "sr", "sr_no", "sno", "s_no",
+    "order_id", "orderid", "customer_id", "customerid",
+    "user_id", "userid", "emp_id", "empid", "employee_id",
+    "product_id", "productid", "item_id", "itemid", "sku_id",
+    "transaction_id", "txn_id", "record_id", "entry_id",
+    "asin", "uuid", "guid",
+}
+
+_METRIC_NAMES = {
+    "amount", "revenue", "sales", "price", "cost", "profit",
+    "margin", "salary", "income", "spend", "budget", "expense",
+    "qty", "quantity", "units", "volume", "count",
+    "score", "rating", "satisfaction", "evaluation", "performance",
+    "rate", "percentage", "pct", "percent",
+    "hours", "days", "tenure", "age",
+}
+
+_PIE_VALID_METRICS = {
+    "revenue", "sales", "amount", "profit", "spend",
+    "qty", "quantity", "units", "volume", "count", "headcount",
+}
+
+_SCORE_METRICS = {
+    "satisfaction", "rating", "score", "evaluation",
+    "performance", "satisfaction_level", "last_evaluation",
+}
+
+
+def _is_identifier(col_name: str, series: pd.Series, n_rows: int) -> bool:
+    col_lower = col_name.lower().strip()
+
+    if col_lower in _IDENTIFIER_NAMES:
+        return True
+
+    if re.search(r'\bid\b|\bindex\b|\bidx\b', col_lower):
+        return True
+
+    if not pd.api.types.is_numeric_dtype(series):
+        return False
+
+    if any(kw in col_lower for kw in _METRIC_NAMES):
+        return False
+
+    n_unique = series.nunique()
+    uniqueness_ratio = n_unique / max(n_rows, 1)
+
+    if uniqueness_ratio > 0.95 and n_rows > 100:
+        return True
+
+    try:
+        clean = series.dropna().sort_values().reset_index(drop=True)
+        if len(clean) > 10:
+            diffs = clean.diff().dropna()
+            if (diffs == 1).mean() > 0.95:
+                return True
+    except Exception:
+        pass
+
+    return False
+
+
+def _get_analysis_columns(df: pd.DataFrame) -> Dict:
+    n_rows = len(df)
+    numeric_cols = df.select_dtypes(include="number").columns.tolist()
+    cat_cols = df.select_dtypes(include="object").columns.tolist()
+    date_cols = df.select_dtypes(include="datetime").columns.tolist()
+
+    id_cols = []
+    metrics = []
+    score_metrics = []
+
+    for col in numeric_cols:
+        if _is_identifier(col, df[col], n_rows):
+            id_cols.append(col)
+            continue
+        col_lower = col.lower()
+        if any(kw in col_lower for kw in _SCORE_METRICS):
+            score_metrics.append(col)
+        else:
+            metrics.append(col)
+
+    all_metrics = score_metrics + metrics
+    dimensions = [
+        c for c in cat_cols
+        if 2 <= df[c].nunique() <= 30
+        and not _is_identifier(c, df[c], n_rows)
+    ]
+
+    return {
+        "metrics": metrics,
+        "score_metrics": score_metrics,
+        "all_metrics": all_metrics,
+        "dimensions": dimensions,
+        "date_cols": date_cols,
+        "id_cols": id_cols,
+        "cat_cols": cat_cols,
+    }
+
+
+def _pick_primary_metric(cols: Dict, domain: str = "general") -> Optional[str]:
+    domain_priority = {
+        "ecommerce": ["amount", "revenue", "sales", "price", "qty", "quantity"],
+        "hr":        ["satisfaction_level", "satisfaction", "last_evaluation",
+                      "salary", "average_montly_hours", "number_project"],
+        "sales":     ["revenue", "sales", "amount", "profit", "margin"],
+        "finance":   ["revenue", "profit", "amount", "income", "expense"],
+        "marketing": ["revenue", "spend", "impressions", "clicks", "conversions"],
+        "general":   [],
+    }
+
+    priority = domain_priority.get(domain, [])
+    all_metrics = cols["all_metrics"]
+
+    if not all_metrics:
+        return None
+
+    for preferred in priority:
+        for col in all_metrics:
+            if preferred in col.lower():
+                return col
+
+    if cols["score_metrics"]:
+        return cols["score_metrics"][0]
+    if cols["metrics"]:
+        return cols["metrics"][0]
+
+    return None
+
+
+def _pick_best_dimension(cols: Dict, metric_col: Optional[str]) -> Optional[str]:
+    dims = cols["dimensions"]
+    if not dims:
+        return None
+    return dims[0]
+
+
+def _is_score_metric(col_name: str) -> bool:
+    col_lower = col_name.lower()
+    return any(kw in col_lower for kw in _SCORE_METRICS)
+
+
+def _is_pie_valid(metric_col: str) -> bool:
+    col_lower = metric_col.lower()
+    return any(kw in col_lower for kw in _PIE_VALID_METRICS)
+
+
+# ══════════════════════════════════════════════════════════
+#  STYLING
+# ══════════════════════════════════════════════════════════
+
+def _style(fig: go.Figure) -> go.Figure:
     fig.update_layout(
         paper_bgcolor="#07080f",
         plot_bgcolor="#0e0f1a",
@@ -19,120 +196,247 @@ def _style(fig):
     return fig
 
 
-def recommend_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
-    num_cols  = df.select_dtypes(include="number").columns.tolist()
-    cat_cols  = df.select_dtypes(include="object").columns.tolist()
-    date_cols = df.select_dtypes(include="datetime").columns.tolist()
-    charts    = []
+# ══════════════════════════════════════════════════════════
+#  FIX-002 thru FIX-008: SMART CHART RECOMMENDER
+# ══════════════════════════════════════════════════════════
 
-    if date_cols and num_cols:
-        fig = px.line(
-            df.sort_values(date_cols[0]),
-            x=date_cols[0], y=num_cols[0],
-            title=f"📈 {num_cols[0]} Over Time",
-            template=TEMPLATE, color_discrete_sequence=PALETTE
+def recommend_charts(
+    df: pd.DataFrame,
+    domain: str = "general"
+) -> List[Tuple[str, go.Figure]]:
+    """
+    5 meaningful charts using column role detection.
+    ID columns excluded. Aggregation method matches metric type.
+    """
+    cols = _get_analysis_columns(df)
+    charts = []
+
+    primary_metric = _pick_primary_metric(cols, domain)
+    best_dim = _pick_best_dimension(cols, primary_metric)
+    all_metrics = cols["all_metrics"]
+    date_cols = cols["date_cols"]
+
+    # Chart 1: Primary metric by dimension (BAR)
+    if primary_metric and best_dim:
+        is_score = _is_score_metric(primary_metric)
+        agg_func = "mean" if is_score else "sum"
+        label = "Avg" if is_score else "Total"
+
+        agg = (
+            df.groupby(best_dim)[primary_metric]
+            .agg(agg_func)
+            .reset_index()
+            .sort_values(primary_metric, ascending=False)
+            .head(15)
         )
-        charts.append(("Time Series", _style(fig)))
+        agg[primary_metric] = agg[primary_metric].round(4 if is_score else 0)
 
-    if len(num_cols) >= 3:
-        corr = df[num_cols].corr().round(2)
-        fig  = px.imshow(
-            corr, text_auto=True,
-            title="🔗 Correlation Matrix",
+        fig = px.bar(
+            agg, x=best_dim, y=primary_metric,
+            title=f"{label} {primary_metric.replace('_', ' ').title()} "
+                  f"by {best_dim.replace('_', ' ').title()}",
             template=TEMPLATE,
-            color_continuous_scale="RdBu_r",
-            zmin=-1, zmax=1
+            color=primary_metric,
+            color_continuous_scale="Blues",
+            text=primary_metric,
         )
-        charts.append(("Correlations", _style(fig)))
-
-    if cat_cols and num_cols:
-        best = next((c for c in cat_cols if 2 <= df[c].nunique() <= 30), cat_cols[0])
-        agg  = (df.groupby(best)[num_cols[0]].sum()
-                  .reset_index()
-                  .sort_values(num_cols[0], ascending=False)
-                  .head(20))
-        fig  = px.bar(
-            agg, x=best, y=num_cols[0],
-            title=f"📊 {num_cols[0]} by {best}",
-            template=TEMPLATE, color=num_cols[0],
-            color_continuous_scale="Blues"
+        fig.update_traces(
+            texttemplate="%{text:.3f}" if is_score else "%{text:,.0f}",
+            textposition="outside"
         )
-        charts.append(("Top Categories", _style(fig)))
+        charts.append((f"{primary_metric} by {best_dim}", _style(fig)))
 
-    if num_cols:
+    # Chart 2: Trend (LINE) — only real datetime, never order_id
+    if date_cols and primary_metric:
+        date_col = date_cols[0]
+        try:
+            trend = (
+                df.groupby(pd.Grouper(key=date_col, freq="M"))[primary_metric]
+                .mean()
+                .reset_index()
+            )
+            trend.columns = [date_col, primary_metric]
+            trend = trend.dropna()
+
+            if len(trend) >= 2:
+                fig = px.line(
+                    trend, x=date_col, y=primary_metric,
+                    title=f"{primary_metric.replace('_', ' ').title()} Trend Over Time",
+                    template=TEMPLATE,
+                    color_discrete_sequence=PALETTE,
+                    markers=True,
+                )
+                charts.append(("Trend Over Time", _style(fig)))
+        except Exception:
+            pass
+
+    # Chart 3: Distribution histogram
+    if primary_metric:
         fig = px.histogram(
-            df, x=num_cols[0], nbins=40, marginal="box",
-            title=f"📉 Distribution: {num_cols[0]}",
-            template=TEMPLATE, color_discrete_sequence=PALETTE
+            df, x=primary_metric, nbins=40, marginal="box",
+            title=f"Distribution: {primary_metric.replace('_', ' ').title()}",
+            template=TEMPLATE,
+            color_discrete_sequence=PALETTE,
         )
         charts.append(("Distribution", _style(fig)))
 
-    if len(num_cols) >= 2:
-        fig = px.scatter(
-            df.head(2000),
-            x=num_cols[0], y=num_cols[1],
-            color=cat_cols[0] if cat_cols else None,
-            title=f"🔵 {num_cols[0]} vs {num_cols[1]}",
+    # Chart 4: Correlation matrix — ID columns excluded
+    if len(all_metrics) >= 2:
+        corr = df[all_metrics].corr().round(2)
+        fig = px.imshow(
+            corr, text_auto=True,
+            title="Correlation Matrix",
             template=TEMPLATE,
-            color_discrete_sequence=PALETTE,
-            opacity=0.7
+            color_continuous_scale="RdBu_r",
+            zmin=-1, zmax=1,
         )
-        charts.append(("Scatter", _style(fig)))
+        charts.append(("Correlation Matrix", _style(fig)))
 
-    return charts
+    # Chart 5: Share or Ranking
+    if primary_metric and best_dim:
+        if _is_pie_valid(primary_metric):
+            agg = (
+                df.groupby(best_dim)[primary_metric]
+                .sum().reset_index()
+                .sort_values(primary_metric, ascending=False).head(8)
+            )
+            fig = px.pie(
+                agg, names=best_dim, values=primary_metric,
+                title=f"{primary_metric.replace('_', ' ').title()} "
+                      f"Share by {best_dim.replace('_', ' ').title()}",
+                template=TEMPLATE,
+                color_discrete_sequence=PALETTE,
+            )
+            charts.append((f"Share by {best_dim}", _style(fig)))
+        else:
+            # Score metric — horizontal bar ranked chart
+            agg = (
+                df.groupby(best_dim)[primary_metric]
+                .mean().reset_index()
+                .sort_values(primary_metric, ascending=True)
+            )
+            agg[primary_metric] = agg[primary_metric].round(3)
+            fig = px.bar(
+                agg, x=primary_metric, y=best_dim, orientation="h",
+                title=f"{primary_metric.replace('_', ' ').title()} "
+                      f"Ranking by {best_dim.replace('_', ' ').title()}",
+                template=TEMPLATE,
+                color=primary_metric,
+                color_continuous_scale="Blues",
+                text=primary_metric,
+            )
+            fig.update_traces(texttemplate="%{text:.3f}", textposition="outside")
+            charts.append((f"Ranking by {best_dim}", _style(fig)))
+
+    return charts[:5]
 
 
-def make_bar(df, x, y, title=""):
-    agg = (df.groupby(x)[y].sum()
-             .reset_index()
-             .sort_values(y, ascending=False)
-             .head(25))
-    return _style(px.bar(agg, x=x, y=y,
-        title=title or f"{y} by {x}",
-        template=TEMPLATE, color=y,
-        color_continuous_scale="Blues"))
+# ══════════════════════════════════════════════════════════
+#  INDIVIDUAL CHART BUILDERS
+# ══════════════════════════════════════════════════════════
+
+def make_bar(df: pd.DataFrame, x: str, y: str, title: str = "") -> go.Figure:
+    is_score = _is_score_metric(y)
+    agg_func = "mean" if is_score else "sum"
+    agg = (
+        df.groupby(x)[y].agg(agg_func)
+        .reset_index()
+        .sort_values(y, ascending=False)
+        .head(20)
+    )
+    agg[y] = agg[y].round(4 if is_score else 0)
+    return _style(px.bar(
+        agg, x=x, y=y,
+        title=title or f"{'Avg' if is_score else 'Total'} {y} by {x}",
+        template=TEMPLATE, color=y, color_continuous_scale="Blues",
+    ))
 
 
-def make_line(df, x, y, title=""):
+def make_horizontal_bar(
+    df: pd.DataFrame, x: str, y: str, title: str = ""
+) -> go.Figure:
+    is_score = _is_score_metric(y)
+    agg = (
+        df.groupby(x)[y]
+        .agg("mean" if is_score else "sum")
+        .reset_index()
+        .sort_values(y, ascending=True).head(20)
+    )
+    return _style(px.bar(
+        agg, x=y, y=x, orientation="h",
+        title=title or f"{y} Ranking by {x}",
+        template=TEMPLATE, color=y, color_continuous_scale="Blues",
+    ))
+
+
+def make_line(df: pd.DataFrame, x: str, y: str, title: str = "") -> go.Figure:
     return _style(px.line(
         df.sort_values(x), x=x, y=y,
         title=title or f"{y} over {x}",
-        template=TEMPLATE,
-        color_discrete_sequence=PALETTE))
+        template=TEMPLATE, color_discrete_sequence=PALETTE, markers=True,
+    ))
 
 
-def make_scatter(df, x, y, color=None, title=""):
+def make_scatter(
+    df: pd.DataFrame, x: str, y: str,
+    color: Optional[str] = None, title: str = ""
+) -> go.Figure:
     return _style(px.scatter(
         df.head(3000), x=x, y=y, color=color,
         title=title or f"{x} vs {y}",
-        template=TEMPLATE,
-        color_discrete_sequence=PALETTE,
-        opacity=0.7))
+        template=TEMPLATE, color_discrete_sequence=PALETTE, opacity=0.7,
+    ))
 
 
-def make_histogram(df, col, nbins=40, title=""):
+def make_histogram(
+    df: pd.DataFrame, col: str, nbins: int = 40, title: str = ""
+) -> go.Figure:
     return _style(px.histogram(
         df, x=col, nbins=nbins, marginal="box",
         title=title or f"Distribution: {col}",
-        template=TEMPLATE,
-        color_discrete_sequence=PALETTE))
+        template=TEMPLATE, color_discrete_sequence=PALETTE,
+    ))
 
 
-def make_pie(df, names_col, values_col, title=""):
+def make_pie(
+    df: pd.DataFrame, names_col: str, values_col: str, title: str = ""
+) -> go.Figure:
+    """Guard: redirects score metrics to horizontal bar."""
+    if not _is_pie_valid(values_col):
+        return make_horizontal_bar(
+            df, names_col, values_col,
+            title=title or f"{values_col} by {names_col}"
+        )
     agg = df.groupby(names_col)[values_col].sum().reset_index().head(10)
     return _style(px.pie(
         agg, names=names_col, values=values_col,
-        title=title or f"{values_col} by {names_col}",
-        template=TEMPLATE,
-        color_discrete_sequence=PALETTE))
+        title=title or f"{values_col} Share by {names_col}",
+        template=TEMPLATE, color_discrete_sequence=PALETTE,
+    ))
 
 
-def make_heatmap(df):
-    num_cols = df.select_dtypes(include="number").columns.tolist()
-    corr     = df[num_cols].corr().round(2)
+def make_heatmap(df: pd.DataFrame, domain: str = "general") -> go.Figure:
+    """Correlation matrix with ID columns excluded."""
+    cols = _get_analysis_columns(df)
+    metric_cols = cols["all_metrics"]
+    if len(metric_cols) < 2:
+        metric_cols = df.select_dtypes(include="number").columns.tolist()
+    corr = df[metric_cols].corr().round(2)
     return _style(px.imshow(
-        corr, text_auto=True,
-        title="Correlation Matrix",
-        template=TEMPLATE,
-        color_continuous_scale="RdBu_r",
-        zmin=-1, zmax=1))
+        corr, text_auto=True, title="Correlation Matrix",
+        template=TEMPLATE, color_continuous_scale="RdBu_r", zmin=-1, zmax=1,
+    ))
+
+
+# ══════════════════════════════════════════════════════════
+#  FIX-006: SANITY CHECK
+# ══════════════════════════════════════════════════════════
+
+def safe_pct_gap(val_a: float, val_b: float) -> str:
+    """Cap absurd percentage gaps — anything >999% = column selection error."""
+    if val_b == 0:
+        return "N/A (baseline is zero)"
+    gap = abs(val_a - val_b) / abs(val_b) * 100
+    if gap > 999:
+        return ">999% (verify column selection)"
+    return f"{gap:.1f}%"
