@@ -59,6 +59,18 @@ def auto_clean(df: pd.DataFrame) -> tuple[pd.DataFrame, CleaningReport]:
         for c in fully_empty:
             report.add(c, "100% empty", "column dropped", "all null", "removed", len(df))
 
+    # FIX-053: Auto-drop columns with >55% missing values
+    # These introduce more noise than signal and corrupt chart generation
+    high_missing = [c for c in df.columns
+                    if df[c].isna().mean() > 0.55 and c in df.columns]
+    if high_missing:
+        df.drop(columns=high_missing, inplace=True)
+        for c in high_missing:
+            pct = int(df[c].isna().mean() * 100) if c in df.columns else 0
+            report.add(c, f">55% missing values ({pct}% null)",
+                       "column auto-dropped — too sparse for reliable analysis",
+                       f"{pct}% null", "removed", 0)
+
     # ── 3. Drop constant columns (1 unique non-null value) ─
     constant_cols = []
     for c in df.columns:
