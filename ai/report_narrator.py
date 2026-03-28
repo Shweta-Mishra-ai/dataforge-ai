@@ -243,16 +243,45 @@ def _fb_bar(s: dict) -> str:
     )
 
 
-def _fb_hist(s: dict) -> str:
+def _fb_hist(s: dict, domain: str = "general") -> str:
+    """FIX-056: Domain-aware histogram fallback — no 'employee' language in non-HR reports."""
     if not s.get("ok"):
         return f"Distribution of {s.get('metric_label','metric')} reveals key patterns."
+
+    skew_note = (
+        f"The distribution is {s['shape']} — use {s['use_stat']} ({s['use_val']}) "
+        f"rather than mean for accurate reporting."
+        if s["shape"] != "symmetric"
+        else "The distribution is approximately symmetric — mean is a reliable central measure."
+    )
+
+    # FIX-056: Domain-specific bottom-25% language
+    if domain == "hr":
+        risk_note = (
+            f"Employees below {s['q1']} (bottom 25%) represent the highest flight-risk segment. "
+            f"Prioritise retention conversations with this group first."
+        )
+    elif domain == "ecommerce":
+        risk_note = (
+            f"Orders or products in the bottom 25% (below {s['q1']}) represent the "
+            f"lowest-performing segment — review for pricing, quality, or demand issues."
+        )
+    elif domain in ("sales", "finance"):
+        risk_note = (
+            f"The bottom 25% (below {s['q1']}) represents the underperforming segment — "
+            f"investigate root causes and prioritise improvement actions here first."
+        )
+    else:
+        risk_note = (
+            f"Values in the bottom 25% (below {s['q1']}) represent the segment "
+            f"most in need of attention."
+        )
+
     return (
         f"{s['metric_label']} typical value is {s['use_val']} "
         f"(range: {s['min']}–{s['max']}). "
-        f"{'Skewed distribution — use ' + s['use_stat'] + ' (' + str(s['use_val']) + ') for accurate reporting.' if s['shape'] != 'symmetric' else 'Symmetric distribution — mean is a reliable central measure.'} "
-        f"Employees below {s['q1']} (bottom 25%) represent the highest-risk group. "
-        f"Strategic Action: Focus retention interventions on employees below "
-        f"{s['q1']} to address the most at-risk segment first."
+        f"{skew_note} "
+        f"{risk_note}"
     )
 
 
@@ -649,7 +678,7 @@ def generate_chart_narrative(
                 cleaned = _clean_output(raw)
                 if not _is_hallucinated(cleaned, df) and len(cleaned) > 50:
                     return cleaned
-            return _fb_hist(s)
+            return _fb_hist(s, domain=domain)
 
         # ── Pie / Share ───────────────────────────────────
         elif "pie" in title or "share" in title:
@@ -714,7 +743,7 @@ def generate_chart_narrative(
                 return _fb_bar(s)
             elif num:
                 s = _hist_stats(df, num[0])
-                return _fb_hist(s)
+                return _fb_hist(s, domain=domain)
             else:
                 return "Chart analysis from dataset."
 
@@ -729,7 +758,7 @@ def generate_chart_narrative(
                 return _fb_bar(s)
             elif num:
                 s = _hist_stats(df, num[0])
-                return _fb_hist(s)
+                return _fb_hist(s, domain=domain)
         except Exception:
             pass
         return (f"Analysis of {chart_title}: "
