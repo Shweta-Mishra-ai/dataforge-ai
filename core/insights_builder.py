@@ -153,7 +153,7 @@ def build_top_insights(
                     problem  = f"Mean ({s.mean():.3f}) misrepresents the typical value "
                                f"due to {diff:.0f}% gap vs median ({s.median():.3f}).",
                     cause    = "A small group of extreme values pulls the mean "
-                               "away from the typical employee experience.",
+                               "above the level most records actually show — median is more representative.",
                     evidence = f"Mean={s.mean():.3f} vs Median={s.median():.3f} "
                                f"— {diff:.0f}% difference. Skewness={sk:.2f}.",
                     action   = f"Report median ({s.median():.3f}) in all dashboards "
