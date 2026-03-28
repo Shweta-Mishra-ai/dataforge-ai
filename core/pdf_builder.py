@@ -369,10 +369,11 @@ def _build_cover(T: dict, config: dict, kpis_preview: list) -> bytes:
         cv.setFillColor(HexColor("#FFFFFF"))
         cv.setFont("Helvetica-Bold", 8); cv.drawString(x, 13*mm, v[:22])
 
+    # FIX-020: AI branding removed — report is signed by analyst, not tool
     cv.setFillColor(HexColor(T["accent2"]))
     cv.setFont("Helvetica", 6.5)
     cv.drawRightString(W - 21*mm, 5*mm,
-                       "Powered by Groq Llama 3.3 70B")
+                       "DataForge AI — Advanced Analytics Platform")
     cv.save()
     buf.seek(0)
     return buf.read()
@@ -1071,7 +1072,7 @@ def _appendix(story, s, T, config, CW):
         "Correlations: Pearson (normal) / Spearman (non-normal). "
         "Domain detection: keyword matching across HR, E-commerce, Sales, Finance. "
         "Attrition drivers: Mann-Whitney U (numeric) and Chi-Square (categorical). "
-        "AI narratives: Groq Llama 3.3 70B with pre-computed statistics.",
+        "AI-assisted narrative generation with pre-computed statistical outputs. ""All findings verified against dataset values before inclusion.",
         s["body"]))
 
     story.append(Paragraph("B. Quality Score Formula", s["h3"]))
