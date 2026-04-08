@@ -23,6 +23,48 @@ import plotly.express as px
 import plotly.graph_objects as go
 from typing import List, Tuple, Optional, Dict
 
+# Human-readable column name translator
+def _ht(col: str) -> str:
+    """Convert raw column name to human-readable title for chart labels."""
+    _MAP = {
+        "satisfaction_level":    "Employee Satisfaction Score",
+        "last_evaluation":       "Last Performance Evaluation",
+        "number_project":        "Number of Active Projects",
+        "average_montly_hours":  "Avg Monthly Hours Worked",
+        "average_monthly_hours": "Avg Monthly Hours Worked",
+        "time_spend_company":    "Employee Tenure (Years)",
+        "work_accident":         "Work Accident Rate",
+        "left":                  "Employee Attrition",
+        "attrition":             "Attrition Rate",
+        "promotion_last_5years": "Promoted in Last 5 Years",
+        "department":            "Department",
+        "dept":                  "Department",
+        "salary":                "Salary Band",
+        "discounted_price":      "Selling Price",
+        "actual_price":          "Original Price (MRP)",
+        "discount_percentage":   "Discount Applied (%)",
+        "rating_count":          "Number of Reviews",
+        "rating":                "Customer Rating",
+        "amount":                "Order Revenue",
+        "qty":                   "Order Quantity",
+        "fulfilment":            "Fulfilment Method",
+        "status":                "Order Status",
+        "revenue":               "Revenue",
+        "sales":                 "Sales Amount",
+        "profit":                "Profit",
+        "margin":                "Profit Margin (%)",
+        "region":                "Sales Region",
+        "pcs":                   "Units Sold (PCS)",
+        "gross amt":             "Gross Revenue",
+        "gross_amt":             "Gross Revenue",
+        "rate":                  "Unit Rate",
+    }
+    low = col.lower().strip()
+    if low in _MAP:
+        return _MAP[low]
+    # Fallback: clean up underscores and capitalise
+    return " ".join(w.capitalize() for w in col.replace("_", " ").split())
+
 PALETTE  = ["#4f8ef7", "#22d3a5", "#f7934f", "#a78bfa",
             "#f77070", "#ffd43b", "#38bdf8", "#fb7185"]
 TEMPLATE = "plotly_dark"
@@ -233,8 +275,7 @@ def recommend_charts(
 
         fig = px.bar(
             agg, x=best_dim, y=primary_metric,
-            title=f"{label} {primary_metric.replace('_', ' ').title()} "
-                  f"by {best_dim.replace('_', ' ').title()}",
+            title=f"{label} {_ht(primary_metric)} by {_ht(best_dim)}",
             template=TEMPLATE,
             color=primary_metric,
             color_continuous_scale="Blues",
@@ -244,7 +285,7 @@ def recommend_charts(
             texttemplate="%{text:.3f}" if is_score else "%{text:,.0f}",
             textposition="outside"
         )
-        charts.append((f"{primary_metric} by {best_dim}", _style(fig)))
+        charts.append((_ht(primary_metric) + " by " + _ht(best_dim), _style(fig)))
 
     # Chart 2: Trend (LINE) — only real datetime, never order_id
     if date_cols and primary_metric:
@@ -261,7 +302,7 @@ def recommend_charts(
             if len(trend) >= 2:
                 fig = px.line(
                     trend, x=date_col, y=primary_metric,
-                    title=f"{primary_metric.replace('_', ' ').title()} Trend Over Time",
+                    title=f"{_ht(primary_metric)} Trend Over Time",
                     template=TEMPLATE,
                     color_discrete_sequence=PALETTE,
                     markers=True,
@@ -274,7 +315,7 @@ def recommend_charts(
     if primary_metric:
         fig = px.histogram(
             df, x=primary_metric, nbins=40, marginal="box",
-            title=f"Distribution: {primary_metric.replace('_', ' ').title()}",
+            title=f"Distribution: {_ht(primary_metric)}",
             template=TEMPLATE,
             color_discrete_sequence=PALETTE,
         )
@@ -302,12 +343,11 @@ def recommend_charts(
             )
             fig = px.pie(
                 agg, names=best_dim, values=primary_metric,
-                title=f"{primary_metric.replace('_', ' ').title()} "
-                      f"Share by {best_dim.replace('_', ' ').title()}",
+                title=f"{_ht(primary_metric)} Share by {_ht(best_dim)}",
                 template=TEMPLATE,
                 color_discrete_sequence=PALETTE,
             )
-            charts.append((f"Share by {best_dim}", _style(fig)))
+            charts.append(("Share by " + _ht(best_dim), _style(fig)))
         else:
             # Score metric — horizontal bar ranked chart
             agg = (
@@ -318,15 +358,14 @@ def recommend_charts(
             agg[primary_metric] = agg[primary_metric].round(3)
             fig = px.bar(
                 agg, x=primary_metric, y=best_dim, orientation="h",
-                title=f"{primary_metric.replace('_', ' ').title()} "
-                      f"Ranking by {best_dim.replace('_', ' ').title()}",
+                title=f"{_ht(primary_metric)} Ranking by {_ht(best_dim)}",
                 template=TEMPLATE,
                 color=primary_metric,
                 color_continuous_scale="Blues",
                 text=primary_metric,
             )
             fig.update_traces(texttemplate="%{text:.3f}", textposition="outside")
-            charts.append((f"Ranking by {best_dim}", _style(fig)))
+            charts.append((_ht(primary_metric) + " Ranking by " + _ht(best_dim), _style(fig)))
 
     return charts[:5]
 
