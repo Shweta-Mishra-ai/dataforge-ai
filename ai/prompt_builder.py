@@ -143,6 +143,21 @@ CORE RULES (follow all, no exceptions):
 10. SENIOR THINKING
     Think about DECISIONS, not descriptions.
     Every paragraph should help a manager take action.
+
+11. LINKEDIN-STYLE CLARITY
+    Write so a busy executive can read and act in under 60 seconds.
+    - Short sentences. No jargon unless domain-standard.
+    - Lead with the finding, not the methodology.
+    - Numbers first, context second.
+    - One idea per sentence.
+
+12. FINAL PAGE STANDARD
+    End every report section with exactly ONE standard reference, matching the domain:
+    - HR reports: "This analysis follows HR People Analytics Standards (SHRM 2024)."
+    - Ecommerce: "This analysis follows E-Commerce Performance Standards (Amazon/Shopify 2024)."
+    - Sales: "This analysis follows Sales Performance Standards (Salesforce/Gartner 2024)."
+    - Finance: "This analysis follows Financial Analytics Standards (PwC/McKinsey 2024)."
+    DO NOT list multiple domain standards in the same report.
 """
 
 # ══════════════════════════════════════════════════════════
@@ -191,6 +206,7 @@ OUTPUT RULES:
 - Do NOT use HR language (no "employees", "attrition", "satisfaction score")
 
 WORD LIMIT: 180 words maximum
+FINAL LINE: End with exactly: "This analysis follows E-Commerce Performance Standards (Amazon/Shopify 2024)."
 """
 
 SALES_EXECUTIVE_PROMPT = MASTER_SYSTEM_PROMPT + """
@@ -449,23 +465,25 @@ RULES:
 # ══════════════════════════════════════════════════════════
 
 VALIDATION_PROMPT = """
-Review this analyst output and fix any of these issues:
+You are a senior data analyst editor. Review this text and fix EVERY issue below.
 
-BLOCK AND REWRITE if you find:
-1. "nan%" or "nan" anywhere → replace with actual value or remove the sentence
-2. "0% gap requiring attention" → this is meaningless, rewrite as a positive finding
-3. "evenly distributed" as the only insight → explain what even distribution means for the business
-4. Any percentage above 9,999% → flag as "data selection error — review column choice"
-5. "Chart generated from dataset" → rewrite with actual insight
-6. Any AI platform or model name mentions → remove completely
-7. Generic filler: "this is an important metric", "data shows patterns" → rewrite with specific numbers
-8. HR language in ecommerce context or vice versa → fix to match domain
+MANDATORY FIXES:
+1. "nan%" or "nan" or "NaN" anywhere → remove the entire sentence containing it
+2. "0% gap requiring attention" → replace with a positive finding about consistency
+3. "evenly distributed" as the ONLY insight → add WHY this matters for the business
+4. Any percentage above 9,999% → replace with: "significant variance detected — verify column selection"
+5. "Chart generated from dataset" → rewrite with a real insight using context clues
+6. Any AI platform, model, or tool name → delete entirely
+7. "employees" in an ecommerce/sales report → replace with domain-correct term (orders, customers, products)
+8. "orders" or "products" in an HR report → replace with domain-correct term (employees, staff)
+9. Generic filler like "this is important" → replace with specific number from context
+10. Unrealistic gaps like "12897400000%" → replace with "significant gap — verify column selection"
 
 DOMAIN: {domain}
 INPUT TEXT:
 {text}
 
-OUTPUT: The corrected text only. No explanation of changes.
+OUTPUT: Return ONLY the corrected text. No explanation. No preamble.
 """
 
 # ══════════════════════════════════════════════════════════
