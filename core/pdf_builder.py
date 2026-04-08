@@ -244,19 +244,19 @@ class _ReportCanvas(CV.Canvas):
         self.setFont("Helvetica", 6.5)
         self.drawString(18*mm, 4.5*mm,
             _domain_footer_text(getattr(self, "_domain", "general")))
+        self.drawRightString(W - 18*mm, 4.5*mm,
+            "Page {} of {}".format(self._pageNumber, tot))
 
 def _domain_footer_text(domain: str) -> str:
     """FIX-054: Domain-specific footer — no HR benchmarks in sales reports."""
     _map = {
-        "hr":        "Benchmarks are indicative — verify with qualified HR professionals before action",
-        "ecommerce": "Benchmarks are indicative — verify with e-commerce specialists before action",
-        "sales":     "Benchmarks are indicative — verify with sales leadership before action",
-        "finance":   "Benchmarks are indicative — verify with qualified finance professionals before action",
+        "hr":        "Benchmarks: SHRM · Gallup · Mercer — verify with qualified HR professionals before action",
+        "ecommerce": "Benchmarks: Amazon · Shopify · Klaviyo — verify with e-commerce specialists before action",
+        "sales":     "Benchmarks: Salesforce · Gartner · HubSpot — verify with sales leadership before action",
+        "finance":   "Benchmarks: PwC · McKinsey · Deloitte — verify with qualified finance professionals before action",
         "general":   "Findings based on provided dataset — verify with domain experts before action",
     }
     return _map.get(domain, _map["general"])
-        self.drawRightString(W - 18*mm, 4.5*mm,
-            "Page {} of {}".format(self._pageNumber, tot))
 
 
 # ══════════════════════════════════════════════════════════
@@ -862,7 +862,24 @@ def _dataset_overview(story, s, T, df, profile, CW):
 
     if num_cols:
         story.append(Paragraph("Descriptive Statistics", s["h3"]))
-        show  = num_cols[:5]
+        # Exclude pure sequential index columns from descriptive stats
+        import re as _re
+        _ID_KW = {"index","idx","id","rowid","row_id","empid","emp_id",
+                  "order_id","orderid","product_id","customer_id","user_id"}
+        def _is_id_col(col, series):
+            cl = col.lower().strip()
+            if cl in _ID_KW or _re.search(r'\bid\b|\bindex\b', cl):
+                return True
+            if len(series.dropna()) > 10:
+                try:
+                    diffs = series.dropna().sort_values().diff().dropna()
+                    if (diffs == 1).mean() > 0.90:
+                        return True
+                except Exception:
+                    pass
+            return False
+        filtered_num = [c for c in num_cols if not _is_id_col(c, df[c])]
+        show = filtered_num[:5] if filtered_num else num_cols[:5]
         desc  = df[show].describe().round(3)
         hrow  = ["Stat"] + [c[:10] for c in show]
         rows  = [hrow] + [
@@ -1079,7 +1096,7 @@ def _recommendations(story, s, T, actions, CW):
 #  APPENDIX
 # ══════════════════════════════════════════════════════════
 
-def _appendix(story, s, T, config, CW):
+def _appendix(story, s, T, config, CW, domain: str = "general"):
     _sec(story, s, T, "Appendix — Methodology & Sources")
 
     story.append(Paragraph("A. Methodology", s["h3"]))
@@ -1090,7 +1107,8 @@ def _appendix(story, s, T, config, CW):
         "Correlations: Pearson (normal) / Spearman (non-normal). "
         "Domain detection: keyword matching across HR, E-commerce, Sales, Finance. "
         "Attrition drivers: Mann-Whitney U (numeric) and Chi-Square (categorical). "
-        "AI-assisted narrative generation with pre-computed statistical outputs. ""All findings verified against dataset values before inclusion.",
+        "AI-assisted narrative generation with pre-computed statistical outputs. "
+        "All findings verified against dataset values before inclusion.",
         s["body"]))
 
     story.append(Paragraph("B. Quality Score Formula", s["h3"]))
@@ -1233,10 +1251,12 @@ def build_pdf(
     CW  = W - 2 * M
 
     def canvas_maker(fn, **kw):
-        return _ReportCanvas(fn, T=T,
+        c = _ReportCanvas(fn, T=T,
                              report_title=report_title,
                              client_name=client_name,
                              report_date=report_date, **kw)
+        c._domain = domain
+        return c
 
     doc = BaseDocTemplate(
         content_buf, pagesize=A4,
@@ -1317,7 +1337,7 @@ def build_pdf(
     _recommendations(story, s, T, recommendations, CW)
     story.append(PageBreak())
 
-    _appendix(story, s, T, config, CW)
+    _appendix(story, s, T, config, CW, domain=domain)
 
     # ── Build PDF ─────────────────────────────────────────
     doc.build(story, canvasmaker=canvas_maker)
