@@ -20,8 +20,15 @@ if "df_active" not in st.session_state:
     st.page_link("pages/1_📥_Data_Upload.py", label="← Go to Upload", icon="📥")
     st.stop()
 
-df       = st.session_state["df_active"]
-groq_key = st.secrets.get("GROQ_API_KEY", "")
+df = st.session_state["df_active"]
+
+# FIX: st.secrets raises StreamlitSecretNotFoundError when secrets.toml is absent.
+# Safe pattern: try secrets first, fall back to env variable.
+try:
+    groq_key = st.secrets.get("GROQ_API_KEY", "")
+except Exception:
+    import os
+    groq_key = os.environ.get("GROQ_API_KEY", "")
 
 if not groq_key:
     st.error("⚠️ GROQ_API_KEY not found in .streamlit/secrets.toml")

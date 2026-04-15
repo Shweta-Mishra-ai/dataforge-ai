@@ -310,7 +310,7 @@ with tab3:
                     "SIGNIFICANT" if gc.is_significant else "not significant",
                     gc.numeric_col, gc.group_col,
                     gc.test_used, gc.p_value, gc.effect_label),
-                expanded=gc.is_significant
+                expanded=bool(gc.is_significant)   # FIX: numpy.bool_ → Python bool
             ):
                 st.markdown(gc.interpretation)
                 if gc.post_hoc:

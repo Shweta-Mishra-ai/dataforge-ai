@@ -223,7 +223,8 @@ if gen_btn:
         # ── Step 8: Charts ────────────────────────────────
         progress.progress(65, text="Generating charts...")
         chart_data = []
-        groq_key   = ""
+        # FIX: st.secrets raises when secrets.toml is absent — use safe fallback
+        groq_key = ""
         try:
             groq_key = st.secrets.get("GROQ_API_KEY", "")
         except Exception:
