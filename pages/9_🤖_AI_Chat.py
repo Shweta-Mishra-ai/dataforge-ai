@@ -1,3 +1,4 @@
+import io
 import streamlit as st
 import plotly.io as pio
 import pandas as pd
@@ -65,7 +66,7 @@ for msg in st.session_state["messages"]:
         if msg.get("df_json"):
             try:
                 st.dataframe(
-                    pd.read_json(msg["df_json"]),
+                    pd.read_json(io.StringIO(msg["df_json"])),
                     use_container_width=True
                 )
             except Exception:
