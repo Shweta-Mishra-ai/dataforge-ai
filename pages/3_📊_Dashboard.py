@@ -89,8 +89,8 @@ with st.sidebar:
     st.divider()
     st.caption("Showing {:,} of {:,} rows".format(
         len(df_filtered), len(df_master)))
-    # FIXED: use_container_width=True → width="stretch"
-    if st.button("Reset Filters", width="stretch"):
+    # FIXED: Reverted width="stretch" back to use_container_width=True
+    if st.button("Reset Filters", use_container_width=True):
         st.rerun()
 
 # ══════════════════════════════════════════════════════════
@@ -324,7 +324,7 @@ with tabs[tab_idx]:
                 # All columns are str — no Arrow conversion issue
                 st.dataframe(
                     pd.DataFrame(stat_data),
-                    width="stretch",
+                    use_container_width=True,
                     hide_index=True,
                 )
 
