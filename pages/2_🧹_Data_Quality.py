@@ -3,6 +3,7 @@ pages/2_Data_Quality.py
 Data Quality + Statistical Analysis page.
 Uses session_manager — no direct session_state access.
 """
+import io
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -20,14 +21,16 @@ filename = get_filename()
 # ── Cached cleaning ───────────────────────────────────────
 @st.cache_data(show_spinner=False)
 def run_cleaning(df_json: str) -> tuple:
-    df = pd.read_json(df_json)
+    # FIX: pandas 3.0 treats long strings as file paths — must use io.StringIO
+    df = pd.read_json(io.StringIO(df_json))
     cleaned_df, report = auto_clean(df)
     summary = get_cleaning_summary(report)
     return cleaned_df, summary
 
 @st.cache_data(show_spinner=False)
 def run_stats(df_json: str):
-    df = pd.read_json(df_json)
+    # FIX: pandas 3.0 treats long strings as file paths — must use io.StringIO
+    df = pd.read_json(io.StringIO(df_json))
     return analyze(df)
 
 st.markdown("## Data Quality Report")

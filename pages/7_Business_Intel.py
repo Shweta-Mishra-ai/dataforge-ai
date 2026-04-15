@@ -2,6 +2,7 @@
 pages/7_Business_Intel.py — Business Intelligence Dashboard.
 Benchmarking, Root Cause, Cohort Analysis, Pareto, Segment Health.
 """
+import io
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -33,7 +34,7 @@ st.divider()
 
 @st.cache_data(show_spinner=False)
 def get_bi(df_json: str):
-    return run_bi(pd.read_json(df_json))
+    return run_bi(pd.read_json(io.StringIO(df_json)))
 
 with st.spinner("Running BI analysis..."):
     report = get_bi(df.to_json())
@@ -244,7 +245,7 @@ with tab3:
 
         @st.cache_data(show_spinner=False)
         def get_cohort(df_json, cc, mc):
-            return analyze_cohort(pd.read_json(df_json), cc, mc)
+            return analyze_cohort(pd.read_json(io.StringIO(df_json)), cc, mc)
 
         coh = get_cohort(df.to_json(), cohort_col, metric_col)
 
@@ -334,7 +335,7 @@ with tab4:
 
         @st.cache_data(show_spinner=False)
         def get_pareto(df_json, gc, vc, fn):
-            return analyze_pareto(pd.read_json(df_json), gc, vc, fn)
+            return analyze_pareto(pd.read_json(io.StringIO(df_json)), gc, vc, fn)
 
         par = get_pareto(df.to_json(), par_group, par_value, par_agg)
 
@@ -427,7 +428,7 @@ with tab5:
             @st.cache_data(show_spinner=False)
             def get_seg_health(df_json, sc, sm):
                 return analyze_segment_health(
-                    pd.read_json(df_json), sc, sm)
+                    pd.read_json(io.StringIO(df_json)), sc, sm)
 
             segs = get_seg_health(df.to_json(), seg_col, seg_metrics)
 

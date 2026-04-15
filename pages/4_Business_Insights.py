@@ -1,3 +1,4 @@
+import io
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -15,7 +16,8 @@ COLORS = ["#1a4a8a", "#2196F3", "#22d3a5", "#f7934f", "#a78bfa", "#f77070"]
 
 @st.cache_data(show_spinner=False)
 def get_story(df_json: str):
-    df = pd.read_json(df_json)
+    # FIX: pandas 3.0 treats long strings as file paths
+    df = pd.read_json(io.StringIO(df_json))
     return generate_story(df)
 
 df = get_df()
