@@ -1,10 +1,12 @@
 """
-pages/3_📊_Dashboard.py
-FIXED:
-  - pd.read_json(df_json) → pd.read_json(io.StringIO(df_json))
-  - use_container_width=True → width="stretch"
-  - Arrow serialization: stats table uses .astype(str)
-  - st.plotly_chart keeps use_container_width (plotly needs it)
+pages/3_📊_Dashboard.py  — DataForge AI IMPROVED
+Changes vs original:
+  - Domain detected at load time
+  - Domain badge shown in header
+  - Domain KPI cards replace generic numeric means
+  - Domain-specific charts shown FIRST (before generic stats)
+  - Clients see HR/Finance/Sales/Ecommerce insights immediately
+  - Generic analysis still available in tabs below
 """
 import io
 import streamlit as st
@@ -12,66 +14,112 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
 from core.session_manager import require_data, get_df, get_filename, get_cached_stats
 require_data()
 
 from core.stats_engine import analyze
+from core.story_engine import detect_domain
 
-st.set_page_config(page_title="Dashboard", layout="wide")
+# Import domain dashboards (new file)
+try:
+    from core.domain_dashboards import get_domain_kpis, get_domain_charts
+    DOMAIN_DASH_AVAILABLE = True
+except ImportError:
+    DOMAIN_DASH_AVAILABLE = False
 
-# ── Theme ─────────────────────────────────────────────────
-COLORS = ["#1a4a8a", "#2196F3", "#42A5F5", "#22d3a5",
-          "#f7934f", "#a78bfa", "#f77070", "#ffd43b"]
+st.set_page_config(page_title="Dashboard — DataForge AI", layout="wide")
 
-PLOTLY_THEME = dict(
-    paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="#f8faff",
-    font=dict(family="Helvetica, Arial", size=11, color="#1e1e28"),
-    margin=dict(l=10, r=10, t=40, b=10),
-    legend=dict(orientation="h", yanchor="bottom", y=1.02,
-                xanchor="right", x=1),
-    colorway=COLORS,
-)
+# ── CSS ───────────────────────────────────────────────────────────────────────
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+html,body,[class*="css"]{font-family:'Inter',sans-serif!important}
+.block-container{padding-top:1.2rem!important}
 
-# ── Cache ──────────────────────────────────────────────────
+.domain-badge{
+    display:inline-flex;align-items:center;gap:8px;
+    padding:8px 18px;border-radius:20px;
+    font-size:13px;font-weight:700;letter-spacing:.05em;
+    margin-bottom:16px;
+}
+.kpi-card{
+    background:white;border:1px solid #E2E8F0;border-radius:14px;
+    padding:18px 16px;position:relative;overflow:hidden;
+    transition:box-shadow .2s;
+}
+.kpi-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.07)}
+.kpi-val{font-size:26px;font-weight:800;line-height:1.1;margin-bottom:4px}
+.kpi-lbl{font-size:11px;font-weight:700;text-transform:uppercase;
+         letter-spacing:.07em;color:#64748B;margin-bottom:6px}
+.kpi-sub{font-size:11px;color:#94A3B8;line-height:1.4}
+.kpi-accent{position:absolute;top:0;left:0;right:0;height:3px;border-radius:14px 14px 0 0}
+
+.section-hdr{
+    font-size:16px;font-weight:800;color:#0F172A;
+    margin:24px 0 12px;display:flex;align-items:center;gap:8px;
+}
+.domain-section{
+    background:linear-gradient(135deg,#F0F7FF,#EFF6FF);
+    border:1px solid #BFDBFE;border-radius:16px;
+    padding:20px 22px;margin-bottom:20px;
+}
+
+section[data-testid="stSidebar"]{background:linear-gradient(180deg,#0D1B2E,#0F2240)!important}
+section[data-testid="stSidebar"] *{color:rgba(255,255,255,.85)!important}
+</style>
+""", unsafe_allow_html=True)
+
+# ── Cache stats ───────────────────────────────────────────────────────────────
 @st.cache_data(show_spinner=False)
 def get_stats(df_json: str):
-    # FIXED: pd.read_json(df_json) → pd.read_json(io.StringIO(df_json))
     df = pd.read_json(io.StringIO(df_json))
     return analyze(df), df
 
-# ── Load data ─────────────────────────────────────────────
+# ── Load data ─────────────────────────────────────────────────────────────────
 df_master = get_df()
+fname     = get_filename()
 stats, _  = get_stats(df_master.to_json(date_format="iso"))
 
 num_cols = stats.numeric_cols
-cat_cols = [c for c in stats.categorical_cols
-            if df_master[c].nunique() <= 50]
-id_cols  = [c for c in stats.categorical_cols
-            if df_master[c].nunique() > 50]
+cat_cols = [c for c in stats.categorical_cols if df_master[c].nunique() <= 50]
 dt_cols  = stats.datetime_cols
 
-# ══════════════════════════════════════════════════════════
+# Detect domain once
+domain, confidence = detect_domain(df_master)
+
+DOMAIN_META = {
+    "hr":        {"icon": "👥", "label": "HR Analytics",     "color": "#1D4ED8", "bg": "#DBEAFE"},
+    "finance":   {"icon": "💰", "label": "Finance",          "color": "#065F46", "bg": "#D1FAE5"},
+    "ecommerce": {"icon": "🛒", "label": "E-Commerce",       "color": "#B45309", "bg": "#FEF3C7"},
+    "sales":     {"icon": "📈", "label": "Sales",            "color": "#6D28D9", "bg": "#EDE9FE"},
+    "general":   {"icon": "📊", "label": "General Business", "color": "#475569", "bg": "#F1F5F9"},
+}
+dmeta = DOMAIN_META.get(domain, DOMAIN_META["general"])
+
+# ══════════════════════════════════════════════════════════════════════════════
 #  SIDEBAR FILTERS
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════════════
 with st.sidebar:
+    st.markdown("""
+    <div style="padding:16px 0 10px;text-align:center">
+        <div style="font-size:20px;font-weight:900;color:white">🔬 DataForge AI</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.4);text-transform:uppercase;
+                    letter-spacing:.1em;margin-top:3px">Dashboard</div>
+    </div>
+    """, unsafe_allow_html=True)
+    st.divider()
+
     st.markdown("### 🎛️ Filters")
     st.caption("Filter once → all charts update")
 
     df_filtered = df_master.copy()
 
-    active_cat_filters = {}
     for col in cat_cols[:4]:
         unique_vals = sorted(df_master[col].dropna().unique().tolist())
-        if len(unique_vals) <= 20:
-            selected = st.multiselect(
-                col, unique_vals,
-                default=unique_vals,
-                key="filter_{}".format(col)
-            )
-            active_cat_filters[col] = selected
+        if 2 <= len(unique_vals) <= 20:
+            selected = st.multiselect(col, unique_vals, default=unique_vals,
+                                      key=f"filter_{col}")
             if selected:
                 df_filtered = df_filtered[df_filtered[col].isin(selected)]
 
@@ -79,395 +127,383 @@ with st.sidebar:
         s = df_master[col].dropna()
         lo, hi = float(s.min()), float(s.max())
         if lo < hi:
-            rng = st.slider(col, lo, hi, (lo, hi),
-                            key="range_{}".format(col))
-            df_filtered = df_filtered[
-                (df_filtered[col] >= rng[0]) &
-                (df_filtered[col] <= rng[1])
-            ]
+            rng = st.slider(col, lo, hi, (lo, hi), key=f"range_{col}")
+            df_filtered = df_filtered[(df_filtered[col] >= rng[0]) &
+                                       (df_filtered[col] <= rng[1])]
 
     st.divider()
-    st.caption("Showing {:,} of {:,} rows".format(
-        len(df_filtered), len(df_master)))
-    # FIXED: Reverted width="stretch" back to use_container_width=True
+    st.caption(f"Showing {len(df_filtered):,} of {len(df_master):,} rows")
     if st.button("Reset Filters", use_container_width=True):
         st.rerun()
 
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════════════
 #  HEADER
-# ══════════════════════════════════════════════════════════
-fname = get_filename()
-st.markdown("## 📊 Dashboard — {}".format(fname))
-st.caption("Real-time analysis · {:,} rows · {} columns · {} filtered".format(
-    len(df_master), len(df_master.columns), len(df_filtered)))
+# ══════════════════════════════════════════════════════════════════════════════
+col_title, col_info = st.columns([3, 1])
+with col_title:
+    st.markdown(f"## 📊 Dashboard — {fname}")
+    # Domain badge
+    st.markdown(f"""
+    <span class="domain-badge" style="background:{dmeta['bg']};color:{dmeta['color']};">
+        {dmeta['icon']} {dmeta['label']} Domain
+        {"· " + f"{confidence:.0%} confidence" if confidence > 0.1 else ""}
+    </span>
+    """, unsafe_allow_html=True)
+
+with col_info:
+    st.markdown(f"""
+    <div style="text-align:right;padding-top:8px">
+        <div style="font-size:22px;font-weight:800;color:#0F172A">{len(df_filtered):,}</div>
+        <div style="font-size:11px;color:#64748B">rows after filters</div>
+        <div style="font-size:11px;color:#94A3B8">{len(df_master.columns)} columns</div>
+    </div>
+    """, unsafe_allow_html=True)
+
 st.divider()
 
-# ══════════════════════════════════════════════════════════
-#  SECTION 1 — KPI CARDS
-# ══════════════════════════════════════════════════════════
-if num_cols:
-    st.markdown("### 📌 Key Performance Indicators")
+# ══════════════════════════════════════════════════════════════════════════════
+#  SECTION 1 — DOMAIN KPI CARDS
+# ══════════════════════════════════════════════════════════════════════════════
+if DOMAIN_DASH_AVAILABLE and domain != "general":
+    st.markdown(f'<div class="section-hdr">{dmeta["icon"]} {dmeta["label"]} KPIs</div>',
+                unsafe_allow_html=True)
 
-    kpi_cols = num_cols[:4]
-    cols_ui  = st.columns(len(kpi_cols))
+    try:
+        kpis = get_domain_kpis(df_filtered, domain)
+        n    = min(len(kpis), 6)
+        cols = st.columns(n)
 
-    for i, col in enumerate(kpi_cols):
-        s_full   = df_master[col].dropna()
-        s_filter = df_filtered[col].dropna() if col in df_filtered else s_full
+        for i, kpi in enumerate(kpis[:n]):
+            with cols[i]:
+                color = kpi.get("color", "#1B2A4A")
+                delta = kpi.get("delta")
+                st.markdown(f"""
+                <div class="kpi-card">
+                    <div class="kpi-accent" style="background:{color}"></div>
+                    <div class="kpi-lbl">{kpi['label']}</div>
+                    <div class="kpi-val" style="color:{color}">{kpi['value']}</div>
+                    <div class="kpi-sub">{kpi.get('sub','')}</div>
+                    {f'<div style="font-size:11px;font-weight:700;color:{color};margin-top:6px">{delta}</div>' if delta else ''}
+                </div>
+                """, unsafe_allow_html=True)
+    except Exception as e:
+        st.warning(f"Domain KPIs unavailable: {e}")
 
-        mean_full   = s_full.mean()
-        mean_filter = s_filter.mean() if len(s_filter) > 0 else mean_full
-        delta       = mean_filter - mean_full
+else:
+    # Generic KPI cards for general domain
+    if num_cols:
+        st.markdown('<div class="section-hdr">📌 Key Metrics</div>', unsafe_allow_html=True)
+        kpi_cols = num_cols[:5]
+        cols_ui  = st.columns(len(kpi_cols))
 
-        cs = stats.column_stats.get(col)
-        skew_note = ""
-        if cs and cs.skewness and abs(cs.skewness) > 1:
-            skew_note = " (median: {:.2f})".format(cs.median)
+        for i, col in enumerate(kpi_cols):
+            s = df_filtered[col].dropna() if col in df_filtered else df_master[col].dropna()
+            cs = stats.column_stats.get(col)
+            use_median = cs and cs.skewness and abs(cs.skewness) > 1
+            display_val = s.median() if use_median else s.mean()
+            label_note  = "Median" if use_median else "Mean"
 
-        with cols_ui[i]:
-            st.metric(
-                label=col[:20],
-                value="{:,.2f}{}".format(mean_filter, skew_note),
-                delta="{:+.2f} vs full dataset".format(delta)
-                      if abs(delta) > 0.001 else None,
-                help="Sum: {:,.0f} | Min: {:,.2f} | Max: {:,.2f}".format(
-                    s_filter.sum(), s_filter.min(), s_filter.max())
-            )
+            with cols_ui[i]:
+                st.metric(
+                    label=col[:22],
+                    value=f"{display_val:,.2f}",
+                    help=f"Sum: {s.sum():,.0f} | Min: {s.min():,.2f} | Max: {s.max():,.2f}"
+                )
 
-    skewed_cols = [c for c in kpi_cols
-                   if stats.column_stats.get(c) and
-                   stats.column_stats[c].skewness and
-                   abs(stats.column_stats[c].skewness) > 1]
-    if skewed_cols:
-        st.warning(
-            "⚠️ **Statistical note:** {} — distribution is skewed. "
-            "Median shown in brackets is more reliable than mean.".format(
-                ", ".join(skewed_cols))
-        )
+st.markdown("<br>", unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  SECTION 2 — DOMAIN-SPECIFIC CHARTS (shown FIRST)
+# ══════════════════════════════════════════════════════════════════════════════
+if DOMAIN_DASH_AVAILABLE and domain != "general":
+    st.markdown(f'<div class="section-hdr">{dmeta["icon"]} {dmeta["label"]} Analysis</div>',
+                unsafe_allow_html=True)
+
+    try:
+        domain_charts = get_domain_charts(df_filtered, domain)
+        if domain_charts:
+            # Show in pairs
+            for idx in range(0, len(domain_charts), 2):
+                pair = domain_charts[idx:idx+2]
+                c1, c2 = st.columns(2 if len(pair) == 2 else [1, 0])
+                for col_ui, (chart_title, fig) in zip([c1, c2], pair):
+                    with col_ui:
+                        st.plotly_chart(fig, use_container_width=True,
+                                        config={"displayModeBar": False})
+                if len(pair) == 1:
+                    st.empty()  # Fill second column
+        else:
+            st.info(f"Domain-specific charts require certain columns. "
+                    f"For {dmeta['label']}, ensure your dataset has the expected column names.")
+    except Exception as e:
+        st.warning(f"Domain charts unavailable: {e}")
+
     st.divider()
 
-# ══════════════════════════════════════════════════════════
-#  SECTION 2 — CHARTS
-# ══════════════════════════════════════════════════════════
-st.markdown("### 📈 Visual Analysis")
+# ══════════════════════════════════════════════════════════════════════════════
+#  SECTION 3 — GENERIC ANALYSIS TABS
+# ══════════════════════════════════════════════════════════════════════════════
+st.markdown('<div class="section-hdr">📊 Statistical Analysis</div>',
+            unsafe_allow_html=True)
 
-chart_tab_labels = ["Overview", "Distribution", "Relationships", "Deep Dive"]
+tab_labels = ["Overview", "Distributions", "Relationships", "Deep Dive"]
 if dt_cols:
-    chart_tab_labels.insert(1, "Trends")
+    tab_labels.insert(1, "Trends")
 
-tabs    = st.tabs(chart_tab_labels)
+tabs = st.tabs(tab_labels)
 tab_idx = 0
 
-# ── Overview ──────────────────────────────────────────────
+# ── Overview tab ──────────────────────────────────────────────────────────────
 with tabs[tab_idx]:
     tab_idx += 1
-    if cat_cols and num_cols:
-        c1, c2 = st.columns(2)
 
-        with c1:
-            best_cat = next(
-                (c for c in cat_cols if 2 <= df_filtered[c].nunique() <= 15),
-                cat_cols[0]
-            )
-            best_num = num_cols[0]
-            agg = (df_filtered.groupby(best_cat)[best_num]
-                   .mean().reset_index()
-                   .sort_values(best_num, ascending=True)
-                   .tail(15))
-            fig = px.bar(
-                agg, x=best_num, y=best_cat,
-                orientation="h",
-                title="Avg {} by {}".format(best_num, best_cat),
-                color=best_num,
-                color_continuous_scale=["#90CAF9", "#1a4a8a"],
-                text=agg[best_num].round(2),
-            )
-            fig.update_traces(textposition="outside")
-            fig.update_layout(**PLOTLY_THEME)
-            fig.update_coloraxes(showscale=False)
-            st.plotly_chart(fig, use_container_width=True)
-
-        with c2:
-            if len(cat_cols) >= 1 and len(num_cols) >= 1:
-                best_cat2 = next(
-                    (c for c in cat_cols if 2 <= df_filtered[c].nunique() <= 10),
-                    cat_cols[0]
+    if num_cols and cat_cols:
+        t1, t2 = st.columns(2)
+        with t1:
+            col  = st.selectbox("Numeric column", num_cols, key="ov_num")
+            cat  = st.selectbox("Group by", cat_cols, key="ov_cat")
+            agg  = st.radio("Aggregation", ["Mean", "Median", "Sum", "Count"],
+                            horizontal=True, key="ov_agg")
+            agg_fn = {"Mean":"mean","Median":"median","Sum":"sum","Count":"count"}[agg]
+            try:
+                gdata = (df_filtered.groupby(cat)[col]
+                                    .agg(agg_fn)
+                                    .reset_index()
+                                    .sort_values(col, ascending=True)
+                                    .tail(20))
+                fig = go.Figure(go.Bar(
+                    x=gdata[col], y=gdata[cat], orientation="h",
+                    marker_color="#1B4FD8", opacity=0.85,
+                    text=[f"{v:,.1f}" for v in gdata[col]],
+                    textposition="outside",
+                ))
+                fig.update_layout(
+                    title=f"{agg} of {col} by {cat}",
+                    height=max(300, len(gdata) * 36 + 80),
+                    paper_bgcolor="white", plot_bgcolor="white",
+                    margin=dict(l=10, r=80, t=50, b=20),
+                    xaxis=dict(showgrid=True, gridcolor="#E2E8F0"),
+                    yaxis=dict(showgrid=False),
                 )
-                pie_agg = (df_filtered.groupby(best_cat2)[num_cols[0]]
-                           .sum().reset_index()
-                           .sort_values(num_cols[0], ascending=False)
-                           .head(8))
-                fig2 = px.pie(
-                    pie_agg, values=num_cols[0], names=best_cat2,
-                    title="{} Share by {}".format(num_cols[0], best_cat2),
-                    color_discrete_sequence=COLORS,
-                    hole=0.4,
-                )
-                fig2.update_layout(**PLOTLY_THEME)
-                st.plotly_chart(fig2, use_container_width=True)
-    elif num_cols:
-        fig = px.bar(
-            x=num_cols[:8],
-            y=[df_filtered[c].mean() for c in num_cols[:8]],
-            title="Column Averages",
-            labels={"x": "Column", "y": "Average"},
-            color=num_cols[:8],
-            color_discrete_sequence=COLORS,
-        )
-        fig.update_layout(**PLOTLY_THEME)
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("No numeric + categorical columns available for overview charts.")
+                st.plotly_chart(fig, use_container_width=True,
+                                config={"displayModeBar": False})
+            except Exception as e:
+                st.error(f"Chart failed: {e}")
 
-# ── Trends ────────────────────────────────────────────────
-if dt_cols and "Trends" in chart_tab_labels:
+        with t2:
+            col2 = st.selectbox("Numeric column", num_cols,
+                                 index=min(1, len(num_cols)-1), key="ov_num2")
+            try:
+                s = df_filtered[col2].dropna()
+                fig2 = px.histogram(s, nbins=25, color_discrete_sequence=["#1B4FD8"],
+                                    labels={col2: col2, "count": "Frequency"})
+                mean_v = float(s.mean()); med_v = float(s.median())
+                fig2.add_vline(x=mean_v, line_dash="solid", line_color="#DC2626",
+                               line_width=2, annotation_text=f"Mean {mean_v:.2f}")
+                fig2.add_vline(x=med_v,  line_dash="dash",  line_color="#059669",
+                               line_width=1.5, annotation_text=f"Median {med_v:.2f}")
+                fig2.update_layout(
+                    title=f"Distribution: {col2}",
+                    height=400, paper_bgcolor="white", plot_bgcolor="white",
+                    margin=dict(l=10, r=10, t=50, b=20),
+                )
+                st.plotly_chart(fig2, use_container_width=True,
+                                config={"displayModeBar": False})
+            except Exception as e:
+                st.error(f"Chart failed: {e}")
+
+    # Summary stats table
+    st.markdown("#### Summary Statistics")
+    if num_cols:
+        try:
+            desc = df_filtered[num_cols].describe().round(3)
+            desc.index = desc.index.str.upper()
+            st.dataframe(desc.astype(str), use_container_width=True)
+        except Exception:
+            pass
+
+# ── Trends tab ────────────────────────────────────────────────────────────────
+if dt_cols:
     with tabs[tab_idx]:
         tab_idx += 1
-        dt_col  = dt_cols[0]
-        val_col = st.selectbox("Select metric", num_cols, key="trend_metric")
-        agg_by  = st.radio("Aggregate by",
-                           ["Day", "Week", "Month", "Quarter"],
-                           horizontal=True, key="trend_agg")
+        if num_cols:
+            t1, t2 = st.columns([1, 3])
+            with t1:
+                dt_col   = st.selectbox("Date column", dt_cols, key="trend_dt")
+                val_col  = st.selectbox("Metric", num_cols, key="trend_val")
+                freq     = st.selectbox("Granularity", ["D","W","ME","QE","YE"],
+                                        format_func=lambda x: {"D":"Daily","W":"Weekly",
+                                                                "ME":"Monthly","QE":"Quarterly",
+                                                                "YE":"Yearly"}[x],
+                                        index=2, key="trend_freq")
+                agg2 = st.radio("Aggregation", ["Sum","Mean"], horizontal=True, key="trend_agg")
+            with t2:
+                try:
+                    df_t = df_filtered.copy()
+                    df_t[dt_col] = pd.to_datetime(df_t[dt_col], errors="coerce")
+                    df_t = df_t.dropna(subset=[dt_col])
+                    df_t = df_t.set_index(dt_col)
+                    trend_data = (df_t[val_col].resample(freq).sum()
+                                  if agg2 == "Sum"
+                                  else df_t[val_col].resample(freq).mean())
+                    trend_data = trend_data.dropna().reset_index()
+                    trend_data.columns = ["Date", val_col]
 
-        freq_map = {"Day": "D", "Week": "W", "Month": "ME", "Quarter": "QE"}
-        freq  = freq_map[agg_by]
-        trend = (df_filtered.set_index(dt_col)[val_col]
-                 .resample(freq).mean().reset_index())
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(
+                        x=trend_data["Date"], y=trend_data[val_col],
+                        mode="lines+markers", name=val_col,
+                        line=dict(color="#1B4FD8", width=2.5),
+                        marker=dict(size=5),
+                        fill="tozeroy", fillcolor="rgba(27,79,216,0.08)",
+                    ))
+                    fig.update_layout(
+                        title=f"{agg2} of {val_col} over Time",
+                        height=380, paper_bgcolor="white", plot_bgcolor="white",
+                        margin=dict(l=10, r=10, t=50, b=20),
+                        xaxis=dict(showgrid=False),
+                        yaxis=dict(showgrid=True, gridcolor="#E2E8F0"),
+                    )
+                    st.plotly_chart(fig, use_container_width=True,
+                                    config={"displayModeBar": False})
+                except Exception as e:
+                    st.error(f"Trend chart failed: {e}")
 
-        fig = px.line(
-            trend, x=dt_col, y=val_col,
-            title="{} — {} Trend".format(val_col, agg_by),
-            line_shape="spline",
-            markers=True,
-        )
-        fig.update_traces(line_color=COLORS[0], line_width=2.5,
-                          marker_color=COLORS[1])
-        fig.add_hline(
-            y=trend[val_col].mean(),
-            line_dash="dash", line_color="#f7934f",
-            annotation_text="Avg: {:.2f}".format(trend[val_col].mean()),
-            annotation_position="right",
-        )
-        fig.update_layout(**PLOTLY_THEME)
-        st.plotly_chart(fig, use_container_width=True)
-
-# ── Distribution ──────────────────────────────────────────
+# ── Distributions tab ─────────────────────────────────────────────────────────
 with tabs[tab_idx]:
     tab_idx += 1
-    if not num_cols:
-        st.info("No numeric columns for distribution analysis.")
-    else:
-        col_sel = st.selectbox("Select column", num_cols, key="dist_col")
-        c1, c2  = st.columns(2)
+    if num_cols:
+        selected_cols = st.multiselect("Select columns", num_cols,
+                                        default=num_cols[:min(4, len(num_cols))],
+                                        key="dist_cols")
+        if selected_cols:
+            cols_per_row = 2
+            for idx in range(0, len(selected_cols), cols_per_row):
+                row_cols = selected_cols[idx:idx+cols_per_row]
+                cols_ui  = st.columns(len(row_cols))
+                for ci, col in enumerate(row_cols):
+                    with cols_ui[ci]:
+                        try:
+                            s = df_filtered[col].dropna()
+                            cs = stats.column_stats.get(col)
+                            skew = cs.skewness if cs and cs.skewness else float(s.skew())
+                            fig = px.histogram(s, nbins=25,
+                                               color_discrete_sequence=["#1B4FD8"])
+                            fig.add_vline(x=float(s.median()), line_dash="dash",
+                                          line_color="#059669", line_width=2)
+                            fig.update_layout(
+                                title=f"{col}<br><sup>skew={skew:.2f} · "
+                                      f"{'use median' if abs(skew)>1 else 'mean OK'}</sup>",
+                                height=280, paper_bgcolor="white",
+                                plot_bgcolor="white",
+                                margin=dict(l=10, r=10, t=55, b=20),
+                            )
+                            st.plotly_chart(fig, use_container_width=True,
+                                            config={"displayModeBar": False})
+                        except Exception as e:
+                            st.error(f"{col}: {e}")
 
-        with c1:
-            cs  = stats.column_stats.get(col_sel)
-            fig = px.histogram(
-                df_filtered, x=col_sel,
-                nbins=30,
-                title="Distribution: {}".format(col_sel),
-                color_discrete_sequence=[COLORS[0]],
-                marginal="box",
-            )
-            if cs and cs.mean:
-                fig.add_vline(x=cs.mean, line_dash="dash",
-                              line_color="#f7934f",
-                              annotation_text="Mean: {:.2f}".format(cs.mean))
-                fig.add_vline(x=cs.median, line_dash="dot",
-                              line_color="#22d3a5",
-                              annotation_text="Median: {:.2f}".format(cs.median))
-            fig.update_layout(**PLOTLY_THEME)
-            st.plotly_chart(fig, use_container_width=True)
-
-        with c2:
-            if cs:
-                st.markdown("**Statistical Summary**")
-                # FIXED: All values → str to avoid Arrow serialization error
-                # "Non-Normal" string mixed with floats caused the crash
-                stat_data = {
-                    "Metric": [
-                        "Mean", "Median", "Std Dev", "Variance",
-                        "Min", "Max", "IQR", "Skewness",
-                        "Kurtosis", "Normality", "Outliers (IQR)",
-                    ],
-                    "Value": [
-                        str(round(cs.mean,   4)) if cs.mean   is not None else "—",
-                        str(round(cs.median, 4)) if cs.median is not None else "—",
-                        str(round(cs.std,    4)) if cs.std    is not None else "—",
-                        str(round(cs.variance, 4)) if cs.variance is not None else "—",
-                        str(round(cs.min_val, 4)) if cs.min_val is not None else "—",
-                        str(round(cs.max_val, 4)) if cs.max_val is not None else "—",
-                        str(round(cs.iqr,    4)) if cs.iqr    is not None else "—",
-                        str(round(cs.skewness, 4)) if cs.skewness is not None else "—",
-                        str(round(cs.kurtosis, 4)) if cs.kurtosis is not None else "—",
-                        str(cs.normality_label) if cs.normality_label else "—",
-                        str(cs.outlier_count_iqr) if cs.outlier_count_iqr is not None else "—",
-                    ],
-                    "Interpretation": [
-                        "Average value",
-                        "Middle value — robust to outliers",
-                        "Spread of data",
-                        "Squared spread",
-                        "Smallest value",
-                        "Largest value",
-                        "Middle 50% range",
-                        str(cs.skew_label)     if cs.skew_label     else "-",
-                        str(cs.kurtosis_label) if cs.kurtosis_label else "-",
-                        "p={:.4f} ({})".format(
-                            cs.normality_pvalue or 0,
-                            cs.normality_test   or "")
-                        if cs.normality_pvalue else "-",
-                        str(cs.outlier_method_recommended)
-                        if cs.outlier_method_recommended else "-",
-                    ],
-                }
-                # All columns are str — no Arrow conversion issue
-                st.dataframe(
-                    pd.DataFrame(stat_data),
-                    use_container_width=True,
-                    hide_index=True,
-                )
-
-# ── Relationships ─────────────────────────────────────────
+# ── Relationships tab ─────────────────────────────────────────────────────────
 with tabs[tab_idx]:
     tab_idx += 1
-    if len(num_cols) < 2:
-        st.info("Need at least 2 numeric columns for relationship analysis.")
-    else:
-        c1, c2 = st.columns(2)
+    if len(num_cols) >= 2:
+        col_a = st.selectbox("X axis", num_cols, key="rel_x")
+        col_b = st.selectbox("Y axis", num_cols,
+                              index=min(1, len(num_cols)-1), key="rel_y")
+        col_c = st.selectbox("Colour by (optional)", ["None"] + cat_cols,
+                              key="rel_color")
 
-        with c1:
-            corr = df_filtered[num_cols[:10]].corr().round(2)
-            fig  = px.imshow(
-                corr,
-                color_continuous_scale="RdBu_r",
-                zmin=-1, zmax=1,
-                title="Correlation Matrix",
-                text_auto=True,
-                aspect="auto",
-            )
-            fig.update_layout(**PLOTLY_THEME)
-            st.plotly_chart(fig, use_container_width=True)
-
-        with c2:
-            x_col    = st.selectbox("X axis", num_cols, key="scatter_x")
-            y_col    = st.selectbox("Y axis", num_cols,
-                                    index=min(1, len(num_cols)-1),
-                                    key="scatter_y")
-            color_by = st.selectbox("Color by (optional)",
-                                    ["None"] + cat_cols[:5],
-                                    key="scatter_c")
-
-            sample_df = (df_filtered
-                         .sample(min(2000, len(df_filtered)), random_state=42)
-                         .dropna(subset=[x_col, y_col]))
-
-            fig = px.scatter(
-                sample_df,
-                x=x_col, y=y_col,
-                color=color_by if color_by != "None" else None,
-                title="{} vs {}".format(x_col, y_col),
-                color_discrete_sequence=COLORS,
-                opacity=0.6,
-            )
-            try:
-                x_vals = sample_df[x_col].values
-                y_vals = sample_df[y_col].values
-                m, b   = np.polyfit(x_vals, y_vals, 1)
-                x_line = np.linspace(x_vals.min(), x_vals.max(), 100)
-                y_line = m * x_line + b
-                fig.add_trace(go.Scatter(
-                    x=x_line, y=y_line,
-                    mode="lines",
-                    name="Trend",
-                    line=dict(color="#f7934f", width=2, dash="dash"),
-                ))
-            except Exception:
-                pass
-            fig.update_layout(**PLOTLY_THEME)
-            st.plotly_chart(fig, use_container_width=True)
-
-        if stats.top_correlations:
-            st.markdown("**Statistically Significant Relationships (p < 0.05)**")
-            for c in stats.top_correlations[:5]:
-                icon = "🔴" if c.strength == "strong" else "🟡"
-                st.markdown("{} {}".format(icon, c.label))
-
-# ── Deep Dive ─────────────────────────────────────────────
-with tabs[tab_idx]:
-    tab_idx += 1
-    st.markdown("#### Custom Analysis")
-
-    c1, c2, c3 = st.columns(3)
-    chart_type = c1.selectbox("Chart type",
-                              ["Bar", "Line", "Box Plot",
-                               "Violin", "Scatter", "Histogram"],
-                              key="dd_type")
-    x_ax = c2.selectbox("X axis",
-                        (cat_cols + num_cols + dt_cols)[:20],
-                        key="dd_x")
-    y_ax = c3.selectbox("Y axis", num_cols, key="dd_y") if num_cols else None
-
-    if y_ax:
         try:
-            if chart_type == "Bar":
-                agg = df_filtered.groupby(x_ax)[y_ax].mean().reset_index()
-                fig = px.bar(agg, x=x_ax, y=y_ax,
-                             title="{} by {}".format(y_ax, x_ax),
-                             color=y_ax,
-                             color_continuous_scale=["#90CAF9", "#1a4a8a"])
-            elif chart_type == "Line":
-                fig = px.line(df_filtered.sort_values(x_ax),
-                              x=x_ax, y=y_ax,
-                              title="{} over {}".format(y_ax, x_ax))
-            elif chart_type == "Box Plot":
-                fig = px.box(df_filtered, x=x_ax, y=y_ax,
-                             title="{} distribution by {}".format(y_ax, x_ax),
-                             color=x_ax,
-                             color_discrete_sequence=COLORS)
-            elif chart_type == "Violin":
-                fig = px.violin(df_filtered, x=x_ax, y=y_ax,
-                                title="{} violin by {}".format(y_ax, x_ax),
-                                color=x_ax, box=True,
-                                color_discrete_sequence=COLORS)
-            elif chart_type == "Scatter":
-                fig = px.scatter(
-                    df_filtered.sample(min(2000, len(df_filtered))),
-                    x=x_ax, y=y_ax,
-                    title="{} vs {}".format(x_ax, y_ax),
-                    opacity=0.6,
-                    color_discrete_sequence=[COLORS[0]])
-            else:
-                fig = px.histogram(df_filtered, x=y_ax, nbins=30,
-                                   title="Distribution: {}".format(y_ax),
-                                   color_discrete_sequence=[COLORS[0]])
-
-            fig.update_layout(**PLOTLY_THEME)
-            st.plotly_chart(fig, use_container_width=True)
-
+            kwargs = dict(opacity=0.55, color_discrete_sequence=px.colors.qualitative.Set2)
+            if col_c != "None":
+                kwargs["color"] = col_c
+            fig = px.scatter(df_filtered, x=col_a, y=col_b,
+                             trendline="ols", **kwargs)
+            fig.update_layout(
+                title=f"{col_a} vs {col_b}",
+                height=420, paper_bgcolor="white", plot_bgcolor="white",
+                margin=dict(l=10, r=10, t=50, b=20),
+            )
+            st.plotly_chart(fig, use_container_width=True,
+                            config={"displayModeBar": False})
         except Exception as e:
-            st.error("Chart error: {}".format(str(e)))
+            st.error(f"Scatter failed: {e}")
 
-st.divider()
+    # Correlation heatmap
+    if len(num_cols) >= 3:
+        st.markdown("#### Correlation Matrix (Spearman)")
+        try:
+            corr_df  = df_filtered[num_cols[:12]].corr(method="spearman").round(3)
+            fig_corr = go.Figure(go.Heatmap(
+                z=corr_df.values,
+                x=corr_df.columns.tolist(),
+                y=corr_df.columns.tolist(),
+                colorscale="RdBu", zmid=0, zmin=-1, zmax=1,
+                text=np.round(corr_df.values, 2),
+                texttemplate="%{text:.2f}",
+                textfont=dict(size=9),
+                colorbar=dict(title="r", thickness=12),
+            ))
+            fig_corr.update_layout(
+                title="Spearman Correlation Matrix (r²: shared variance, not causation)",
+                height=max(350, len(num_cols[:12]) * 40 + 80),
+                paper_bgcolor="white",
+                margin=dict(l=10, r=10, t=60, b=20),
+            )
+            st.plotly_chart(fig_corr, use_container_width=True,
+                            config={"displayModeBar": False})
+            st.caption("r² = shared variance between two variables. "
+                       "Correlation is association — not causation.")
+        except Exception as e:
+            st.error(f"Correlation failed: {e}")
 
-# ══════════════════════════════════════════════════════════
-#  SECTION 3 — STATISTICAL INSIGHTS
-# ══════════════════════════════════════════════════════════
-st.markdown("### 💡 Statistical Insights")
-
-if stats.dataset_insights:
-    c1, c2 = st.columns(2)
-    mid    = len(stats.dataset_insights) // 2
+# ── Deep Dive tab ─────────────────────────────────────────────────────────────
+with tabs[tab_idx]:
+    tab_idx += 1
+    st.markdown("#### Custom Chart Builder")
+    c1, c2, c3, c4 = st.columns(4)
     with c1:
-        for insight in stats.dataset_insights[:mid + 1]:
-            st.info("📌 " + insight)
+        chart_type = st.selectbox("Chart type", ["Bar","Box","Violin","Histogram","Line"],
+                                   key="dd_type")
     with c2:
-        for insight in stats.dataset_insights[mid + 1:]:
-            st.info("📌 " + insight)
-else:
-    st.success("✅ No major statistical concerns detected in this dataset.")
+        x_col = st.selectbox("X axis", num_cols + cat_cols, key="dd_x")
+    with c3:
+        y_opts = ["—"] + num_cols
+        y_col  = st.selectbox("Y axis", y_opts, key="dd_y")
+    with c4:
+        hue_opts = ["None"] + cat_cols
+        hue_col  = st.selectbox("Colour by", hue_opts, key="dd_hue")
 
-if stats.recommended_analysis:
-    st.markdown("**Recommended next steps:**")
-    for rec in stats.recommended_analysis:
-        st.markdown("→ " + rec)
+    try:
+        c_kwargs = dict(color_discrete_sequence=px.colors.qualitative.Set2)
+        if hue_col != "None": c_kwargs["color"] = hue_col
+
+        if chart_type == "Bar" and y_col != "—":
+            fig = px.bar(df_filtered, x=x_col, y=y_col, **c_kwargs)
+        elif chart_type == "Box" and y_col != "—":
+            fig = px.box(df_filtered, x=x_col if x_col in cat_cols else None,
+                         y=y_col, **c_kwargs)
+        elif chart_type == "Violin" and y_col != "—":
+            fig = px.violin(df_filtered, x=x_col if x_col in cat_cols else None,
+                            y=y_col, box=True, **c_kwargs)
+        elif chart_type == "Histogram":
+            fig = px.histogram(df_filtered, x=x_col, **c_kwargs)
+        elif chart_type == "Line" and y_col != "—":
+            fig = px.line(df_filtered, x=x_col, y=y_col, **c_kwargs)
+        else:
+            fig = px.histogram(df_filtered, x=x_col, **c_kwargs)
+
+        fig.update_layout(
+            height=420, paper_bgcolor="white", plot_bgcolor="white",
+            margin=dict(l=10, r=10, t=40, b=20),
+        )
+        st.plotly_chart(fig, use_container_width=True,
+                        config={"displayModeBar": False})
+    except Exception as e:
+        st.error(f"Custom chart failed: {e}")
+
+# ── Data Preview ──────────────────────────────────────────────────────────────
+st.divider()
+with st.expander("🔍 Filtered Data Preview"):
+    st.dataframe(df_filtered.head(200), use_container_width=True)
+    st.caption(f"Showing first 200 of {len(df_filtered):,} rows after filters.")
