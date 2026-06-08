@@ -6,7 +6,7 @@ UPGRADED from basic to:
   ✅ Premium dark-navy cover with domain badge + KPI strip
   ✅ Running header / footer on every page
   ✅ Insight cards: Problem → Cause → Evidence → Action → Impact
-  ✅ SHRM/Gallup/Mercer industry benchmarks (HR domain)
+  ✅ Internal-only benchmark context (no external sources hardcoded)
   ✅ Correlation warning box (r ≠ causation)
   ✅ Scenario modelling table
   ✅ Risk register with severity colouring
@@ -130,14 +130,9 @@ DOMAIN_THEMES = {
     "general":   "Corporate Light",
 }
 
-# SHRM/Gallup/Mercer benchmarks for HR domain
-HR_BENCHMARKS = [
-    ["Attrition Rate",         "—",    "10–15%",      "<10%",          "SHRM 2024"],
-    ["Employee Satisfaction",  "—",    "0.70 (70%+)", "0.80+",         "Gallup/Mercer"],
-    ["Replacement Cost/EE",    "—",    "50–200% sal", "6–9 mo salary", "SHRM/Gallup"],
-    ["Mgr-Driven Satisfaction","—",    "70%",         "Manager train", "Gallup 2024"],
-    ["Preventable Exits",      "—",    "52%",         "Proactive 1:1", "Gallup 2024"],
-]
+# Internal comparison guidance only — no hardcoded external benchmarks
+# Values in "General Guidance" column are labelled as indicative
+HR_BENCHMARKS = []  # Not used — see _benchmark_section for dataset-computed values
 
 
 # ══════════════════════════════════════════════════════════
@@ -250,7 +245,7 @@ class _ReportCanvas(CV.Canvas):
 def _domain_footer_text(domain: str) -> str:
     """FIX-054: Domain-specific footer — no HR benchmarks in sales reports."""
     _map = {
-        "hr":        "Benchmarks: SHRM · Gallup · Mercer — verify with qualified HR professionals before action",
+        "hr":        "All metrics computed from submitted dataset only — no external benchmarks embedded",
         "ecommerce": "Benchmarks: Amazon · Shopify · Klaviyo — verify with e-commerce specialists before action",
         "sales":     "Benchmarks: Salesforce · Gartner · HubSpot — verify with sales leadership before action",
         "finance":   "Benchmarks: PwC · McKinsey · Deloitte — verify with qualified finance professionals before action",
@@ -710,92 +705,121 @@ def _dq_note(story, s, T, df: pd.DataFrame, profile, CW):
 # ══════════════════════════════════════════════════════════
 
 def _benchmark_section(story, s, T, domain, CW, df=None):
-    if domain not in ("hr", "ecommerce", "sales"): return
-    # FIX-057: Domain-specific subtitle
-    _bench_subtitles = {
-        "hr":        "Sources: SHRM · Gallup · Mercer (2024–2026) — HR domain only",
-        "ecommerce": "Sources: Amazon Seller Reports · Shopify · Klaviyo (2024–2026)",
-        "sales":     "Sources: Salesforce · Gartner · HubSpot (2024–2026)",
-        "finance":   "Sources: PwC · McKinsey · Deloitte Finance (2024–2026)",
-    }
-    _bench_sub = _bench_subtitles.get(domain, "Benchmarks are indicative — verify with domain experts")
-    _sec(story, s, T, "Industry Benchmark Context", _bench_sub)
+    """
+    FIXED: Computes internal comparisons from dataset only.
+    No hardcoded SHRM/Gallup/Mercer figures presented as authoritative.
+    External ranges are clearly labelled as general guidance only.
+    """
+    if domain not in ("hr", "ecommerce", "sales", "finance"): return
+
+    _sec(story, s, T, "Internal Performance Context",
+         "Computed from your dataset — external ranges shown as indicative guidance only")
 
     story.append(Paragraph(
-        "Senior analysts do not interpret data in isolation. "
-        "Every metric must be measured against published industry standards "
-        "to distinguish 'acceptable' from 'urgent.'", s["body"]))
+        "All values in the 'Your Organisation' column are computed directly from the "
+        "submitted dataset. Any general industry ranges in the 'Context' column are "
+        "indicative guidance only — they are not verified benchmarks from any external "
+        "source and must be validated against your sector-specific data before use "
+        "in any board-level presentation.",
+        s["body"]))
     story.append(Spacer(1, 3*mm))
 
-    # ── Compute real "This Org" values from df ────────────
-    org = {}
-    if df is not None:
-        import numpy as np
-        # Attrition
+    rows = []
+    import numpy as np
+
+    if df is not None and domain == "hr":
         atr_col = next((c for c in df.columns
                         if c.lower() in ("left","attrition","churned","exited")), None)
         if atr_col:
-            org["attrition"] = f"{float(df[atr_col].mean())*100:.1f}%"
+            rate = float(df[atr_col].mean()) * 100
+            rows.append(["Attrition Rate", f"{rate:.1f}%",
+                         "General guidance: 10–20% (varies widely by sector)",
+                         "Dataset computed"])
 
-        # Satisfaction
-        sat_col = next((c for c in df.columns
-                        if "satisfaction" in c.lower()), None)
+        sat_col = next((c for c in df.columns if "satisfaction" in c.lower()), None)
         if sat_col:
-            org["satisfaction"] = f"{float(df[sat_col].mean()):.2f}"
+            mean_s = float(df[sat_col].mean()); med_s = float(df[sat_col].median())
+            rows.append(["Avg Satisfaction", f"{mean_s:.3f}",
+                         f"Dataset median: {med_s:.3f} (internal reference only)",
+                         "Dataset computed"])
 
-        # Rating (ecommerce)
+        promo_col = next((c for c in df.columns if "promot" in c.lower()), None)
+        if promo_col:
+            rate_p = float(df[promo_col].mean()) * 100
+            rows.append(["Promotion Rate (5yr)", f"{rate_p:.1f}%",
+                         "Verify against HRIS records — field may be under-populated",
+                         "Dataset computed"])
+
+        dept_col = next((c for c in df.columns
+                         if "dept" in c.lower() or "department" in c.lower()), None)
+        if dept_col and atr_col:
+            dept_rates = df.groupby(dept_col)[atr_col].mean() * 100
+            rows.append(["Dept Attrition Range",
+                         f"{dept_rates.min():.1f}% – {dept_rates.max():.1f}%",
+                         f"Best: {dept_rates.idxmin()} | Worst: {dept_rates.idxmax()}",
+                         "Internal comparison"])
+
+    elif df is not None and domain == "ecommerce":
         rat_col = next((c for c in df.columns
-                        if "rating" in c.lower()
-                        and "count" not in c.lower()), None)
+                        if "rating" in c.lower() and "count" not in c.lower()), None)
         if rat_col:
-            org["rating"] = f"{float(df[rat_col].mean()):.2f}/5"
+            mean_r = float(df[rat_col].mean()); med_r = float(df[rat_col].median())
+            rows.append(["Customer Rating", f"{mean_r:.2f}/5",
+                         f"Dataset median: {med_r:.2f}/5 (internal reference)",
+                         "Dataset computed"])
 
-    if domain == "hr":
-        rows = [
-            ["Attrition Rate",         org.get("attrition","—"),
-             "10–15%", "<10%", "SHRM 2024"],
-            ["Employee Satisfaction",  org.get("satisfaction","—"),
-             "0.70 (70%+)", "0.80+", "Gallup/Mercer"],
-            ["Replacement Cost/EE",    "—",
-             "50–200% sal", "6–9 mo salary", "SHRM/Gallup"],
-            ["Mgr-Driven Satisfaction","—",
-             "70%", "Manager train", "Gallup 2024"],
-            ["Preventable Exits",      "—",
-             "52%", "Proactive 1:1", "Gallup 2024"],
-        ]
-        note = ("SHRM 2024 State of Workplace · "
-                "Gallup State of Global Workplace 2024 · "
-                "Mercer Global Talent Trends 2024")
-    elif domain == "ecommerce":
-        rows = [
-            ["Customer Rating",  org.get("rating","—"),
-             "4.0+", "4.5+", "Amazon/G2 2024"],
-            ["Return Rate",      "—", "< 20%",  "< 10%", "Shopify 2024"],
-            ["Repeat Purchase",  "—", "30%+",   "40%+",  "Klaviyo 2024"],
-            ["Conversion Rate",  "—", "2–4%",   "5%+",   "BigCommerce 2024"],
-        ]
-        note = "Amazon Seller Reports 2024 · Shopify Commerce Trends 2024"
-    else:  # sales
-        rows = [
-            ["Win Rate",        "—", "20–30%",   "40%+",      "Salesforce 2024"],
-            ["Quota Attainment","—", "60–70%",   "80%+",      "Gartner 2024"],
-            ["Pipeline Coverage","—","3–4×",     "5×+",       "HubSpot 2024"],
-            ["Avg Deal Cycle",  "—", "< 90 days","< 60 days", "Forrester 2024"],
-        ]
-        note = "Salesforce State of Sales 2024 · Gartner Sales Benchmark 2024"
+        disc_col = next((c for c in df.columns if "discount" in c.lower()), None)
+        if disc_col:
+            mean_d = float(df[disc_col].mean())
+            rows.append(["Avg Discount", f"{mean_d:.1f}%",
+                         "Compare to your historical periods for trend analysis",
+                         "Dataset computed"])
+
+    elif df is not None and domain in ("sales", "finance"):
+        num_cols = df.select_dtypes(include="number").columns.tolist()
+        for col in num_cols[:3]:
+            try:
+                mean_v = float(df[col].mean()); med_v = float(df[col].median())
+                rows.append([col[:22], f"{mean_v:.2f}",
+                             f"Dataset median: {med_v:.2f}",
+                             "Dataset computed"])
+            except Exception:
+                pass
+
+    if not rows:
+        story.append(Paragraph(
+            "Performance context requires domain-specific columns not detected in this dataset. "
+            "Run the domain-specific analysis pages for detailed metrics.",
+            s["body"]))
+        return
 
     _gtable(story, T,
-            ["Metric", "This Org", "Industry Norm", "Best Practice", "Source"],
+            ["Metric", "Your Organisation", "Context / Reference", "Source"],
             rows,
-            [CW * x for x in [0.22, 0.12, 0.17, 0.17, 0.32]])
-    story.append(Paragraph(note, s["note"]))
+            [CW * x for x in [0.24, 0.18, 0.42, 0.16]])
+
+    caveat_text = (
+        "<b>Important:</b> These figures are from the submitted dataset only. "
+        "Any general ranges shown in the Context column are indicative guidance — "
+        "they are not verified benchmarks from SHRM, Gallup, Mercer, or any external source. "
+        "Validate against your sector-specific data before presenting to a board."
+    )
+    caveat = Table([[Paragraph(caveat_text, s["warn"])]], colWidths=["100%"])
+    caveat.setStyle(TableStyle([
+        ("LEFTPADDING",  (0,0),(-1,-1), 10),
+        ("RIGHTPADDING", (0,0),(-1,-1), 10),
+        ("TOPPADDING",   (0,0),(-1,-1), 8),
+        ("BOTTOMPADDING",(0,0),(-1,-1), 8),
+        ("BOX",          (0,0),(-1,-1), 1, _c(T["warning"])),
+    ]))
+    story.append(caveat)
 
 
 # ══════════════════════════════════════════════════════════
 #  ATTRITION PAGE
 # ══════════════════════════════════════════════════════════
 
-def _attrition_page(story, s, T, attrition, CW):
+def _attrition_page(story, s, T, attrition, CW, config=None):
     if attrition is None: return
     _sec(story, s, T, "Attrition Deep Dive",
          "Employee turnover analysis — drivers, segments, cost")
@@ -805,19 +829,39 @@ def _attrition_page(story, s, T, attrition, CW):
          "sub": "{:,} left".format(attrition.n_left),
          "color": T["negative"] if attrition.rate > 15 else T["warning"]},
         {"label": "SEVERITY", "value": attrition.severity.upper(),
-         "sub": "Benchmark: 10–15%", "color": T["negative"]},
+         "sub": "Internal threshold: 10%", "color": T["negative"]},
         {"label": "FLIGHT RISK", "value": "{:,}".format(attrition.n_flight_risk),
          "sub": "{:.0f}% of remaining".format(attrition.flight_risk_pct),
          "color": T["warning"]},
         {"label": "COST RISK",
          "value": "HIGH" if attrition.n_left > 50 else "MED",
-         "sub": "50–200% salary/hire", "color": T["negative"]},
+         "sub": "Scenario estimate — see below", "color": T["negative"]},
     ], CW)
 
     _narrative_box(story, s, T,
                    getattr(attrition, "interpretation", ""))
-    _narrative_box(story, s, T,
-                   getattr(attrition, "cost_estimate", ""))
+    # FIXED: Cost estimate narrative — check if it contains a dollar figure
+    cost_narrative = getattr(attrition, "cost_estimate", "")
+    if cost_narrative:
+        # Wrap in a clearly-labelled scenario box
+        scenario_label = Table([[Paragraph(
+            "<b>⚠ SCENARIO ESTIMATE — NOT FROM DATASET DATA</b><br/>"
+            "The dataset does not contain salary figures. The cost range below uses "
+            "an assumed average salary configured at report setup. "
+            "Substitute your actual average salary to produce a reliable figure. "
+            "<b>Do not present this dollar range to a board without inserting real salary data.</b>",
+            s["warn"])]],
+            colWidths=["100%"])
+        scenario_label.setStyle(TableStyle([
+            ("LEFTPADDING",  (0,0),(-1,-1), 10),
+            ("RIGHTPADDING", (0,0),(-1,-1), 10),
+            ("TOPPADDING",   (0,0),(-1,-1), 8),
+            ("BOTTOMPADDING",(0,0),(-1,-1), 8),
+            ("BOX",          (0,0),(-1,-1), 1.5, _c(T["warning"])),
+        ]))
+        story.append(scenario_label)
+        story.append(Spacer(1, 2*mm))
+        _narrative_box(story, s, T, cost_narrative)
 
     # Drivers
     drivers = getattr(attrition, "top_drivers", [])
@@ -1096,6 +1140,275 @@ def _recommendations(story, s, T, actions, CW):
 #  APPENDIX
 # ══════════════════════════════════════════════════════════
 
+def _finance_page(story, s, T, df, config, CW, profile=None):
+    """
+    Finance-domain PDF section.
+    Generates P&L summary, margin analysis, budget vs actual,
+    cost concentration, and period trend.
+    All values computed from dataset — no external benchmarks hardcoded.
+    """
+    from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.units import mm
+    import pandas as pd
+    import numpy as np
+
+    def _c(hex_str):
+        from reportlab.lib import colors
+        return colors.HexColor(hex_str)
+
+    def _find(keywords, exclude=None):
+        excl = exclude or []
+        for c in df.columns:
+            cl = c.lower()
+            if any(k in cl for k in keywords) and not any(e in cl for e in excl):
+                return c
+        return None
+
+    _sec(story, s, T, "Finance Analysis",
+         "P&L summary · Margin · Budget vs Actual · Cost breakdown — all from dataset")
+
+    story.append(Paragraph(
+        "All figures below are computed directly from the submitted dataset. "
+        "No external benchmarks are embedded. Any general guidance references "
+        "are clearly labelled and must be verified against sector-specific data.",
+        s["body"]))
+    story.append(Spacer(1, 3*mm))
+
+    rev_col    = _find(["revenue","total_revenue","income","turnover","sales_amount"])
+    cost_col   = _find(["cost","cogs","cost_of_goods","direct_cost"])
+    profit_col = _find(["net_profit","profit","net_income"])
+    gross_col  = _find(["gross_profit","gross_income"])
+    budget_col = _find(["budget","plan","target","forecast"])
+    actual_col = _find(["actual","actuals"], exclude=["target","budget"])
+    if budget_col and not actual_col:
+        actual_col = rev_col
+    period_col = _find(["month","quarter","period","year","date"])
+    cat_col    = _find(["category","department","cost_center","account","segment"])
+    opex_col   = _find(["opex","operating_expense","overhead"])
+    expense_col= _find(["expense","spend","expenditure"])
+    val_col    = cost_col or expense_col or opex_col
+
+    # ── P&L Summary Table ─────────────────────────────────────────────────
+    story.append(Paragraph("P&L Summary", s["h3"]))
+
+    pl_rows = []
+    total_rev, total_cost, gross_profit, gross_margin = 0, 0, 0, 0
+    total_opex, ebitda_proxy, total_profit = 0, 0, 0
+
+    if rev_col:
+        total_rev = float(df[rev_col].sum())
+        pl_rows.append(["Total Revenue", f"{total_rev:,.0f}", "100.0%", "—"])
+
+    if cost_col:
+        total_cost  = float(df[cost_col].sum())
+        gross_profit = total_rev - total_cost
+        gross_margin = gross_profit / total_rev * 100 if total_rev else 0
+        pl_rows.append(["Cost of Goods / Direct Cost", f"({total_cost:,.0f})",
+                         f"({total_cost/total_rev*100:.1f}%)" if total_rev else "—",
+                         "Dataset computed"])
+        pl_rows.append(["Gross Profit", f"{gross_profit:,.0f}",
+                         f"{gross_margin:.1f}%",
+                         "Revenue minus direct cost"])
+    elif gross_col:
+        gross_profit = float(df[gross_col].sum())
+        gross_margin = gross_profit / total_rev * 100 if total_rev else 0
+        pl_rows.append(["Gross Profit", f"{gross_profit:,.0f}",
+                         f"{gross_margin:.1f}%", "Dataset computed"])
+
+    if opex_col:
+        total_opex   = float(df[opex_col].sum())
+        ebitda_proxy = gross_profit - total_opex
+        opex_ratio   = total_opex / total_rev * 100 if total_rev else 0
+        pl_rows.append(["Operating Expenses (OpEx)", f"({total_opex:,.0f})",
+                         f"({opex_ratio:.1f}%)", "Dataset computed"])
+        pl_rows.append(["Operating Profit (proxy)", f"{ebitda_proxy:,.0f}",
+                         f"{ebitda_proxy/total_rev*100:.1f}%" if total_rev else "—",
+                         "Gross profit minus OpEx"])
+
+    if profit_col:
+        total_profit = float(df[profit_col].sum())
+        net_margin   = total_profit / total_rev * 100 if total_rev else 0
+        pl_rows.append(["Net Profit / Income", f"{total_profit:,.0f}",
+                         f"{net_margin:.1f}%", "Dataset computed"])
+
+    if pl_rows:
+        header = ["Line Item", "Amount", "% Revenue", "Source"]
+        all_rows = [header] + pl_rows
+        col_w = [CW*0.38, CW*0.22, CW*0.18, CW*0.22]
+        t = Table([[Paragraph(str(c), s["th"] if ri == 0 else s["td"])
+                    for c in row]
+                   for ri, row in enumerate(all_rows)],
+                  colWidths=col_w)
+        t.setStyle(TableStyle([
+            ("BACKGROUND",    (0,0), (-1,0), _c(T["primary"])),
+            ("TEXTCOLOR",     (0,0), (-1,0), _c("#FFFFFF")),
+            ("TOPPADDING",    (0,0), (-1,-1), 4),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 4),
+            ("LEFTPADDING",   (0,0), (-1,-1), 6),
+            ("GRID",          (0,0), (-1,-1), 0.3, _c("#E2E8F0")),
+            ("ROWBACKGROUNDS",(0,1), (-1,-1), [_c("#FFFFFF"), _c("#F8FAFC")]),
+            # Highlight gross profit row
+            ("BACKGROUND",    (0,2), (-1,2), _c("#F0FDF4")) if cost_col else ("",),
+            ("FONTNAME",      (0,2), (-1,2), "Helvetica-Bold") if cost_col else ("",),
+        ]))
+        story.append(t)
+        story.append(Spacer(1, 3*mm))
+
+        # Margin summary chips
+        if gross_margin:
+            margin_color = T["positive"] if gross_margin > 40 else T["warning"] if gross_margin > 20 else T["negative"]
+            margin_box = Table([[Paragraph(
+                f"<b>Gross Margin: {gross_margin:.1f}%</b> | "
+                f"{'Healthy — focus on protecting it.' if gross_margin > 40 else 'Moderate — review cost drivers.' if gross_margin > 20 else 'Low — immediate cost review required.'}"
+                f" (Computed from dataset — compare to your prior periods, not generic norms.)",
+                s["note"])]],
+                colWidths=[CW])
+            margin_box.setStyle(TableStyle([
+                ("LEFTPADDING",  (0,0),(0,0), 10),
+                ("TOPPADDING",   (0,0),(0,0), 8),
+                ("BOTTOMPADDING",(0,0),(0,0), 8),
+                ("BOX",          (0,0),(0,0), 1, _c(margin_color)),
+            ]))
+            story.append(margin_box)
+            story.append(Spacer(1, 3*mm))
+
+    # ── Budget vs Actual Table ────────────────────────────────────────────
+    if budget_col and actual_col and budget_col != actual_col:
+        story.append(Paragraph("Budget vs Actual Variance", s["h3"]))
+        try:
+            comp_col = period_col or cat_col
+            if comp_col:
+                bva = df.groupby(comp_col)[[budget_col, actual_col]].sum().reset_index()
+                bva.columns = ["Period/Category", "Budget", "Actual"]
+                bva["Variance"]     = bva["Actual"] - bva["Budget"]
+                bva["Variance %"]   = ((bva["Actual"] - bva["Budget"]) /
+                                        bva["Budget"].replace(0, np.nan) * 100).round(1)
+                bva = bva.sort_values("Variance %", key=abs, ascending=False).head(12)
+
+                bva_header = ["Period / Category", "Budget", "Actual", "Variance", "Variance %"]
+                bva_data   = [[str(row["Period/Category"])[:28],
+                               f"{row['Budget']:,.0f}",
+                               f"{row['Actual']:,.0f}",
+                               f"{row['Variance']:+,.0f}",
+                               f"{row['Variance %']:+.1f}%"]
+                              for _, row in bva.iterrows()]
+
+                all_rows_bva = [bva_header] + bva_data
+                col_w_bva    = [CW*0.30, CW*0.17, CW*0.17, CW*0.18, CW*0.18]
+
+                t_bva = Table([[Paragraph(str(c), s["th"] if ri == 0 else s["td"])
+                                for c in row]
+                               for ri, row in enumerate(all_rows_bva)],
+                              colWidths=col_w_bva)
+                t_bva.setStyle(TableStyle([
+                    ("BACKGROUND",    (0,0), (-1,0), _c(T["primary"])),
+                    ("TEXTCOLOR",     (0,0), (-1,0), _c("#FFFFFF")),
+                    ("TOPPADDING",    (0,0), (-1,-1), 4),
+                    ("BOTTOMPADDING", (0,0), (-1,-1), 4),
+                    ("LEFTPADDING",   (0,0), (-1,-1), 5),
+                    ("GRID",          (0,0), (-1,-1), 0.3, _c("#E2E8F0")),
+                    ("ROWBACKGROUNDS",(0,1), (-1,-1), [_c("#FFFFFF"), _c("#F8FAFC")]),
+                ]))
+                story.append(t_bva)
+                story.append(Spacer(1, 3*mm))
+
+                # Variance summary
+                over_n  = int((bva["Variance %"] > 10).sum())
+                under_n = int((bva["Variance %"] < -10).sum())
+                if over_n + under_n > 0:
+                    story.append(Paragraph(
+                        f"⚠ {over_n} items exceed budget by >10% | "
+                        f"{under_n} items under budget by >10%. "
+                        f"A variance trigger of ±10% is commonly used as a review threshold — "
+                        f"adjust to your organisation's planning standards.",
+                        s["note"]))
+        except Exception as e:
+            story.append(Paragraph(f"Budget vs actual table unavailable: {e}", s["note"]))
+
+    # ── Cost by Category ──────────────────────────────────────────────────
+    if cat_col and val_col:
+        story.append(Paragraph("Cost / Expense by Category", s["h3"]))
+        try:
+            cat_cost = df.groupby(cat_col)[val_col].sum().sort_values(ascending=False).head(10)
+            total_c  = float(cat_cost.sum())
+            cat_rows = [[str(idx)[:32], f"{val:,.0f}", f"{val/total_c*100:.1f}%"]
+                        for idx, val in cat_cost.items()]
+            cat_header = ["Category / Segment", "Total Amount", "% of Total"]
+            all_cat    = [cat_header] + cat_rows
+            col_w_cat  = [CW*0.50, CW*0.28, CW*0.22]
+            t_cat = Table([[Paragraph(str(c), s["th"] if ri == 0 else s["td"])
+                            for c in row]
+                           for ri, row in enumerate(all_cat)],
+                          colWidths=col_w_cat)
+            t_cat.setStyle(TableStyle([
+                ("BACKGROUND",    (0,0), (-1,0), _c(T["primary"])),
+                ("TEXTCOLOR",     (0,0), (-1,0), _c("#FFFFFF")),
+                ("TOPPADDING",    (0,0), (-1,-1), 4),
+                ("BOTTOMPADDING", (0,0), (-1,-1), 4),
+                ("LEFTPADDING",   (0,0), (-1,-1), 5),
+                ("GRID",          (0,0), (-1,-1), 0.3, _c("#E2E8F0")),
+                ("ROWBACKGROUNDS",(0,1), (-1,-1), [_c("#FFFFFF"), _c("#F8FAFC")]),
+            ]))
+            story.append(t_cat)
+
+            top_cat     = str(cat_cost.index[0])
+            top_pct     = float(cat_cost.iloc[0] / total_c * 100)
+            top3_pct    = float(cat_cost.iloc[:3].sum() / total_c * 100)
+            story.append(Spacer(1, 2*mm))
+            story.append(Paragraph(
+                f"'{top_cat}' = {top_pct:.1f}% of total | "
+                f"Top 3 combined = {top3_pct:.1f}%. "
+                f"{'High concentration — assess dependency risk.' if top_pct > 50 else 'Moderate concentration — monitor for shifts.'} "
+                f"All values from dataset.", s["note"]))
+        except Exception as e:
+            story.append(Paragraph(f"Cost breakdown unavailable: {e}", s["note"]))
+
+    story.append(Spacer(1, 3*mm))
+
+    # ── Period Trend Summary ──────────────────────────────────────────────
+    if period_col and rev_col:
+        story.append(Paragraph("Period-over-Period Revenue Summary", s["h3"]))
+        try:
+            period_rev = df.groupby(period_col)[rev_col].sum()
+            try:
+                period_rev = period_rev.sort_index()
+            except Exception:
+                pass
+
+            if len(period_rev) >= 2:
+                period_rows = [[str(idx)[:20], f"{val:,.0f}",
+                                f"{(val - period_rev.iloc[max(0,i-1)]) / period_rev.iloc[max(0,i-1)] * 100:+.1f}%"
+                                if i > 0 else "—"]
+                               for i, (idx, val) in enumerate(period_rev.items())]
+                period_header = ["Period", "Revenue", "Change vs Prior"]
+                all_period    = [period_header] + period_rows
+                col_w_p       = [CW*0.38, CW*0.35, CW*0.27]
+                t_p = Table([[Paragraph(str(c), s["th"] if ri == 0 else s["td"])
+                              for c in row]
+                             for ri, row in enumerate(all_period)],
+                            colWidths=col_w_p)
+                t_p.setStyle(TableStyle([
+                    ("BACKGROUND",    (0,0), (-1,0), _c(T["primary"])),
+                    ("TEXTCOLOR",     (0,0), (-1,0), _c("#FFFFFF")),
+                    ("TOPPADDING",    (0,0), (-1,-1), 4),
+                    ("BOTTOMPADDING", (0,0), (-1,-1), 4),
+                    ("LEFTPADDING",   (0,0), (-1,-1), 5),
+                    ("GRID",          (0,0), (-1,-1), 0.3, _c("#E2E8F0")),
+                    ("ROWBACKGROUNDS",(0,1), (-1,-1), [_c("#FFFFFF"), _c("#F8FAFC")]),
+                ]))
+                story.append(t_p)
+        except Exception as e:
+            story.append(Paragraph(f"Period trend unavailable: {e}", s["note"]))
+
+    # Disclaimer
+    story.append(Spacer(1, 3*mm))
+    story.append(Paragraph(
+        "All financial metrics above are computed from the submitted dataset only. "
+        "No external financial benchmarks are embedded. "
+        "Verify all figures with your accounting team before using in board materials.",
+        s["note"]))
+
+
 def _appendix(story, s, T, config, CW, domain: str = "general"):
     _sec(story, s, T, "Appendix — Methodology & Sources")
 
@@ -1111,40 +1424,64 @@ def _appendix(story, s, T, config, CW, domain: str = "general"):
         "All findings verified against dataset values before inclusion.",
         s["body"]))
 
-    story.append(Paragraph("B. Quality Score Formula", s["h3"]))
+    story.append(Paragraph("B. Quality Score Formula & This Dataset's Breakdown", s["h3"]))
+    story.append(Paragraph(
+        "Formula: Total = (Completeness × 0.60) + (Deduplication × 0.30) + (Column Health × 0.10). "
+        "Weights reflect analytical impact: missing values corrupt statistics most severely; "
+        "duplicates inflate all aggregates; distributional issues are correctable. "
+        "The table below shows the formula applied to this specific dataset so the score is fully auditable.",
+        s["body"]))
+    story.append(Spacer(1, 2*mm))
+    # Compute actual scores
+    _raw_rows   = getattr(profile, "total_rows", len(df)) if profile else len(df)
+    _dupes      = getattr(profile, "duplicate_rows", 0) if profile else int(df.duplicated().sum())
+    _unique     = _raw_rows - _dupes
+    _miss_pct   = getattr(profile, "missing_pct", df.isna().mean().mean()*100) if profile else df.isna().mean().mean()*100
+    _col_hlth   = getattr(profile, "overall_quality_score", 95) if profile else 95
+    _comp_score = round((1 - _miss_pct/100) * 60, 1)
+    _ded_score  = round((_unique / max(_raw_rows,1)) * 30, 1)
+    _col_score  = round(min(_col_hlth,100)/100 * 10, 1)
+    _total      = round(_comp_score + _ded_score + _col_score, 1)
     _gtable(story, T,
-            ["Component", "Weight", "Description"],
-            [["Completeness",  "60%", "% of non-missing cells"],
-             ["Deduplication", "30%", "% of unique rows"],
-             ["Column Health", "10%", "Avg per-column quality score"]],
-            [CW*0.25, CW*0.15, CW*0.60])
+            ["Component", "Weight", "Formula", "This Dataset", "Score"],
+            [["Completeness",  "60%",
+              "60 × (1 – missing_rate)",
+              f"Missing: {_miss_pct:.1f}%",
+              f"{_comp_score:.1f} / 60"],
+             ["Deduplication", "30%",
+              "30 × (unique / raw_rows)",
+              f"{_unique:,} / {_raw_rows:,} = {_unique/max(_raw_rows,1)*100:.1f}%",
+              f"{_ded_score:.1f} / 30"],
+             ["Column Health", "10%",
+              "10 × avg(per-col score)",
+              f"Avg: {_col_hlth:.1f}%",
+              f"{_col_score:.1f} / 10"],
+             ["TOTAL",         "100%", "Sum of above", "—", f"{_total:.1f} / 100"]],
+            [CW*x for x in [0.20, 0.10, 0.28, 0.28, 0.14]])
 
     # FIX-055: Domain-isolated appendix sources
     story.append(Paragraph("C. Industry Sources", s["h3"]))
     _domain_sources = {
         "hr": [
-            "SHRM 2024 State of the Workplace — attrition benchmarks and replacement cost norms.",
-            "Gallup State of the Global Workplace 2024 — employee engagement and exit research.",
-            "Mercer Global Talent Trends 2024 — career growth as primary attrition driver.",
-            "Deloitte Human Capital Trends 2025 — HR analytics adoption and workforce insights.",
+            "All metrics computed from submitted dataset only. No external benchmark database was queried.",
+            "General industry context provided as indicative guidance — verify against sector-specific data.",
+            "Statistical methods: logistic regression (attrition drivers), Kruskal-Wallis (group comparisons),",
+            "  Spearman correlation (non-normal distributions), IQR outlier detection (1.5×).",
         ],
         "ecommerce": [
-            "Amazon Seller Reports 2024 — marketplace performance benchmarks.",
-            "Shopify Commerce Trends 2024 — cancellation, return, and conversion norms.",
-            "Klaviyo 2024 E-Commerce Benchmarks — repeat purchase and customer retention rates.",
-            "BigCommerce 2024 — conversion rate industry standards.",
+            "All metrics computed from submitted dataset only. No external benchmark database was queried.",
+            "General e-commerce context provided as indicative guidance — verify with your platform data.",
+            "Statistical methods: distribution analysis, correlation testing, outlier detection, trend analysis.",
         ],
         "sales": [
-            "Salesforce State of Sales 2024 — win rate and quota attainment benchmarks.",
-            "Gartner Sales Benchmark 2024 — pipeline coverage and deal cycle norms.",
-            "HubSpot Sales Trends 2024 — pipeline velocity and conversion benchmarks.",
-            "Forrester B2B Sales Research 2024 — deal cycle and sales productivity norms.",
+            "All metrics computed from submitted dataset only. No external benchmark database was queried.",
+            "General sales context provided as indicative guidance — verify against your CRM data.",
+            "Statistical methods: distribution analysis, cohort comparisons, correlation testing.",
         ],
         "finance": [
-            "PwC Global CFO Survey 2024 — finance benchmarks and cost management norms.",
-            "McKinsey Global Institute 2024 — profit margin and operational efficiency data.",
-            "Deloitte Finance Trends 2025 — cost structure and financial planning insights.",
-            "KPMG Financial Performance Benchmarks 2024 — industry-specific financial norms.",
+            "All metrics computed from submitted dataset only. No external benchmark database was queried.",
+            "General finance context provided as indicative guidance — verify against sector-specific data.",
+            "Statistical methods: distribution analysis, variance decomposition, trend analysis.",
         ],
     }
     _sources = _domain_sources.get(domain, [
@@ -1160,7 +1497,7 @@ def _appendix(story, s, T, config, CW, domain: str = "general"):
         "Report generated by DataForge AI on {} for {}. "
         "Findings based solely on provided dataset. "
         "Correlations do not imply causation. "
-        "Industry benchmarks are indicative — verify against sector-specific data. "
+        "Any general industry ranges shown are indicative guidance — not verified external benchmarks. "
         "Verify with qualified data analyst before business decisions.".format(
             datetime.now().strftime("%B %d, %Y"),
             config.get("client_name", "Client")),
@@ -1283,7 +1620,9 @@ def build_pdf(
     _add_toc("Executive Summary")
     _add_toc("Data Quality & Transparency Note")
     if domain in ("hr", "ecommerce", "sales"):
-        _add_toc("Industry Benchmark Context")
+        _add_toc("Performance Context")
+    if domain == "finance":
+        _add_toc("Finance Analysis — P&L · Margin · Budget")
     _add_toc("Top Insights — Decision Summary")
     if attrition:
         _add_toc("Attrition Deep Dive")
@@ -1311,12 +1650,15 @@ def build_pdf(
     if domain in ("hr", "ecommerce", "sales"):
         _benchmark_section(story, s, T, domain, CW, df=df)
         story.append(PageBreak())
+    if domain == "finance":
+        _finance_page(story, s, T, df, config, CW, profile)
+        story.append(PageBreak())
 
     _top_insights(story, s, T, top_insights, CW)
     story.append(PageBreak())
 
     if attrition:
-        _attrition_page(story, s, T, attrition, CW)
+        _attrition_page(story, s, T, attrition, CW, config=config)
         story.append(PageBreak())
 
     _dataset_overview(story, s, T, df, profile, CW)
