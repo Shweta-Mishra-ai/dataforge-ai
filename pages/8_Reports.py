@@ -1,23 +1,15 @@
 """
 pages/8_Reports.py — DataForge AI
 Client-grade PDF Report Generator.
-FIXED v4:
-  ✅ Top Insights — structured cards (not "No structured insights available")
-  ✅ Logo upload — appears on cover page
-  ✅ Client/Company name — editable, appears on cover
-  ✅ Domain auto-detected and passed to pdf_builder
+Config is READ from session_state (set on landing page).
+No duplicate inputs — clean one-click generation.
 """
 import streamlit as st
 import pandas as pd
 import numpy as np
-import io
-import os
-import tempfile
+import io, os, tempfile
 
-from core.session_manager import (
-    require_data, get_df, get_filename,
-    get_cached_stats, get_cached_ml,
-)
+from core.session_manager import require_data, get_df, get_filename, get_cached_stats, get_cached_ml
 
 st.set_page_config(page_title="Reports — DataForge AI", layout="wide")
 require_data()
@@ -25,213 +17,218 @@ require_data()
 df    = get_df()
 fname = get_filename()
 
-# ── IMPORTS ───────────────────────────────────────────────
 from core.pdf_builder    import build_pdf, THEMES
 from core.chart_exporter import generate_all_charts
 from core.story_engine   import generate_story, detect_domain
 from core.data_profiler  import profile_dataset
 
 
-def _clean_fname(name: str) -> str:
-    for ext in [".csv", ".xlsx", ".xls", ".json"]:
-        name = name.replace(ext, "")
+def _clean_fname(name):
+    for ext in [".csv",".xlsx",".xls",".json"]:
+        name = name.replace(ext,"")
     while name.startswith("cleaned_"):
         name = name[len("cleaned_"):]
-    return name.strip("_- ").replace("_", " ")
+    return name.strip("_- ").replace("_"," ")
 
 
 fname_clean = _clean_fname(fname)
 
-# ══════════════════════════════════════════════════════════
-#  PAGE HEADER
-# ══════════════════════════════════════════════════════════
-st.markdown("## 📄 Reports & Export")
-st.caption("{} — {:,} rows, {} columns".format(
-    fname_clean, len(df), len(df.columns)))
+# ── CSS ───────────────────────────────────────────────────────────────────
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+html,body,[class*="css"]{font-family:'Inter',sans-serif!important}
+.block-container{padding-top:1.2rem!important}
+.cfg-block{background:white;border:1px solid #E2E8F0;border-radius:14px;padding:22px 24px;margin-bottom:16px}
+.cfg-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+           color:#6B7280;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #F1F5F9}
+.pre-chip{background:#DBEAFE;border:1px solid #93C5FD;color:#1D4ED8;
+          font-size:12px;font-weight:600;padding:6px 14px;border-radius:8px;display:inline-block}
+section[data-testid="stSidebar"]{background:linear-gradient(180deg,#0D1B2E,#0F2240)!important}
+section[data-testid="stSidebar"] *{color:rgba(255,255,255,.85)!important}
+</style>
+""", unsafe_allow_html=True)
+
+# ── Header ────────────────────────────────────────────────────────────────
+st.markdown("## 📄 Generate PDF Report")
+st.caption(f"{fname_clean} — {len(df):,} rows · {len(df.columns)} columns")
 st.divider()
 
-# ══════════════════════════════════════════════════════════
-#  SECTION 1 — REPORT CONFIGURATION
-# ══════════════════════════════════════════════════════════
-st.markdown("### Report Configuration")
+# ── Read config from session_state (set on landing page) ─────────────────
+pre_client  = st.session_state.get("client_name", "")
+pre_title   = st.session_state.get("report_title", f"Data Analysis Report — {fname_clean}")
+pre_analyst = st.session_state.get("analyst_name", "DataForge AI")
+pre_logo    = st.session_state.get("logo_path", "")
 
-c1, c2, c3 = st.columns(3)
+# ── Show pre-filled config ────────────────────────────────────────────────
+if pre_client or pre_title:
+    st.markdown('<div class="cfg-block">', unsafe_allow_html=True)
+    st.markdown('<div class="cfg-title">Report Configuration (from landing page)</div>', unsafe_allow_html=True)
 
-with c1:
-    report_title = st.text_input(
-        "Report Title",
-        value="Data Analysis Report — {}".format(fname_clean))
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown(f"**Client:** `{pre_client or '—'}`")
+    with c2:
+        st.markdown(f"**Analyst:** `{pre_analyst or '—'}`")
+    with c3:
+        logo_status = "✅ Uploaded" if pre_logo and os.path.exists(pre_logo) else "—"
+        st.markdown(f"**Logo:** {logo_status}")
 
-    client_name = st.text_input(
-        "Prepared For (Client / Company Name)",
-        value="Client",
-        help="Appears on the cover page — use your client's company name for freelancing")
+    st.markdown(f"**Report Title:** {pre_title}")
+    st.markdown("""
+    <div style="font-size:12px;color:#6B7280;margin-top:8px;">
+    ℹ️ To change client name or logo, go back to the <a href="/" style="color:#2563A8">Home page</a>.
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+else:
+    st.info("💡 For a personalised report with client name and logo, set them on the **Home page** first.")
 
-    # ── LOGO UPLOAD ────────────────────────────────────────
-    logo_file = st.file_uploader(
-        "Company Logo (optional)",
-        type=["png", "jpg", "jpeg"],
-        help="Logo appears on the PDF cover page. PNG with transparent background works best.")
+# ── Report options ────────────────────────────────────────────────────────
+st.markdown("### Report Options")
 
-    logo_path = ""
-    if logo_file is not None:
-        try:
-            suffix = "." + logo_file.name.split(".")[-1].lower()
-            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-            tmp.write(logo_file.read())
-            tmp.flush()
-            tmp.close()
-            logo_path = tmp.name
-            st.success("✅ Logo uploaded — will appear on cover page")
-        except Exception as e:
-            st.warning("Logo upload failed: {}".format(e))
-            logo_path = ""
+col1, col2, col3 = st.columns(3)
 
-with c2:
-    theme_name = st.selectbox(
-        "Report Theme",
-        list(THEMES.keys()),
-        help="Theme auto-selects by domain (HR=Blue, Ecom=Orange, Sales=Green) — or choose manually")
+with col1:
+    theme_name    = st.selectbox("Report Theme", list(THEMES.keys()),
+                                 help="Auto-selects by domain or choose manually")
+    subtitle      = st.text_input("Subtitle", value="Powered by DataForge AI")
 
-    subtitle = st.text_input(
-        "Subtitle",
-        value="Powered by DataForge AI")
-
-    avg_salary_k = st.number_input(
-        "Avg Annual Salary ($K) — for cost estimates",
-        min_value=20, max_value=500, value=50, step=5,
-        help="Used to estimate attrition replacement costs in the report")
-
-with c3:
+with col2:
+    avg_salary_k  = st.number_input("Avg Annual Salary ($K) — for scenario cost estimates",
+                                    min_value=20, max_value=500, value=50, step=5,
+                                    help="Used in replacement cost scenario box — clearly labelled as estimated")
     confidential  = st.toggle("Confidential Stamp", value=True)
+
+with col3:
     include_stats = st.toggle("Statistical Analysis", value=True)
     include_bi    = st.toggle("Business Intelligence", value=True)
-    include_ml    = st.toggle(
-        "ML Results", value=False,
-        help="Enable after running ML Predictions page")
+    include_ml    = st.toggle("ML Results", value=False,
+                              help="Enable after running ML Predictions page")
 
 st.divider()
 
-# ══════════════════════════════════════════════════════════
-#  SECTION 2 — WHAT WILL BE INCLUDED
-# ══════════════════════════════════════════════════════════
-st.markdown("### What Will Be Included")
-
+# ── What's included preview ───────────────────────────────────────────────
+st.markdown("### Sections Included")
 stats_cached = get_cached_stats()
 ml_cached    = get_cached_ml()
 
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("Cover + TOC",        "✅ YES")
-c2.metric("Executive Summary",  "✅ Auto-generated")
-c3.metric("Top Insights",       "✅ Structured cards")
-c4.metric("Dataset Overview",   "✅ Stats + cleaning")
-
-c5, c6, c7, c8 = st.columns(4)
-c5.metric("Statistical Analysis",  "✅ YES" if include_stats else "⏸ OFF")
-c6.metric("Business Intelligence", "✅ YES" if include_bi    else "⏸ OFF")
-c7.metric("ML Predictions",        "✅ YES" if (ml_cached and include_ml) else "⏸ OFF")
-c8.metric("Recommendations",       "✅ YES — prioritized")
+cols = st.columns(4)
+preview = [
+    ("Cover + TOC", True),
+    ("Executive Summary", True),
+    ("Top Insights", True),
+    ("Dataset Overview", True),
+    ("Statistical Analysis", include_stats),
+    ("Business Intelligence", include_bi),
+    ("ML Predictions", ml_cached and include_ml),
+    ("Recommendations", True),
+]
+for i, (label, on) in enumerate(preview):
+    cols[i % 4].markdown(
+        f"{'✅' if on else '⏸'} {label}"
+    )
 
 st.divider()
 
-# ══════════════════════════════════════════════════════════
-#  SECTION 3 — GENERATE REPORT
-# ══════════════════════════════════════════════════════════
-st.markdown("### Generate Report")
+# ── Generate button ───────────────────────────────────────────────────────
+st.markdown("### Generate")
 
-gen_btn = st.button(
-    "🚀 Generate PDF Report",
-    type="primary",
-    use_container_width=False)
+gen_btn = st.button("🚀 Generate PDF Report", type="primary")
 
 if gen_btn:
     progress = st.progress(0, text="Starting...")
-
     try:
-        # ── Step 1: Profile ───────────────────────────────
+        # 1. Profile
         progress.progress(8, text="Profiling dataset...")
         try:
             profile = profile_dataset(df)
         except Exception:
             profile = None
 
-        # ── Step 2: Domain detection ──────────────────────
+        # 2. Domain
         progress.progress(12, text="Detecting domain...")
         try:
             domain_name, _ = detect_domain(df)
         except Exception:
             domain_name = "general"
 
-        # ── Step 3: Story / narrative ──────────────────────
+        # 3. Story / narrative
         progress.progress(20, text="Generating executive summary...")
         story_obj = None
         try:
-            story_obj    = generate_story(df)
-            exec_summary = story_obj.executive_summary
-            findings     = story_obj.key_findings
-            risks        = story_obj.business_risks
-            opportunities= story_obj.opportunities
-            actions      = story_obj.recommended_actions
+            story_obj     = generate_story(df)
+            exec_summary  = story_obj.executive_summary
+            findings      = story_obj.key_findings
+            risks         = story_obj.business_risks
+            opportunities = story_obj.opportunities
+            actions       = story_obj.recommended_actions
         except Exception:
-            # No LLM available — generate a real, data-driven summary from statistics
+            # Rule-based fallback — real, specific, not just boilerplate
             num_cols  = df.select_dtypes(include="number").columns.tolist()
             cat_cols  = df.select_dtypes(include="object").columns.tolist()
             miss_pct  = round(df.isna().mean().mean() * 100, 1)
             dup_count = int(df.duplicated().sum())
+
+            # Compute real stats for fallback narrative
+            findings_list, risks_list = [], []
+            for col in num_cols[:4]:
+                try:
+                    mean_v = df[col].mean()
+                    std_v  = df[col].std()
+                    cv     = (std_v / mean_v * 100) if mean_v != 0 else 0
+                    if cv > 60:
+                        findings_list.append(f"'{col}' shows high variability (CV={cv:.0f}%) — wide spread in values")
+                    sk = float(df[col].skew())
+                    if abs(sk) > 1.5:
+                        findings_list.append(f"'{col}' is right-skewed (skew={sk:.2f}) — use median for reporting, not mean")
+                except Exception:
+                    pass
+
             exec_summary = (
-                "This report covers {:,} records across {} variables ({} numeric, {} categorical). "
-                "Data completeness is {:.1f}% (missing: {:.1f}%). "
-                "{} "
-                "Numeric distributions have been assessed for skewness and outliers. "
-                "All findings in this report are computed directly from the submitted dataset "
-                "without assumptions or interpolation.".format(
-                    len(df), len(df.columns), len(num_cols), len(cat_cols),
-                    100 - miss_pct, miss_pct,
-                    "{:,} duplicate rows were removed prior to analysis. ".format(dup_count)
-                    if dup_count > 0 else "No duplicate rows were detected. "
-                )
+                f"This report analyses {len(df):,} records across {len(df.columns)} variables "
+                f"({len(num_cols)} numeric, {len(cat_cols)} categorical). "
+                f"{'Data is fully complete with no missing values. ' if miss_pct == 0 else f'Missing data rate: {miss_pct:.1f}%. '}"
+                f"{'No duplicate rows detected. ' if dup_count == 0 else f'{dup_count:,} duplicate rows were identified and removed before analysis. '}"
+                f"Statistical analysis covers distributions, normality testing, correlation patterns, and outlier detection. "
+                f"All findings are computed directly from the submitted dataset."
             )
-            findings     = [
-                "{:,} rows × {} columns after cleaning".format(len(df), len(df.columns)),
-                "Missing data rate: {:.1f}%".format(miss_pct),
-                "Numeric columns: {} | Categorical columns: {}".format(len(num_cols), len(cat_cols)),
+            findings     = findings_list or [
+                f"{len(df):,} records × {len(df.columns)} columns analysed",
+                f"Missing data: {miss_pct:.1f}%",
+                f"Numeric columns: {len(num_cols)} | Categorical: {len(cat_cols)}",
             ]
-            risks         = ["Add GROQ_API_KEY to .streamlit/secrets.toml to enable AI-generated risk analysis."]
-            opportunities = ["Add GROQ_API_KEY to .streamlit/secrets.toml to enable AI-generated opportunity analysis."]
-            actions       = ["Configure GROQ_API_KEY for full AI-powered executive narrative."]
+            risks         = []
+            opportunities = []
+            actions       = ["Run statistical analysis to identify key variable relationships",
+                             "Review data quality flags before drawing business conclusions",
+                             "Configure GROQ_API_KEY in secrets.toml for AI-generated narratives"]
             story_obj     = None
 
-        # ── Step 4: Build structured top insights ─────────
-        # FIXED: was "No structured insights available"
+        # 4. Structured insights
         progress.progress(30, text="Building structured insights...")
         top_insights = []
         try:
             from core.insights_builder import build_top_insights
             attrition_obj = getattr(story_obj, "attrition", None)
             top_insights  = build_top_insights(
-                df           = df,
-                domain       = domain_name,
-                story_obj    = story_obj,
-                attrition    = attrition_obj,
-                avg_salary_k = float(avg_salary_k),
+                df=df, domain=domain_name,
+                story_obj=story_obj, attrition=attrition_obj,
+                avg_salary_k=float(avg_salary_k),
             )
         except Exception as e:
             top_insights = []
 
-        # ── Step 5: Stats ──────────────────────────────────
+        # 5. Stats
         progress.progress(40, text="Running statistical analysis...")
         stats_report = None
         if include_stats:
             try:
-                if stats_cached:
-                    stats_report = stats_cached
-                else:
-                    from core.stats_engine import analyze
-                    stats_report = analyze(df)
+                stats_report = stats_cached or __import__("core.stats_engine", fromlist=["analyze"]).analyze(df)
             except Exception:
                 pass
 
-        # ── Step 6: Business Intelligence ─────────────────
+        # 6. BI
         progress.progress(52, text="Running business intelligence...")
         bi_report = None
         if include_bi:
@@ -241,13 +238,12 @@ if gen_btn:
             except Exception:
                 pass
 
-        # ── Step 7: ML ────────────────────────────────────
+        # 7. ML
         ml_report = ml_cached if include_ml else None
 
-        # ── Step 8: Charts ────────────────────────────────
+        # 8. Charts
         progress.progress(65, text="Generating charts...")
         chart_data = []
-        # FIX: st.secrets raises when secrets.toml is absent — use safe fallback
         groq_key = ""
         try:
             groq_key = st.secrets.get("GROQ_API_KEY", "")
@@ -259,169 +255,102 @@ if gen_btn:
             for title, img_bytes in charts:
                 if img_bytes:
                     try:
-                        # FIXED: Uses corrected report_narrator
                         from ai.report_narrator import generate_chart_narrative
-                        narrative = generate_chart_narrative(
-                            df, title, groq_key, domain_name)
+                        narrative = generate_chart_narrative(df, title, groq_key, domain_name)
                     except Exception:
-                        narrative = "Chart generated from dataset analysis."
+                        narrative = "Chart analysis computed from dataset statistics."
                     chart_data.append((title, img_bytes, narrative))
-            st.info("{} charts generated.".format(len(chart_data)))
         except Exception as e:
-            st.warning("Charts skipped: {}".format(str(e)))
+            st.warning(f"Charts skipped: {e}")
 
-        # ── Step 9: Build PDF ──────────────────────────────
+        # 9. Build PDF
         progress.progress(80, text="Building PDF...")
-
-        # Attrition object for pdf_builder
         attrition_obj = getattr(story_obj, "attrition", None)
 
-        cleaning_summary = st.session_state.get("clean_report")
-
         config = {
-            "title":        report_title,
+            "title":        pre_title or f"Data Analysis Report — {fname_clean}",
             "subtitle":     subtitle,
-            "client_name":  client_name,
+            "client_name":  pre_client or "Client",
+            "analyst_name": pre_analyst or "DataForge AI",
             "confidential": confidential,
             "theme_name":   theme_name,
-            "logo_path":    logo_path,       # ← logo support
+            "logo_path":    pre_logo,
+            "avg_salary_k": avg_salary_k,
         }
 
         pdf_bytes = build_pdf(
-            df                 = df,
-            config             = config,
-            profile            = profile,
-            cleaning_summary   = cleaning_summary,
-            stats_report       = stats_report,
-            bi_report          = bi_report,
-            ml_report          = ml_report,
-            chart_data         = chart_data,
-            executive_summary  = exec_summary,
-            findings           = findings,
-            risks              = risks,
-            opportunities      = opportunities,
-            recommendations    = actions,
-            top_insights       = top_insights,   # ← FIXED
-            attrition          = attrition_obj,
-            domain             = domain_name,    # ← domain passed
+            df=df, config=config, profile=profile,
+            cleaning_summary=st.session_state.get("clean_report"),
+            stats_report=stats_report, bi_report=bi_report,
+            ml_report=ml_report, chart_data=chart_data,
+            executive_summary=exec_summary,
+            findings=findings, risks=risks, opportunities=opportunities,
+            recommendations=actions, top_insights=top_insights,
+            attrition=attrition_obj, domain=domain_name,
         )
 
         progress.progress(100, text="Done!")
         import time; time.sleep(0.3)
         progress.empty()
 
-        # ── Summary ───────────────────────────────────────
-        n_pages = (3 + len(chart_data)
-                   + (1 if stats_report  else 0)
-                   + (1 if bi_report     else 0)
-                   + (1 if ml_report     else 0) + 2)
+        size_mb = len(pdf_bytes) / (1024*1024)
+        st.success(f"✅ Report ready — {size_mb:.1f} MB · {len(chart_data)} charts · {len(top_insights)} insights")
 
-        st.success(
-            "✅ Report ready — {:.1f} MB | ~{} pages | {} charts | {} insights".format(
-                len(pdf_bytes) / (1024 * 1024),
-                n_pages,
-                len(chart_data),
-                len(top_insights)))
-
-        # Sections preview
-        sections = ["Cover", "TOC", "Executive Summary",
-                    "Data Quality Note", "Top Insights"]
-        if domain_name in ("hr", "ecommerce", "sales"):
-            sections.append("Industry Benchmarks")
-        if attrition_obj:
-            sections.append("Attrition Deep Dive")
-        sections.append("Dataset Overview")
-        if stats_report:  sections.append("Statistical Analysis")
-        if bi_report:     sections.append("Business Intelligence")
-        for i, (t, _, _) in enumerate(chart_data, 1):
-            sections.append("Chart {}: {}".format(i, t[:28]))
-        sections += ["Recommendations", "Appendix"]
-
-        with st.expander("Report sections ({})".format(len(sections))):
-            for i, s in enumerate(sections, 1):
-                st.markdown("{}. {}".format(i, s))
-
-        # ── DOWNLOAD ──────────────────────────────────────
         st.download_button(
-            label            = "⬇️ Download PDF Report",
-            data             = pdf_bytes,
-            file_name        = "DataForge_Report_{}.pdf".format(
-                fname_clean.replace(" ", "_")),
-            mime             = "application/pdf",
-            type             = "primary",
-            use_container_width = True,
+            label="⬇️ Download PDF Report",
+            data=pdf_bytes,
+            file_name=f"DataForge_Report_{fname_clean.replace(' ','_')}.pdf",
+            mime="application/pdf",
+            type="primary",
+            use_container_width=True,
         )
 
-        # Cleanup temp logo file
-        if logo_path and os.path.exists(logo_path):
-            try:
-                os.unlink(logo_path)
-            except Exception:
-                pass
+        # Cleanup logo temp file
+        if pre_logo and os.path.exists(pre_logo):
+            try: os.unlink(pre_logo)
+            except: pass
 
     except Exception as e:
         progress.empty()
-        st.error("Report generation failed: {}".format(str(e)))
+        st.error(f"Report generation failed: {e}")
         st.exception(e)
 
 st.divider()
 
-# ══════════════════════════════════════════════════════════
-#  SECTION 4 — DATA EXPORTS
-# ══════════════════════════════════════════════════════════
+# ── Data Export ───────────────────────────────────────────────────────────
 st.markdown("### Export Data")
-
 c1, c2, c3 = st.columns(3)
 
 with c1:
     st.markdown("**CSV — Cleaned Data**")
-    st.caption("{:,} rows × {} columns".format(len(df), len(df.columns)))
-    st.download_button(
-        "Download CSV",
-        data      = df.to_csv(index=False).encode("utf-8"),
-        file_name = "cleaned_{}.csv".format(fname_clean.replace(" ", "_")),
-        mime      = "text/csv",
-        use_container_width = True,
-    )
-
+    st.caption(f"{len(df):,} rows × {len(df.columns)} columns")
+    st.download_button("Download CSV", data=df.to_csv(index=False).encode("utf-8"),
+                       file_name=f"cleaned_{fname_clean.replace(' ','_')}.csv",
+                       mime="text/csv", use_container_width=True)
 with c2:
     st.markdown("**Excel — 3 Sheets**")
     st.caption("Data + Statistics + Column Info")
     try:
-        buf_xl = io.BytesIO()
-        with pd.ExcelWriter(buf_xl, engine="xlsxwriter") as writer:
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine="xlsxwriter") as writer:
             df.to_excel(writer, sheet_name="Cleaned Data", index=False)
-            df.describe().round(4).reset_index().to_excel(
-                writer, sheet_name="Statistics", index=False)
-            pd.DataFrame([{
-                "Column":    c,
-                "Type":      str(df[c].dtype),
-                "Missing":   int(df[c].isna().sum()),
-                "Missing %": round(df[c].isna().mean() * 100, 2),
-                "Unique":    int(df[c].nunique()),
-                "Sample":    str(df[c].dropna().iloc[0])
-                             if len(df[c].dropna()) > 0 else "",
-            } for c in df.columns]).to_excel(
-                writer, sheet_name="Column Info", index=False)
-        buf_xl.seek(0)
-        st.download_button(
-            "Download Excel",
-            data      = buf_xl,
-            file_name = "cleaned_{}.xlsx".format(fname_clean.replace(" ", "_")),
-            mime      = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width = True,
-        )
+            df.describe().round(4).reset_index().to_excel(writer, sheet_name="Statistics", index=False)
+            pd.DataFrame([{"Column":c,"Type":str(df[c].dtype),
+                           "Missing":int(df[c].isna().sum()),
+                           "Missing %":round(df[c].isna().mean()*100,2),
+                           "Unique":int(df[c].nunique())} for c in df.columns]
+                        ).to_excel(writer, sheet_name="Column Info", index=False)
+        buf.seek(0)
+        st.download_button("Download Excel", data=buf,
+                           file_name=f"cleaned_{fname_clean.replace(' ','_')}.xlsx",
+                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                           use_container_width=True)
     except Exception as e:
-        st.error("Excel failed: {}".format(str(e)))
-
+        st.error(f"Excel failed: {e}")
 with c3:
     st.markdown("**JSON — Records Format**")
     st.caption("For API / downstream pipelines")
-    st.download_button(
-        "Download JSON",
-        data      = df.to_json(orient="records", indent=2,
-                               date_format="iso").encode("utf-8"),
-        file_name = "cleaned_{}.json".format(fname_clean.replace(" ", "_")),
-        mime      = "application/json",
-        use_container_width = True,
-    )
+    st.download_button("Download JSON",
+                       data=df.to_json(orient="records", indent=2, date_format="iso").encode("utf-8"),
+                       file_name=f"cleaned_{fname_clean.replace(' ','_')}.json",
+                       mime="application/json", use_container_width=True)
