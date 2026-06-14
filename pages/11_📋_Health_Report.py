@@ -145,7 +145,7 @@ def compute_health(df: pd.DataFrame) -> dict:
                  (50,"C", "Needs Work","#f97316"),
                  (0, "D", "Poor",    "#ef4444")]
     grade, label, color = next(
-        (g, l, c) for thresh, g, l, c in grade_map if score >= thresh)
+        (g, ln, c) for thresh, g, ln, c in grade_map if score >= thresh)
 
     return {
         "score":       score,
@@ -759,7 +759,7 @@ with c_b:
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#f8faff",
         font=dict(family="Inter, sans-serif", size=11),
         xaxis=dict(range=[0, 100]),
-        margin=dict(l=10, r=10, t=40, b=10), showlegend=False,
+        margin=dict(ln=10, r=10, t=40, b=10), showlegend=False,
     )
     st.plotly_chart(fig2, use_container_width=True)
 

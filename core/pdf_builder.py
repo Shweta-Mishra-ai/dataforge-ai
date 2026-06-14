@@ -371,9 +371,11 @@ def _build_cover(T: dict, config: dict, kpis_preview: list) -> bytes:
     for i, (k, v) in enumerate(meta):
         x = 20*mm + i * mw
         cv.setFillColor(HexColor(T["accent2"]))
-        cv.setFont("Helvetica", 6.5); cv.drawString(x, 21*mm, k)
+        cv.setFont("Helvetica", 6.5)
+        cv.drawString(x, 21*mm, k)
         cv.setFillColor(HexColor("#FFFFFF"))
-        cv.setFont("Helvetica-Bold", 8); cv.drawString(x, 13*mm, v[:22])
+        cv.setFont("Helvetica-Bold", 8)
+        cv.drawString(x, 13*mm, v[:22])
 
     # FIX-020: AI branding removed — report is signed by analyst, not tool
     cv.setFillColor(HexColor(T["accent2"]))
@@ -511,7 +513,7 @@ def _insight_card(story: list, s: dict, T: dict, ins, CW: float, num=None):
     sev_bg = {"critical": T["critical_bg"], "high": T["warning_bg"],
               "warning":  T["info_bg"],     "info": T["bg_card"]}
     col = sev_c.get(sev, T["accent"])
-    bg  = sev_bg.get(sev, T["bg_card"])
+    _bg = sev_bg.get(sev, T["bg_card"])  # noqa: F841
 
     bs = ParagraphStyle("bi_badge", fontName="Helvetica-Bold", fontSize=7.5,
                         textColor=HexColor("#FFFFFF"), alignment=TA_CENTER)
@@ -725,7 +727,6 @@ def _benchmark_section(story, s, T, domain, CW, df=None):
     story.append(Spacer(1, 3*mm))
 
     rows = []
-    import numpy as np
 
     if df is not None and domain == "hr":
         atr_col = next((c for c in df.columns
@@ -738,7 +739,8 @@ def _benchmark_section(story, s, T, domain, CW, df=None):
 
         sat_col = next((c for c in df.columns if "satisfaction" in c.lower()), None)
         if sat_col:
-            mean_s = float(df[sat_col].mean()); med_s = float(df[sat_col].median())
+            mean_s = float(df[sat_col].mean())
+            med_s = float(df[sat_col].median())
             rows.append(["Avg Satisfaction", f"{mean_s:.3f}",
                          f"Dataset median: {med_s:.3f} (internal reference only)",
                          "Dataset computed"])
@@ -763,7 +765,8 @@ def _benchmark_section(story, s, T, domain, CW, df=None):
         rat_col = next((c for c in df.columns
                         if "rating" in c.lower() and "count" not in c.lower()), None)
         if rat_col:
-            mean_r = float(df[rat_col].mean()); med_r = float(df[rat_col].median())
+            mean_r = float(df[rat_col].mean())
+            med_r = float(df[rat_col].median())
             rows.append(["Customer Rating", f"{mean_r:.2f}/5",
                          f"Dataset median: {med_r:.2f}/5 (internal reference)",
                          "Dataset computed"])
@@ -779,7 +782,8 @@ def _benchmark_section(story, s, T, domain, CW, df=None):
         num_cols = df.select_dtypes(include="number").columns.tolist()
         for col in num_cols[:3]:
             try:
-                mean_v = float(df[col].mean()); med_v = float(df[col].median())
+                mean_v = float(df[col].mean())
+                med_v = float(df[col].median())
                 rows.append([col[:22], f"{mean_v:.2f}",
                              f"Dataset median: {med_v:.2f}",
                              "Dataset computed"])
@@ -1150,7 +1154,6 @@ def _finance_page(story, s, T, df, config, CW, profile=None):
     from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
     from reportlab.lib.units import mm
     import pandas as pd
-    import numpy as np
 
     def _c(hex_str):
         from reportlab.lib import colors
@@ -1409,7 +1412,7 @@ def _finance_page(story, s, T, df, config, CW, profile=None):
         s["note"]))
 
 
-def _appendix(story, s, T, config, CW, domain: str = "general"):
+def _appendix(story, s, T, config, CW, domain: str = "general", df=None, profile=None):
     _sec(story, s, T, "Appendix — Methodology & Sources")
 
     story.append(Paragraph("A. Methodology", s["h3"]))
@@ -1432,11 +1435,11 @@ def _appendix(story, s, T, config, CW, domain: str = "general"):
         "The table below shows the formula applied to this specific dataset so the score is fully auditable.",
         s["body"]))
     story.append(Spacer(1, 2*mm))
-    # Compute actual scores
-    _raw_rows   = getattr(profile, "total_rows", len(df)) if profile else len(df)
-    _dupes      = getattr(profile, "duplicate_rows", 0) if profile else int(df.duplicated().sum())
+    # Compute actual scores (profile/df come from function signature defaults)
+    _raw_rows   = getattr(profile, "total_rows", len(df)) if profile else len(df)  # noqa: F821
+    _dupes      = getattr(profile, "duplicate_rows", 0) if profile else (int(df.duplicated().sum()) if df is not None else 0)  # noqa: F821
     _unique     = _raw_rows - _dupes
-    _miss_pct   = getattr(profile, "missing_pct", df.isna().mean().mean()*100) if profile else df.isna().mean().mean()*100
+    _miss_pct   = (getattr(profile, "missing_pct", None) or (df.isna().mean().mean()*100 if df is not None else 0)) if profile else (df.isna().mean().mean()*100 if df is not None else 0)  # noqa: F821
     _col_hlth   = getattr(profile, "overall_quality_score", 95) if profile else 95
     _comp_score = round((1 - _miss_pct/100) * 60, 1)
     _ded_score  = round((_unique / max(_raw_rows,1)) * 30, 1)
@@ -1679,7 +1682,7 @@ def build_pdf(
     _recommendations(story, s, T, recommendations, CW)
     story.append(PageBreak())
 
-    _appendix(story, s, T, config, CW, domain=domain)
+    _appendix(story, s, T, config, CW, domain=domain, df=df, profile=profile)
 
     # ── Build PDF ─────────────────────────────────────────
     doc.build(story, canvasmaker=canvas_maker)

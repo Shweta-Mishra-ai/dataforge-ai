@@ -486,9 +486,9 @@ def analyze_group_comparison(
         # Check variance homogeneity first
         try:
             _, lev_p = levene(*group_arrays)
-            equal_var = lev_p > 0.05
+            _equal_var = lev_p > 0.05
         except Exception:
-            equal_var = True
+            _equal_var = True
 
         try:
             stat, p   = f_oneway(*group_arrays)

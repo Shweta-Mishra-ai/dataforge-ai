@@ -302,7 +302,7 @@ def _ecommerce_insights(df: pd.DataFrame) -> List[Dict]:
             total = df[amount_col].sum()
             mean_aov = df[amount_col].mean()
             missing_pct = df[amount_col].isna().mean() * 100
-            outlier_n = int((df[amount_col] > df[amount_col].quantile(0.99)).sum())
+            _outlier_n = int((df[amount_col] > df[amount_col].quantile(0.99)).sum())
 
             body = (
                 f"Total revenue: {total:,.0f}. "
