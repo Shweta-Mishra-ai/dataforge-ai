@@ -9,6 +9,9 @@ on:
 jobs:
   lint-test:
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -22,28 +25,32 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install \
-            streamlit>=1.32.0 \
-            pandas>=2.0.0 \
-            numpy>=1.24.0 \
-            plotly>=5.18.0 \
-            scipy>=1.11.0 \
-            statsmodels>=0.14.0 \
-            matplotlib>=3.8.0 \
-            Pillow>=10.0.0 \
-            reportlab>=4.0.0 \
-            openpyxl>=3.1.0 \
-            scikit-learn>=1.4.0 \
-            pydantic>=2.0.0 \
-            tenacity>=8.2.0 \
+            "streamlit>=1.32.0" \
+            "pandas>=2.0.0" \
+            "numpy>=1.24.0" \
+            "plotly>=5.18.0" \
+            "scipy>=1.11.0" \
+            "statsmodels>=0.14.0" \
+            "matplotlib>=3.8.0" \
+            "Pillow>=10.0.0" \
+            "reportlab>=4.0.0" \
+            "openpyxl>=3.1.0" \
+            "xlsxwriter>=3.1.0" \
+            "scikit-learn>=1.4.0" \
+            "pydantic>=2.0.0" \
+            "pydantic-settings>=2.0.0" \
+            "tenacity>=8.2.0" \
+            "pypdf>=4.0.0" \
             ruff pytest
 
       - name: Install optional dependencies
         run: |
-          pip install groq xgboost shap google-generativeai || true
+          pip install groq xgboost shap "google-generativeai>=0.7.0" || true
 
       - name: Ruff lint
         run: |
-          ruff check . --select=E,F,W \
+          ruff check . \
+            --select=E,F,W \
             --ignore=E501,E402,F401,W291,W293,E701 \
             --output-format=github
 
@@ -54,14 +61,22 @@ jobs:
           bad = []
           for f in glob.glob("**/*.py", recursive=True):
               if "__pycache__" in f: continue
-              try: ast.parse(open(f).read())
-              except SyntaxError as e: bad.append(f"{f}: {e}")
+              try:
+                  ast.parse(open(f).read())
+              except SyntaxError as e:
+                  bad.append(f"{f}: {e}")
           if bad:
-              print("SYNTAX ERRORS:"); [print(b) for b in bad]; sys.exit(1)
-          print(f"✅ All {sum(1 for _ in glob.glob('**/*.py', recursive=True))} files syntax OK")
+              print("SYNTAX ERRORS:")
+              for b in bad:
+                  print(b)
+              sys.exit(1)
+          total = sum(1 for _ in glob.glob("**/*.py", recursive=True))
+          print(f"✅ All {total} files syntax OK")
           PYEOF
 
       - name: Pytest
         run: |
-          python -m pytest tests/ -v --tb=short -W ignore::DeprecationWarning -W ignore::FutureWarning
-
+          python -m pytest tests/ -v --tb=short \
+            -W ignore::DeprecationWarning \
+            -W ignore::FutureWarning \
+            -W ignore::UserWarning
