@@ -350,7 +350,7 @@ with tabs[3]:
             col1.metric("Attrition Rate",    f"{rate:.1f}%", f"{n:,} departed")
             if sat_col:
                 col2.metric("Avg Satisfaction", f"{float(df[sat_col].mean()):.2f}",
-                             f"Target: 0.70")
+                             "Target: 0.70")
             if ten_col:
                 col3.metric("Median Tenure",    f"{float(df[ten_col].median()):.1f} yrs",
                              "Right-skewed — use median")

@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install ruff pytest pandas numpy scipy reportlab pillow matplotlib plotly
+          pip install -r requirements.txt --ignore-requires-python || true
+
+      - name: Ruff lint
+        run: |
+          ruff check . --select=E,F,W \
+            --ignore=E501,E402,F401,W291,W293,E701 \
+            --output-format=github
+
+      - name: Pytest
+        run: |
+          python -m pytest tests/ -v --tb=short
+
+      - name: Syntax check
+        run: |
+          python - << 'PYEOF'
+          import ast, glob, sys
+          bad = []
+          for f in glob.glob("**/*.py", recursive=True):
+              if "__pycache__" in f: continue
+              try: ast.parse(open(f).read())
+              except SyntaxError as e: bad.append(f"{f}: {e}")
+          if bad:
+              print("SYNTAX ERRORS:"); [print(b) for b in bad]; sys.exit(1)
+          print(f"All {len(glob.glob('**/*.py', recursive=True))} files OK")
+          PYEOF

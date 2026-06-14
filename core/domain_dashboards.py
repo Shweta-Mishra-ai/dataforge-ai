@@ -96,7 +96,7 @@ def _hr_kpis(df: pd.DataFrame) -> List[Dict]:
     kpis = []
     atr_col  = _find_col(df, ["left","attrition","churned","exited"])
     sat_col  = _find_col(df, ["satisfaction"])
-    dept_col = _find_col(df, ["department","dept"])
+    _dept_col = _find_col(df, ["department","dept"])
     sal_col  = _find_col(df, ["salary"])
     ten_col  = _find_col(df, ["tenure","time_spend","years_at"])
     eval_col = _find_col(df, ["evaluation","performance","last_eval"])
@@ -154,7 +154,7 @@ def _hr_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
     dept_col = _find_col(df, ["department","dept"])
     sal_col  = _find_col(df, ["salary"])
     ten_col  = _find_col(df, ["tenure","time_spend","years_at"])
-    eval_col = _find_col(df, ["evaluation","performance","last_eval"])
+    _eval_col = _find_col(df, ["evaluation","performance","last_eval"])
 
     # Chart 1: Attrition by Department
     if dept_col and atr_col:
@@ -288,7 +288,8 @@ def _hr_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
             # Reorder salary columns
             for order in [["low","medium","high"], ["Low","Medium","High"]]:
                 if all(c in heat.columns for c in order):
-                    heat = heat[order]; break
+                    heat = heat[order]
+                    break
 
             fig = go.Figure(go.Heatmap(
                 z=heat.values,
@@ -594,7 +595,7 @@ def _ecommerce_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
     charts = []
     rating_col = _find_col(df, ["rating"], exclude=["count","num"])
     price_col  = _find_col(df, ["discounted_price","selling_price","price"], exclude=["actual","mrp"])
-    actual_col = _find_col(df, ["actual_price","mrp","original_price"])
+    _actual_col = _find_col(df, ["actual_price","mrp","original_price"])
     disc_col   = _find_col(df, ["discount"])
     cat_col    = _find_col(df, ["category"])
     rev_col    = _find_col(df, ["revenue","sales","amount"])
@@ -728,10 +729,10 @@ def _sales_kpis(df: pd.DataFrame) -> List[Dict]:
     rev_col    = _find_col(df, ["revenue","sales","amount","value"], exclude=["budget","target"])
     target_col = _find_col(df, ["target","quota","budget","plan"])
     rep_col    = _find_col(df, ["rep","salesperson","agent","executive","owner"])
-    region_col = _find_col(df, ["region","territory","area","zone"])
+    _region_col = _find_col(df, ["region","territory","area","zone"])
     margin_col = _find_col(df, ["margin","profit","gross"])
     won_col    = _find_col(df, ["won","closed","status","result"])
-    prod_col   = _find_col(df, ["product","item","sku","service"])
+    _prod_col  = _find_col(df, ["product","item","sku","service"])
 
     kpis.append({"label": "Total Records", "value": f"{len(df):,}",
                  "sub": "sales transactions / opportunities",
@@ -909,7 +910,7 @@ def _sales_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
         try:
             deal_vals = df[rev_col].dropna()
             p80 = float(deal_vals.quantile(0.80))
-            p20 = float(deal_vals.quantile(0.20))
+            _p20 = float(deal_vals.quantile(0.20))
             fig = px.histogram(deal_vals, nbins=25, color_discrete_sequence=[C_BLUE])
             fig.add_vline(x=float(deal_vals.median()), line_dash="solid",
                           line_color=C_RED, line_width=2,

@@ -7,7 +7,9 @@ No duplicate inputs — clean one-click generation.
 import streamlit as st
 import pandas as pd
 import numpy as np
-import io, os, tempfile
+import io
+import os
+import tempfile
 
 from core.session_manager import require_data, get_df, get_filename, get_cached_stats, get_cached_ml
 
@@ -216,7 +218,7 @@ if gen_btn:
                 story_obj=story_obj, attrition=attrition_obj,
                 avg_salary_k=float(avg_salary_k),
             )
-        except Exception as e:
+        except Exception:
             top_insights = []
 
         # 5. Stats
@@ -290,7 +292,8 @@ if gen_btn:
         )
 
         progress.progress(100, text="Done!")
-        import time; time.sleep(0.3)
+        import time
+        time.sleep(0.3)
         progress.empty()
 
         size_mb = len(pdf_bytes) / (1024*1024)
@@ -307,8 +310,10 @@ if gen_btn:
 
         # Cleanup logo temp file
         if pre_logo and os.path.exists(pre_logo):
-            try: os.unlink(pre_logo)
-            except: pass
+            try:
+                os.unlink(pre_logo)
+            except Exception:
+                pass
 
     except Exception as e:
         progress.empty()

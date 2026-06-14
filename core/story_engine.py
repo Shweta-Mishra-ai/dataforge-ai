@@ -628,7 +628,7 @@ def _insights_ecommerce(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
     price_col  = next((c for c in df.columns
                        if any(k in c.lower() for k in ["discounted_price","selling_price","price"])
                        and c in stats), None)
-    actual_col = next((c for c in df.columns
+    _actual_col = next((c for c in df.columns
                        if "actual_price" in c.lower() or "mrp" in c.lower()), None)
     disc_col   = next((c for c in df.columns if "discount" in c.lower() and c in stats), None)
     cat_col    = next((c for c in df.select_dtypes(include="object").columns
@@ -824,7 +824,7 @@ def _insights_sales(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
     product_col= next((c for c in df.select_dtypes(include="object").columns
                        if any(k in c.lower() for k in ["product","category","segment"])
                        and df[c].nunique()<=30), None)
-    rep_col    = next((c for c in df.select_dtypes(include="object").columns
+    _rep_col    = next((c for c in df.select_dtypes(include="object").columns
                        if any(k in c.lower() for k in ["rep","salesperson","agent","owner"])
                        and df[c].nunique()<=50), None)
 
@@ -940,7 +940,7 @@ def _insights_sales(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
             total_rev = prod_perf["sum"].sum()
             top_prod  = prod_perf.index[0]
             top_share = prod_perf.loc[top_prod,"sum"]/total_rev*100
-            top2_share= prod_perf.iloc[:2]["sum"].sum()/total_rev*100
+            _top2_share= prod_perf.iloc[:2]["sum"].sum()/total_rev*100
 
             if top_share > 40:
                 risks.append(
@@ -1014,7 +1014,7 @@ def _insights_finance(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
     rev_col    = _find(["revenue","total_revenue","net_revenue","income","turnover","sales_amount","gross_revenue"])
     cost_col   = _find(["cost","cogs","cost_of_goods","cost_of_sales","direct_cost"])
     opex_col   = _find(["opex","operating_expense","overhead","indirect_cost","operating_cost"])
-    profit_col = _find(["net_profit","net_income","profit_after","bottom_line"])
+    _profit_col = _find(["net_profit","net_income","profit_after","bottom_line"])
     gross_col  = _find(["gross_profit","gross_income"])
     budget_col = _find(["budget","plan","target","forecast"])
     actual_col = _find(["actual","actuals","realized","achieved"], exclude=["target","budget"])
@@ -1190,8 +1190,8 @@ def _insights_finance(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
                                 "2. Review forecasting methodology for largest-variance categories. "
                                 "3. Set variance triggers: any item >15% variance gets a review. "
                                 "4. Track rolling forecast accuracy as a KPI."),
-                    impact   = (f"Improving forecast accuracy by 5pp reduces planning uncertainty "
-                                f"and allows more precise resource allocation."),
+                    impact   = ("Improving forecast accuracy by 5pp reduces planning uncertainty "
+                                "and allows more precise resource allocation."),
                     severity = bv_sev, category = "budget_variance"
                 ))
         except Exception:

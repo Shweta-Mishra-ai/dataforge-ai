@@ -200,7 +200,7 @@ def _clean_columns(df: pd.DataFrame):
     Does NOT rename or modify column values.
     """
     warnings = []
-    original = list(df.columns)
+    _original = list(df.columns)
 
     # Strip whitespace from column names
     df.columns = [str(c).strip() for c in df.columns]
