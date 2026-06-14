@@ -105,7 +105,7 @@ def detect_task(series: pd.Series) -> Tuple[str, str]:
         return "classification", "Binary target (2 unique values)"
 
     # Object/string → classification
-    if dtype == object or str(dtype) == "str":
+    if dtype is object or str(dtype) == "str":
         if n_uniq <= 20:
             return "classification", "Categorical target ({} classes)".format(n_uniq)
         else:
@@ -375,7 +375,7 @@ def train_models(
                 model=pipe,
             ))
 
-        except Exception as e:
+        except Exception:
             results.append(ModelResult(
                 name=name, task=task,
                 cv_score=-999, cv_std=0,

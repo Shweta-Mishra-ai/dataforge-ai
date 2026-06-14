@@ -313,7 +313,9 @@ with col_left:
         import tempfile
         suffix = "." + logo_file.name.split(".")[-1].lower()
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-        tmp.write(logo_file.read()); tmp.flush(); tmp.close()
+        tmp.write(logo_file.read())
+        tmp.flush()
+        tmp.close()
         st.session_state["logo_path"] = tmp.name
         st.success(f"✅ Logo saved: {logo_file.name}")
 
@@ -391,7 +393,8 @@ with col_right:
             with st.spinner(f"Loading '{sel_sheet}'..."):
                 result = load_file(uploaded, sheet_name=sel_sheet)
             if not result.success:
-                st.error(result.error); st.stop()
+                st.error(result.error)
+                st.stop()
 
         df = result.df
         set_dataframe(df, result.filename, result.file_size_mb)
@@ -408,7 +411,9 @@ with col_right:
                 miss = getattr(profile, "missing_pct", df.isna().mean().mean() * 100)
             except Exception:
                 profile = None
-                qual = "—"; grade = ""; miss = df.isna().mean().mean() * 100
+                qual = "—"
+                grade = ""
+                miss = df.isna().mean().mean() * 100
 
         # Auto-set report title if not set
         if not st.session_state.get("report_title"):

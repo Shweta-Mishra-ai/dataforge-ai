@@ -117,7 +117,7 @@ def build_top_insights(
         internal_target = 0.70  # internal planning target, not external benchmark
 
         if mean_s < internal_target:
-            gap_to_target = internal_target - mean_s
+            _gap_to_target = internal_target - mean_s
             insights.append(Insight(
                 severity = "high" if low_pct > 15 else "warning",
                 title    = f"Avg Satisfaction {mean_s:.2f} — Below Internal 0.70 Target",
@@ -134,9 +134,9 @@ def build_top_insights(
                 action   = ("1. Focus groups with low-satisfaction cohort to identify top 3 issues. "
                             "2. Manager communication training for bottom-quartile teams. "
                             "3. Monthly pulse survey to track trend."),
-                impact   = (f"Each 0.05 improvement in mean satisfaction is associated with "
-                            f"lower attrition in this dataset (r²≈0.15 based on correlation analysis). "
-                            f"Association, not causation."),
+                impact   = ("Each 0.05 improvement in mean satisfaction is associated with "
+                            "lower attrition in this dataset (r²≈0.15 based on correlation analysis). "
+                            "Association, not causation."),
             ))
 
     # ── Salary gap (HR) ───────────────────────────────────────────────────
@@ -146,7 +146,8 @@ def build_top_insights(
         try:
             sal_rates = df.groupby(sal_col)[atr_col].mean() * 100
             if "low" in sal_rates.index and "high" in sal_rates.index:
-                lo_rate = sal_rates["low"]; hi_rate = sal_rates["high"]
+                lo_rate = sal_rates["low"]
+                hi_rate = sal_rates["high"]
                 gap = lo_rate - hi_rate
                 if gap > 5:
                     insights.append(Insight(
@@ -222,7 +223,8 @@ def build_top_insights(
         try:
             sk = float(df[col].skew())
             if abs(sk) > 2.0:
-                mean_v = float(df[col].mean()); med_v = float(df[col].median())
+                mean_v = float(df[col].mean())
+                med_v = float(df[col].median())
                 insights.append(Insight(
                     severity = "warning",
                     title    = f"'{col}' Heavily Skewed — Use Median, Not Mean",

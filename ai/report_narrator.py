@@ -536,7 +536,7 @@ def _build_raw_summary(df: pd.DataFrame, domain: str) -> str:
         if dept_col:
             atr_d = df.groupby(dept_col)[atr_col].mean() * 100
             lines.append(
-                f"• By department: "
+                "• By department: "
                 + " | ".join([f"{k}: {v:.0f}%" for k,v in
                                atr_d.sort_values(ascending=False).items()])
             )
