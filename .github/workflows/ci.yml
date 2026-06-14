@@ -18,21 +18,34 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      - name: Install dependencies
+      - name: Install core dependencies
         run: |
           pip install --upgrade pip
-          pip install ruff pytest pandas numpy scipy reportlab pillow matplotlib plotly
-          pip install -r requirements.txt --ignore-requires-python || true
+          pip install \
+            streamlit>=1.32.0 \
+            pandas>=2.0.0 \
+            numpy>=1.24.0 \
+            plotly>=5.18.0 \
+            scipy>=1.11.0 \
+            statsmodels>=0.14.0 \
+            matplotlib>=3.8.0 \
+            Pillow>=10.0.0 \
+            reportlab>=4.0.0 \
+            openpyxl>=3.1.0 \
+            scikit-learn>=1.4.0 \
+            pydantic>=2.0.0 \
+            tenacity>=8.2.0 \
+            ruff pytest
+
+      - name: Install optional dependencies
+        run: |
+          pip install groq xgboost shap google-generativeai || true
 
       - name: Ruff lint
         run: |
           ruff check . --select=E,F,W \
             --ignore=E501,E402,F401,W291,W293,E701 \
             --output-format=github
-
-      - name: Pytest
-        run: |
-          python -m pytest tests/ -v --tb=short
 
       - name: Syntax check
         run: |
@@ -45,5 +58,10 @@ jobs:
               except SyntaxError as e: bad.append(f"{f}: {e}")
           if bad:
               print("SYNTAX ERRORS:"); [print(b) for b in bad]; sys.exit(1)
-          print(f"All {len(glob.glob('**/*.py', recursive=True))} files OK")
+          print(f"✅ All {sum(1 for _ in glob.glob('**/*.py', recursive=True))} files syntax OK")
           PYEOF
+
+      - name: Pytest
+        run: |
+          python -m pytest tests/ -v --tb=short -W ignore::DeprecationWarning -W ignore::FutureWarning
+
