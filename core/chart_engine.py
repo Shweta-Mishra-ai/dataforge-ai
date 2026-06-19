@@ -25,7 +25,20 @@ from typing import List, Tuple, Optional, Dict
 
 PALETTE  = ["#4f8ef7", "#22d3a5", "#f7934f", "#a78bfa",
             "#f77070", "#ffd43b", "#38bdf8", "#fb7185"]
-TEMPLATE = "plotly_dark"
+# Template resolved per-call based on theme_name (was hardcoded "plotly_dark"
+# which caused all Plotly charts to render dark regardless of selected theme)
+_THEME_TEMPLATE_MAP = {
+    "Dark Tech":       "plotly_dark",
+    "Corporate Light": "plotly_white",
+    "Executive Green": "plotly_white",
+    "Ocean Blue":      "plotly_white",
+    "Slate Gray":      "plotly_white",
+}
+
+def _get_template(theme_name: str = "Corporate Light") -> str:
+    return _THEME_TEMPLATE_MAP.get(theme_name, "plotly_white")
+
+TEMPLATE = "plotly_white"  # default fallback for legacy direct references
 
 
 # ══════════════════════════════════════════════════════════
@@ -202,7 +215,8 @@ def _style(fig: go.Figure) -> go.Figure:
 
 def recommend_charts(
     df: pd.DataFrame,
-    domain: str = "general"
+    domain: str = "general",
+    theme_name: str = "Corporate Light",
 ) -> List[Tuple[str, go.Figure]]:
     """
     5 meaningful charts using column role detection.
@@ -235,7 +249,7 @@ def recommend_charts(
             agg, x=best_dim, y=primary_metric,
             title=f"{label} {primary_metric.replace('_', ' ').title()} "
                   f"by {best_dim.replace('_', ' ').title()}",
-            template=TEMPLATE,
+            template=_get_template(theme_name),
             color=primary_metric,
             color_continuous_scale="Blues",
             text=primary_metric,
@@ -262,7 +276,7 @@ def recommend_charts(
                 fig = px.line(
                     trend, x=date_col, y=primary_metric,
                     title=f"{primary_metric.replace('_', ' ').title()} Trend Over Time",
-                    template=TEMPLATE,
+                    template=_get_template(theme_name),
                     color_discrete_sequence=PALETTE,
                     markers=True,
                 )
@@ -275,7 +289,7 @@ def recommend_charts(
         fig = px.histogram(
             df, x=primary_metric, nbins=40, marginal="box",
             title=f"Distribution: {primary_metric.replace('_', ' ').title()}",
-            template=TEMPLATE,
+            template=_get_template(theme_name),
             color_discrete_sequence=PALETTE,
         )
         charts.append(("Distribution", _style(fig)))
@@ -286,7 +300,7 @@ def recommend_charts(
         fig = px.imshow(
             corr, text_auto=True,
             title="Correlation Matrix",
-            template=TEMPLATE,
+            template=_get_template(theme_name),
             color_continuous_scale="RdBu_r",
             zmin=-1, zmax=1,
         )
@@ -304,7 +318,7 @@ def recommend_charts(
                 agg, names=best_dim, values=primary_metric,
                 title=f"{primary_metric.replace('_', ' ').title()} "
                       f"Share by {best_dim.replace('_', ' ').title()}",
-                template=TEMPLATE,
+                template=_get_template(theme_name),
                 color_discrete_sequence=PALETTE,
             )
             charts.append((f"Share by {best_dim}", _style(fig)))
@@ -320,7 +334,7 @@ def recommend_charts(
                 agg, x=primary_metric, y=best_dim, orientation="h",
                 title=f"{primary_metric.replace('_', ' ').title()} "
                       f"Ranking by {best_dim.replace('_', ' ').title()}",
-                template=TEMPLATE,
+                template=_get_template(theme_name),
                 color=primary_metric,
                 color_continuous_scale="Blues",
                 text=primary_metric,
@@ -335,7 +349,7 @@ def recommend_charts(
 #  INDIVIDUAL CHART BUILDERS
 # ══════════════════════════════════════════════════════════
 
-def make_bar(df: pd.DataFrame, x: str, y: str, title: str = "") -> go.Figure:
+def make_bar(df: pd.DataFrame, x: str, y: str, title: str = "", theme_name: str = "Corporate Light") -> go.Figure:
     is_score = _is_score_metric(y)
     agg_func = "mean" if is_score else "sum"
     agg = (
@@ -348,12 +362,12 @@ def make_bar(df: pd.DataFrame, x: str, y: str, title: str = "") -> go.Figure:
     return _style(px.bar(
         agg, x=x, y=y,
         title=title or f"{'Avg' if is_score else 'Total'} {y} by {x}",
-        template=TEMPLATE, color=y, color_continuous_scale="Blues",
+        template=_get_template(theme_name), color=y, color_continuous_scale="Blues",
     ))
 
 
 def make_horizontal_bar(
-    df: pd.DataFrame, x: str, y: str, title: str = ""
+    df: pd.DataFrame, x: str, y: str, title: str = "", theme_name: str = "Corporate Light"
 ) -> go.Figure:
     is_score = _is_score_metric(y)
     agg = (
@@ -365,57 +379,58 @@ def make_horizontal_bar(
     return _style(px.bar(
         agg, x=y, y=x, orientation="h",
         title=title or f"{y} Ranking by {x}",
-        template=TEMPLATE, color=y, color_continuous_scale="Blues",
+        template=_get_template(theme_name), color=y, color_continuous_scale="Blues",
     ))
 
 
-def make_line(df: pd.DataFrame, x: str, y: str, title: str = "") -> go.Figure:
+def make_line(df: pd.DataFrame, x: str, y: str, title: str = "", theme_name: str = "Corporate Light") -> go.Figure:
     return _style(px.line(
         df.sort_values(x), x=x, y=y,
         title=title or f"{y} over {x}",
-        template=TEMPLATE, color_discrete_sequence=PALETTE, markers=True,
+        template=_get_template(theme_name), color_discrete_sequence=PALETTE, markers=True,
     ))
 
 
 def make_scatter(
     df: pd.DataFrame, x: str, y: str,
-    color: Optional[str] = None, title: str = ""
+    color: Optional[str] = None, title: str = "", theme_name: str = "Corporate Light"
 ) -> go.Figure:
     return _style(px.scatter(
         df.head(3000), x=x, y=y, color=color,
         title=title or f"{x} vs {y}",
-        template=TEMPLATE, color_discrete_sequence=PALETTE, opacity=0.7,
+        template=_get_template(theme_name), color_discrete_sequence=PALETTE, opacity=0.7,
     ))
 
 
 def make_histogram(
-    df: pd.DataFrame, col: str, nbins: int = 40, title: str = ""
+    df: pd.DataFrame, col: str, nbins: int = 40, title: str = "", theme_name: str = "Corporate Light"
 ) -> go.Figure:
     return _style(px.histogram(
         df, x=col, nbins=nbins, marginal="box",
         title=title or f"Distribution: {col}",
-        template=TEMPLATE, color_discrete_sequence=PALETTE,
+        template=_get_template(theme_name), color_discrete_sequence=PALETTE,
     ))
 
 
 def make_pie(
-    df: pd.DataFrame, names_col: str, values_col: str, title: str = ""
+    df: pd.DataFrame, names_col: str, values_col: str, title: str = "", theme_name: str = "Corporate Light"
 ) -> go.Figure:
     """Guard: redirects score metrics to horizontal bar."""
     if not _is_pie_valid(values_col):
         return make_horizontal_bar(
             df, names_col, values_col,
-            title=title or f"{values_col} by {names_col}"
+            title=title or f"{values_col} by {names_col}",
+            theme_name=theme_name,
         )
     agg = df.groupby(names_col)[values_col].sum().reset_index().head(10)
     return _style(px.pie(
         agg, names=names_col, values=values_col,
         title=title or f"{values_col} Share by {names_col}",
-        template=TEMPLATE, color_discrete_sequence=PALETTE,
+        template=_get_template(theme_name), color_discrete_sequence=PALETTE,
     ))
 
 
-def make_heatmap(df: pd.DataFrame, domain: str = "general") -> go.Figure:
+def make_heatmap(df: pd.DataFrame, domain: str = "general", theme_name: str = "Corporate Light") -> go.Figure:
     """Correlation matrix with ID columns excluded."""
     cols = _get_analysis_columns(df)
     metric_cols = cols["all_metrics"]
@@ -424,7 +439,7 @@ def make_heatmap(df: pd.DataFrame, domain: str = "general") -> go.Figure:
     corr = df[metric_cols].corr().round(2)
     return _style(px.imshow(
         corr, text_auto=True, title="Correlation Matrix",
-        template=TEMPLATE, color_continuous_scale="RdBu_r", zmin=-1, zmax=1,
+        template=_get_template(theme_name), color_continuous_scale="RdBu_r", zmin=-1, zmax=1,
     ))
 
 

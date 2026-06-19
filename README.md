@@ -273,18 +273,6 @@ Client sends CSV → You run DataForge → Deliver 3 files:
 
 ---
 
-## Research
-
-This platform implements techniques from:
-
-> **Correctness-Aware Repository Filtering for Token-Efficient LLM Pipelines**
-> Shweta Mishra · arXiv:2605.14362 · May 2025
-> [arxiv.org/abs/2605.14362](https://arxiv.org/abs/2605.14362)
-
-The HybridFilter approach (89.3% mean token reduction, Pearson r=0.997 cost model) informs the context management strategy used in AI narrative generation.
-
----
-
 ## Author
 
 **Shweta Mishra**
@@ -292,7 +280,6 @@ M.Tech Gold Medalist · ECE · CGPA 9.5 · IFTM University
 AI/ML Engineer · Data Analyst · arXiv Researcher
 
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Shweta_Mishra-0A66C2?style=flat&logo=linkedin)](https://linkedin.com/in/shweta-mishra-ai)
-[![arXiv](https://img.shields.io/badge/arXiv-2605.14362-B31B1B?style=flat&logo=arxiv)](https://arxiv.org/abs/2605.14362)
 [![GitHub](https://img.shields.io/badge/GitHub-Shweta--Mishra--ai-181717?style=flat&logo=github)](https://github.com/Shweta-Mishra-ai)
 
 ---
