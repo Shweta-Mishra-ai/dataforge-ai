@@ -76,14 +76,27 @@ def make_bar_chart(
     theme_name: str = "Corporate Light",
     top_n: int = 15,
 ) -> bytes:
+    """Smart bar: mean for score/rating metrics, sum for revenue/count metrics.
+    Fixes the bug where satisfaction_level (0-1 range) displayed as 2,544 (count)."""
     style  = _get_style(theme_name)
     colors = _get_colors(theme_name)
 
+    _SCORE_KW = {"satisfaction","rating","score","evaluation","performance",
+                 "sentiment","nps","csat","quality","health","level","index"}
+    is_score = any(kw in y_col.lower() for kw in _SCORE_KW)
+    agg_func = "mean" if is_score else "sum"
+    fmt      = "{:.3f}" if is_score else "{:,.0f}"
+    y_label  = ("Avg " if is_score else "Total ") + y_col.replace("_", " ").title()
+
     agg = (df.groupby(x_col)[y_col]
-             .sum()
+             .agg(agg_func)
              .reset_index()
              .sort_values(y_col, ascending=False)
              .head(top_n))
+
+    org_avg = float(agg[y_col].mean())
+    bar_colors = [colors[0] if v >= org_avg else (colors[2] if len(colors) > 2 else colors[0])
+                  for v in agg[y_col]]
 
     fig, ax = plt.subplots(figsize=(10, 5))
     fig.patch.set_facecolor(style["figure.facecolor"])
@@ -91,7 +104,7 @@ def make_bar_chart(
 
     bars = ax.bar(
         range(len(agg)), agg[y_col],
-        color=colors[0], alpha=0.85,
+        color=bar_colors, alpha=0.88,
         edgecolor=style["axes.edgecolor"], linewidth=0.5
     )
 
@@ -99,23 +112,28 @@ def make_bar_chart(
         h = bar.get_height()
         ax.text(
             bar.get_x() + bar.get_width() / 2,
-            h * 1.01,
-            "{:,.0f}".format(h),
+            h * 1.012,
+            fmt.format(h),
             ha="center", va="bottom",
-            fontsize=7, color=style["text.color"]
+            fontsize=8, color=style["text.color"], fontweight="bold"
         )
+
+    ax.axhline(org_avg, color=(colors[1] if len(colors) > 1 else "#888888"),
+               linestyle="--", linewidth=1.2, alpha=0.7,
+               label="Avg: {}".format(fmt.format(org_avg)))
+    ax.legend(fontsize=8, framealpha=0)
 
     ax.set_xticks(range(len(agg)))
     ax.set_xticklabels(
-        [str(v)[:12] for v in agg[x_col]],
-        rotation=35, ha="right", fontsize=8
+        [str(v)[:14] for v in agg[x_col]],
+        rotation=35, ha="right", fontsize=8.5
     )
-    ax.set_ylabel(y_col, fontsize=9, color=style["axes.labelcolor"])
-    ax.set_title(title or "{} by {}".format(y_col, x_col),
+    ax.set_ylabel(y_label, fontsize=9, color=style["axes.labelcolor"])
+    ax.set_title(title or "{} by {}".format(y_label, x_col.replace("_", " ").title()),
                  fontsize=11, fontweight="bold",
-                 color=style["text.color"], pad=10)
+                 color=style["text.color"], pad=12)
     fig.tight_layout()
-    return fig_to_bytes(fig)
+    return fig_to_bytes(fig, dpi=170)
 
 
 def make_line_chart(
@@ -235,6 +253,65 @@ def make_histogram(
                  color=style["text.color"], pad=10)
     fig.tight_layout()
     return fig_to_bytes(fig)
+
+
+def make_ranked_bar_chart(
+    df: pd.DataFrame,
+    x_col: str,
+    y_col: str,
+    title: str = "",
+    theme_name: str = "Corporate Light",
+) -> bytes:
+    """Horizontal ranked bar — clearer than a pie chart for comparing
+    many roughly-equal categories on a score metric."""
+    style  = _get_style(theme_name)
+    colors = _get_colors(theme_name)
+
+    is_score = any(kw in y_col.lower() for kw in _SCORE_KEYWORDS)
+    agg_func = "mean" if is_score else "sum"
+    fmt      = "{:.3f}" if is_score else "{:,.0f}"
+
+    agg = (df.groupby(x_col)[y_col]
+             .agg(agg_func)
+             .reset_index()
+             .sort_values(y_col, ascending=True)
+             .head(15))
+
+    org_avg = float(agg[y_col].mean())
+    bar_colors = [colors[0] if v >= org_avg else (colors[4] if len(colors) > 4 else colors[2])
+                  for v in agg[y_col]]
+
+    fig, ax = plt.subplots(figsize=(9, max(4, len(agg) * 0.45)))
+    fig.patch.set_facecolor(style["figure.facecolor"])
+    _apply_style(ax, style)
+
+    bars = ax.barh(
+        range(len(agg)), agg[y_col],
+        color=bar_colors, alpha=0.88,
+        edgecolor=style["axes.edgecolor"], linewidth=0.5
+    )
+
+    for bar in bars:
+        w = bar.get_width()
+        ax.text(w * 1.005, bar.get_y() + bar.get_height() / 2,
+                fmt.format(w), va="center", ha="left", fontsize=8,
+                color=style["text.color"], fontweight="bold")
+
+    ax.axvline(org_avg, color=(colors[3] if len(colors) > 3 else colors[1]),
+               linestyle="--", linewidth=1.2, alpha=0.7,
+               label="Avg: {}".format(fmt.format(org_avg)))
+    ax.legend(fontsize=8, framealpha=0)
+
+    ax.set_yticks(range(len(agg)))
+    ax.set_yticklabels([str(v)[:16] for v in agg[x_col]], fontsize=9)
+    ax.set_xlabel(("Avg " if is_score else "Total ") + y_col.replace("_", " ").title(),
+                  fontsize=9, color=style["axes.labelcolor"])
+    ax.set_title(title or "{} Ranking by {}".format(
+                     y_col.replace("_", " ").title(), x_col.replace("_", " ").title()),
+                 fontsize=11, fontweight="bold",
+                 color=style["text.color"], pad=12)
+    fig.tight_layout()
+    return fig_to_bytes(fig, dpi=170)
 
 
 def make_pie_chart(
@@ -361,55 +438,89 @@ def make_box_plot(
     return fig_to_bytes(fig)
 
 
+_SCORE_KEYWORDS = {"satisfaction","rating","score","evaluation","performance",
+                   "sentiment","nps","csat","quality","health","level","index"}
+
+
+def _pick_best_metric(num_cols, cat_cols=None):
+    """Prefer score/rating columns for headline charts over raw counts/IDs."""
+    for c in num_cols:
+        if any(kw in c.lower() for kw in _SCORE_KEYWORDS):
+            return c
+    return num_cols[0] if num_cols else None
+
+
 def generate_all_charts(
     df: pd.DataFrame,
     theme_name: str = "Corporate Light",
     max_charts: int = 5,
 ) -> List[Tuple[str, bytes]]:
-    """Auto-generate best charts for this dataset."""
+    """Auto-generate best charts for this dataset.
+
+    FIX: previously always used num_cols[0] for every chart and a numeric-bin
+    line chart with unreadable x-axis labels when no datetime column existed.
+    Now picks the best score metric and falls back to a second categorical
+    breakdown or ranked bar chart instead of meaningless numeric bins.
+    """
     num_cols  = df.select_dtypes(include="number").columns.tolist()
-    cat_cols  = df.select_dtypes(include="object").columns.tolist()
+    cat_cols  = df.select_dtypes(include=["object", "string"]).columns.tolist()
     date_cols = df.select_dtypes(include="datetime").columns.tolist()
     charts    = []
 
-    # 1. Bar chart — categorical x numeric
-    if cat_cols and num_cols:
-        best_cat = next(
-            (c for c in cat_cols if 2 <= df[c].nunique() <= 25),
-            cat_cols[0]
-        )
-        title = "{} by {}".format(num_cols[0], best_cat)
+    best_metric = _pick_best_metric(num_cols)
+    best_cat = next(
+        (c for c in cat_cols if 2 <= df[c].nunique() <= 25), cat_cols[0]
+    ) if cat_cols else None
+
+    # 1. Bar chart — best metric by best category (mean/sum auto-detected)
+    if best_cat and best_metric:
+        title = "{} by {}".format(best_metric.replace("_", " ").title(), best_cat)
         try:
             charts.append((title, make_bar_chart(
-                df, best_cat, num_cols[0], title, theme_name
+                df, best_cat, best_metric, title, theme_name
             )))
         except Exception:
             pass
 
-    # 2. Line chart — trend over time or numeric
-    if date_cols and num_cols:
-        title = "{} Over Time".format(num_cols[0])
+    # 2. Second view — datetime trend OR second categorical breakdown
+    #    (avoids numeric-binned x-axis with unreadable labels like "(0.089, 0.)")
+    if date_cols and best_metric:
+        title = "{} Over Time".format(best_metric.replace("_", " ").title())
         try:
             charts.append((title, make_line_chart(
-                df, date_cols[0], num_cols[0], title, theme_name
+                df, date_cols[0], best_metric, title, theme_name
             )))
         except Exception:
             pass
-    elif len(num_cols) >= 2:
-        title = "{} Trend".format(num_cols[1])
-        try:
-            charts.append((title, make_line_chart(
-                df, num_cols[0], num_cols[1], title, theme_name
-            )))
-        except Exception:
-            pass
+    else:
+        second_cat = next(
+            (c for c in cat_cols if c != best_cat and 2 <= df[c].nunique() <= 12),
+            None
+        )
+        if second_cat and best_metric:
+            title = "{} by {}".format(best_metric.replace("_", " ").title(), second_cat)
+            try:
+                charts.append((title, make_bar_chart(
+                    df, second_cat, best_metric, title, theme_name
+                )))
+            except Exception:
+                pass
+        elif len(num_cols) >= 2:
+            second_metric = next((c for c in num_cols if c != best_metric), num_cols[0])
+            title = "Distribution: {}".format(second_metric.replace("_", " ").title())
+            try:
+                charts.append((title, make_histogram(
+                    df, second_metric, title, theme_name
+                )))
+            except Exception:
+                pass
 
-    # 3. Histogram — distribution
-    if num_cols:
-        title = "Distribution: {}".format(num_cols[0])
+    # 3. Histogram — distribution of primary metric
+    if best_metric:
+        title = "Distribution: {}".format(best_metric.replace("_", " ").title())
         try:
             charts.append((title, make_histogram(
-                df, num_cols[0], title, theme_name
+                df, best_metric, title, theme_name
             )))
         except Exception:
             pass
@@ -423,17 +534,18 @@ def generate_all_charts(
         except Exception:
             pass
 
-    # 5. Pie chart — category share
-    if cat_cols and num_cols:
-        best_cat = next(
-            (c for c in cat_cols if 2 <= df[c].nunique() <= 10),
-            None
-        )
-        if best_cat:
-            title = "{} Share by {}".format(num_cols[0], best_cat)
+    # 5. Ranked horizontal bar — clearer comparison than a pie for many categories
+    if best_cat and best_metric:
+        title = "{} Ranking by {}".format(best_metric.replace("_", " ").title(), best_cat)
+        try:
+            charts.append((title, make_ranked_bar_chart(
+                df, best_cat, best_metric, title, theme_name
+            )))
+        except Exception:
+            # Fall back to pie only if ranked bar genuinely fails
             try:
                 charts.append((title, make_pie_chart(
-                    df, best_cat, num_cols[0], title, theme_name
+                    df, best_cat, best_metric, title, theme_name
                 )))
             except Exception:
                 pass

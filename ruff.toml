@@ -1,0 +1,22 @@
+# ruff.toml — DataForge AI linting config
+# Python 3.11+, Streamlit-friendly rules
+
+target-version = "py311"
+line-length = 100
+
+[lint]
+select = ["E", "F", "W"]
+ignore = [
+    "E501",  # line too long — handled by formatter
+    "E402",  # module-level import not at top (Streamlit pattern)
+    "F401",  # unused import (many are conditional/optional)
+    "W291",  # trailing whitespace
+    "W293",  # whitespace before colon
+    "E701",  # multiple statements on one line (common in Streamlit one-liners)
+    "F821",  # undefined name (false positives in nested ReportLab canvas closures)
+]
+
+[lint.per-file-ignores]
+"pages/*.py" = ["E402", "F401", "E501"]  # Streamlit pages have top-level execution
+"tests/*.py" = ["F401"]                   # test fixtures often import for side effects
+"app.py"     = ["E402"]

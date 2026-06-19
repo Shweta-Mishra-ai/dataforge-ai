@@ -294,8 +294,34 @@ def _build_cover(T: dict, config: dict, kpis_preview: list) -> bytes:
     cv.rect(20*mm, H - 44*mm, 55*mm, 1.2*mm, fill=1, stroke=0)
 
     # ── Client / Company Logo (top-right of cover) ────────
-    logo_path = config.get("logo_path", "")
-    if logo_path and os.path.exists(logo_path):
+    logo_bytes = config.get("logo_bytes", None)
+    logo_path  = config.get("logo_path", "")
+    _logo_drawn = False
+
+    if logo_bytes:
+        try:
+            import tempfile
+            logo_ext = config.get("logo_ext", "png")
+            _tmp = tempfile.NamedTemporaryFile(delete=False, suffix="." + logo_ext)
+            _tmp.write(logo_bytes)
+            _tmp.flush()
+            _tmp.close()
+            cv.drawImage(
+                _tmp.name,
+                W - 68*mm, H - 45*mm,
+                width=48*mm, height=20*mm,
+                preserveAspectRatio=True,
+                mask="auto",
+            )
+            _logo_drawn = True
+            try:
+                os.unlink(_tmp.name)
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+    if not _logo_drawn and logo_path and os.path.exists(logo_path):
         try:
             cv.drawImage(
                 logo_path,
@@ -1557,7 +1583,18 @@ def build_pdf(
     if theme_name not in THEMES:
         auto_key  = DOMAIN_THEMES.get(domain, "Corporate Light")
         theme_name = auto_key
-    T = THEMES[theme_name]
+    T = dict(THEMES[theme_name])  # copy — we mutate domain_label below
+
+    # Override domain label/badge based on detected domain (not just theme)
+    _DOMAIN_LABELS = {
+        "hr":        ("HR & PEOPLE ANALYTICS",    "#1976D2"),
+        "ecommerce": ("E-COMMERCE ANALYTICS",     "#F4511E"),
+        "sales":     ("SALES PERFORMANCE",        "#2E7D32"),
+        "finance":   ("FINANCE & ACCOUNTING",     "#5C35CC"),
+    }
+    if domain in _DOMAIN_LABELS:
+        T["domain_label"], T["domain_badge"] = _DOMAIN_LABELS[domain]
+
     config["domain"]     = domain
     config["theme_name"] = theme_name
 

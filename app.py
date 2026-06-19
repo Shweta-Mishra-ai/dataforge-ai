@@ -207,6 +207,23 @@ with st.sidebar:
         """, unsafe_allow_html=True)
 
     st.divider()
+    try:
+        _groq_key = st.secrets.get("GROQ_API_KEY", "") or ""
+    except Exception:
+        _groq_key = os.environ.get("GROQ_API_KEY", "") or ""
+
+    if not _groq_key.strip():
+        st.markdown("""
+        <div style="background:rgba(255,209,102,0.08); border:1px solid rgba(255,209,102,0.2);
+                    border-radius:8px; padding:8px 12px; margin-bottom:8px;">
+            <div style="font-size:10px; font-weight:700; color:#ffd166;
+                        letter-spacing:.07em; text-transform:uppercase;">⚡ AI Narratives OFF</div>
+            <div style="font-size:10px; color:rgba(255,255,255,0.35); margin-top:2px;">
+                Add GROQ_API_KEY in secrets.toml<br>to enable AI-generated insights
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
     if df_loaded:
         st.markdown("<div style='font-size:11px; color:rgba(255,255,255,0.35);'>Use the pages in the sidebar above to navigate.</div>", unsafe_allow_html=True)
 
@@ -310,13 +327,11 @@ with col_left:
         key="logo_uploader"
     )
     if logo_file:
-        import tempfile
-        suffix = "." + logo_file.name.split(".")[-1].lower()
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-        tmp.write(logo_file.read())
-        tmp.flush()
-        tmp.close()
-        st.session_state["logo_path"] = tmp.name
+        logo_bytes = logo_file.read()
+        logo_ext   = logo_file.name.split(".")[-1].lower()
+        st.session_state["logo_bytes"] = logo_bytes
+        st.session_state["logo_ext"]   = logo_ext
+        st.session_state["logo_path"]  = ""
         st.success(f"✅ Logo saved: {logo_file.name}")
 
     # ── Analyst name ───────────────────────────────────────────────────

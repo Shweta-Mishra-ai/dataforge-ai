@@ -25,6 +25,21 @@ from core.story_engine   import generate_story, detect_domain
 from core.data_profiler  import profile_dataset
 
 
+@st.cache_data(show_spinner=False)
+def _cached_profile(df):
+    return profile_dataset(df)
+
+
+@st.cache_data(show_spinner=False)
+def _cached_domain(df):
+    return detect_domain(df)
+
+
+@st.cache_data(show_spinner=False)
+def _cached_charts(df, theme_name, max_charts=5):
+    return generate_all_charts(df, theme_name, max_charts=max_charts)
+
+
 def _clean_fname(name):
     for ext in [".csv",".xlsx",".xls",".json"]:
         name = name.replace(ext,"")
@@ -60,7 +75,9 @@ st.divider()
 pre_client  = st.session_state.get("client_name", "")
 pre_title   = st.session_state.get("report_title", f"Data Analysis Report — {fname_clean}")
 pre_analyst = st.session_state.get("analyst_name", "DataForge AI")
-pre_logo    = st.session_state.get("logo_path", "")
+pre_logo_bytes = st.session_state.get("logo_bytes", None)
+pre_logo_ext   = st.session_state.get("logo_ext", "png")
+pre_logo       = st.session_state.get("logo_path", "")  # legacy fallback
 
 # ── Show pre-filled config ────────────────────────────────────────────────
 if pre_client or pre_title:
@@ -73,7 +90,7 @@ if pre_client or pre_title:
     with c2:
         st.markdown(f"**Analyst:** `{pre_analyst or '—'}`")
     with c3:
-        logo_status = "✅ Uploaded" if pre_logo and os.path.exists(pre_logo) else "—"
+        logo_status = "✅ Uploaded" if pre_logo_bytes else ("✅ Uploaded" if pre_logo and os.path.exists(pre_logo) else "—")
         st.markdown(f"**Logo:** {logo_status}")
 
     st.markdown(f"**Report Title:** {pre_title}")
@@ -144,14 +161,14 @@ if gen_btn:
         # 1. Profile
         progress.progress(8, text="Profiling dataset...")
         try:
-            profile = profile_dataset(df)
+            profile = _cached_profile(df)
         except Exception:
             profile = None
 
         # 2. Domain
         progress.progress(12, text="Detecting domain...")
         try:
-            domain_name, _ = detect_domain(df)
+            domain_name, _ = _cached_domain(df)
         except Exception:
             domain_name = "general"
 
@@ -253,7 +270,7 @@ if gen_btn:
             groq_key = os.environ.get("GROQ_API_KEY", "")
 
         try:
-            charts = generate_all_charts(df, theme_name, max_charts=5)
+            charts = _cached_charts(df, theme_name, max_charts=5)
             for title, img_bytes in charts:
                 if img_bytes:
                     try:
@@ -277,6 +294,8 @@ if gen_btn:
             "confidential": confidential,
             "theme_name":   theme_name,
             "logo_path":    pre_logo,
+            "logo_bytes":   pre_logo_bytes,
+            "logo_ext":     pre_logo_ext,
             "avg_salary_k": avg_salary_k,
         }
 
@@ -308,12 +327,7 @@ if gen_btn:
             use_container_width=True,
         )
 
-        # Cleanup logo temp file
-        if pre_logo and os.path.exists(pre_logo):
-            try:
-                os.unlink(pre_logo)
-            except Exception:
-                pass
+        # Logo is stored as bytes in session_state — no temp file to clean up
 
     except Exception as e:
         progress.empty()
