@@ -23,7 +23,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from typing import List, Tuple, Optional, Dict
 
-PALETTE  = ["#4f8ef7", "#22d3a5", "#f7934f", "#a78bfa",
+PALETTE  = ["#1565C0", "#0D47A1", "#B71C1C", "#1B5E20",
             "#f77070", "#ffd43b", "#38bdf8", "#fb7185"]
 # Template resolved per-call based on theme_name (was hardcoded "plotly_dark"
 # which caused all Plotly charts to render dark regardless of selected theme)
@@ -198,6 +198,8 @@ def _is_pie_valid(metric_col: str) -> bool:
 # ══════════════════════════════════════════════════════════
 
 def _style(fig: go.Figure) -> go.Figure:
+    # Note: this dark style is only used for Dark Tech theme
+    # Light themes use plotly_white template which handles bg automatically
     fig.update_layout(
         paper_bgcolor="#07080f",
         plot_bgcolor="#0e0f1a",
@@ -206,6 +208,34 @@ def _style(fig: go.Figure) -> go.Figure:
     )
     fig.update_xaxes(gridcolor="#1e2035", zeroline=False)
     fig.update_yaxes(gridcolor="#1e2035", zeroline=False)
+    return fig
+
+
+# ══════════════════════════════════════════════════════════
+#  HIGH-CONTRAST LAYOUT HELPER
+# ══════════════════════════════════════════════════════════
+
+def _apply_contrast(fig: go.Figure, theme_name: str = "Corporate Light") -> go.Figure:
+    """Apply readable font + axis colors for light themes.
+    Dark Tech theme uses its own _style(); all others need explicit dark fonts."""
+    if theme_name == "Dark Tech":
+        return _style(fig)
+    fig.update_layout(
+        font=dict(color="#0F172A", size=11, family="Arial, sans-serif"),
+        paper_bgcolor="white",
+        plot_bgcolor="#F8FAFF",
+        title_font=dict(color="#0A1628", size=14),
+    )
+    fig.update_xaxes(
+        tickfont=dict(color="#0F172A", size=10),
+        title_font=dict(color="#0F172A", size=11),
+        gridcolor="#CBD5E1",
+    )
+    fig.update_yaxes(
+        tickfont=dict(color="#0F172A", size=10),
+        title_font=dict(color="#0F172A", size=11),
+        gridcolor="#CBD5E1",
+    )
     return fig
 
 
@@ -258,7 +288,7 @@ def recommend_charts(
             texttemplate="%{text:.3f}" if is_score else "%{text:,.0f}",
             textposition="outside"
         )
-        charts.append((f"{primary_metric} by {best_dim}", _style(fig)))
+        charts.append((f"{primary_metric} by {best_dim}", _apply_contrast(fig, theme_name)))
 
     # Chart 2: Trend (LINE) — only real datetime, never order_id
     if date_cols and primary_metric:
@@ -280,7 +310,7 @@ def recommend_charts(
                     color_discrete_sequence=PALETTE,
                     markers=True,
                 )
-                charts.append(("Trend Over Time", _style(fig)))
+                charts.append(("Trend Over Time", _apply_contrast(fig, theme_name)))
         except Exception:
             pass
 
@@ -292,7 +322,7 @@ def recommend_charts(
             template=_get_template(theme_name),
             color_discrete_sequence=PALETTE,
         )
-        charts.append(("Distribution", _style(fig)))
+        charts.append(("Distribution", _apply_contrast(fig, theme_name)))
 
     # Chart 4: Correlation matrix — ID columns excluded
     if len(all_metrics) >= 2:
@@ -304,7 +334,7 @@ def recommend_charts(
             color_continuous_scale="RdBu_r",
             zmin=-1, zmax=1,
         )
-        charts.append(("Correlation Matrix", _style(fig)))
+        charts.append(("Correlation Matrix", _apply_contrast(fig, theme_name)))
 
     # Chart 5: Share or Ranking
     if primary_metric and best_dim:
@@ -321,7 +351,7 @@ def recommend_charts(
                 template=_get_template(theme_name),
                 color_discrete_sequence=PALETTE,
             )
-            charts.append((f"Share by {best_dim}", _style(fig)))
+            charts.append((f"Share by {best_dim}", _apply_contrast(fig, theme_name)))
         else:
             # Score metric — horizontal bar ranked chart
             agg = (
@@ -340,7 +370,7 @@ def recommend_charts(
                 text=primary_metric,
             )
             fig.update_traces(texttemplate="%{text:.3f}", textposition="outside")
-            charts.append((f"Ranking by {best_dim}", _style(fig)))
+            charts.append((f"Ranking by {best_dim}", _apply_contrast(fig, theme_name)))
 
     return charts[:5]
 
@@ -387,7 +417,7 @@ def make_line(df: pd.DataFrame, x: str, y: str, title: str = "", theme_name: str
     return _style(px.line(
         df.sort_values(x), x=x, y=y,
         title=title or f"{y} over {x}",
-        template=_get_template(theme_name), color_discrete_sequence=PALETTE, markers=True,
+        template=_get_template(theme_name), color_discrete_sequence=["#1565C0","#B71C1C","#1B5E20","#4527A0"], markers=True,
     ))
 
 
