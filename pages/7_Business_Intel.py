@@ -21,9 +21,9 @@ from core.bi_engine import (
     analyze_pareto, analyze_segment_health
 )
 
-COLORS = ["#1a4a8a", "#2196F3", "#22d3a5", "#f7934f", "#a78bfa", "#f77070"]
+COLORS = ["#1565C0", "#0D47A1", "#B71C1C", "#1B5E20", "#4527A0", "#E65100"]
 PLOTLY_BASE = dict(
-    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#f8faff",
+    paper_bgcolor="white", plot_bgcolor="#f8faff",
     font=dict(family="Helvetica", size=11),
     margin=dict(l=10, r=10, t=40, b=10),
 )
@@ -120,7 +120,7 @@ with tab1:
         fig = go.Figure()
         fig.add_trace(go.Histogram(
             x=col_data, name="Frequency",
-            marker_color=COLORS[0], opacity=0.75, nbinsx=30,
+            marker_color=COLORS[0], opacity=1.0, nbinsx=30,
         ))
         for val, label, color in [
             (bm.bottom_10_pct, "P10", "#f77070"),
@@ -296,7 +296,7 @@ with tab3:
             overall_mean = float(df[metric_col].mean())
             fig.add_hline(
                 y=overall_mean, line_dash="dash",
-                line_color="#f7934f",
+                line_color="#E65100",
                 annotation_text="Dataset Avg={:.2f}".format(overall_mean),
             )
             fig.update_layout(
@@ -377,7 +377,7 @@ with tab4:
                 marker=dict(size=5),
             ))
             fig.add_hline(y=80, line_dash="dash",
-                          line_color="#f77070",
+                          line_color="#B71C1C",
                           annotation_text="80% threshold",
                           yref="y2")
             fig.update_layout(

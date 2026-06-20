@@ -567,7 +567,7 @@ with tabs[3]:
                     text=np.round(corr.values, 2), texttemplate="%{text:.2f}",
                     colorbar=dict(title="r", thickness=12),
                 ))
-                fig.update_layout(height=400, paper_bgcolor="white",
+                fig.update_layout(height=400, paper_bgcolor="white", font=dict(color="#0F172A"),
                                   margin=dict(l=10,r=10,t=40,b=10))
                 st.plotly_chart(fig, use_container_width=True,
                                 config={"displayModeBar": False})

@@ -22,8 +22,8 @@ class ReportTheme:
     table_row_main:    tuple = (255, 255, 255)
     table_border:      tuple = (210, 220, 240)
     chart_colors:      list  = field(default_factory=lambda: [
-        "#1a4a8a", "#2196F3", "#42A5F5",
-        "#90CAF9", "#0D47A1", "#1565C0"
+        "#1565C0", "#0D47A1", "#B71C1C",
+        "#1B5E20", "#4527A0", "#E65100"
     ])
     positive_color:    tuple = (34,  139,  84)
     negative_color:    tuple = (200,  50,  50)
@@ -46,8 +46,8 @@ THEMES = {
         table_row_alt      = (245, 248, 255),
         table_row_main     = (255, 255, 255),
         table_border       = (210, 220, 240),
-        chart_colors       = ["#1a4a8a", "#2196F3", "#42A5F5",
-                               "#90CAF9", "#0D47A1", "#1565C0"],
+        chart_colors       = ["#1565C0", "#0D47A1", "#B71C1C",
+                               "#1B5E20", "#4527A0", "#E65100"],
         positive_color     = (34,  139,  84),
         negative_color     = (200,  50,  50),
         neutral_color      = (26,   74, 138),
@@ -67,7 +67,7 @@ THEMES = {
         table_row_alt      = (14,   15,  26),
         table_row_main     = (10,   11,  20),
         table_border       = (30,   32,  53),
-        chart_colors       = ["#4f8ef7", "#22d3a5", "#f7934f",
+        chart_colors       = ["#64B5F6", "#4DB6AC", "#FFB74D",
                                "#a78bfa", "#f77070", "#ffd43b"],
         positive_color     = (34,  211, 165),
         negative_color     = (247, 112, 112),
