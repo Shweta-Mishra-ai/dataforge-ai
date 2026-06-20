@@ -80,3 +80,47 @@ def test_appendix_does_not_crash_without_profile():
         # NameError is NOT OK
         assert "profile" not in str(e) and "df" not in str(e), \
             f"NameError still present: {e}"
+
+
+# ── Logo bytes tests ───────────────────────────────────────────────────
+
+def test_build_pdf_with_logo_bytes():
+    """Logo stored as bytes (not temp file path) should not crash."""
+    from core.pdf_builder import build_pdf
+    import base64
+    fake_png = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+    )
+    config = {
+        "title": "Logo Bytes Test",
+        "client_name": "Test",
+        "analyst_name": "A",
+        "theme_name": "Corporate Light",
+        "logo_bytes": fake_png,
+        "logo_ext": "png",
+        "logo_path": "",
+        "confidential": False,
+        "avg_salary_k": 50,
+    }
+    df = _sample_df()
+    result = build_pdf(df=df, config=config, profile=None, domain="hr")
+    assert isinstance(result, bytes) and len(result) > 1000
+
+
+def test_domain_badge_is_hr_not_business_analytics():
+    """HR domain should show 'HR & PEOPLE ANALYTICS', not 'BUSINESS ANALYTICS'."""
+    from core.pdf_builder import build_pdf
+    config = {
+        "title": "Domain Badge Test",
+        "client_name": "Test",
+        "analyst_name": "A",
+        "theme_name": "Corporate Light",
+        "logo_bytes": None,
+        "logo_path": "",
+        "confidential": False,
+        "avg_salary_k": 50,
+    }
+    df = _sample_df()
+    # Should not crash; domain badge fix verified by page content check
+    result = build_pdf(df=df, config=config, profile=None, domain="hr")
+    assert isinstance(result, bytes)

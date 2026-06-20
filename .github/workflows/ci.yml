@@ -47,12 +47,8 @@ jobs:
         run: |
           pip install groq xgboost shap "google-generativeai>=0.7.0" || true
 
-      - name: Ruff lint
-        run: |
-          ruff check . \
-            --select=E,F,W \
-            --ignore=E501,E402,F401,W291,W293,E701 \
-            --output-format=github
+      - name: Ruff lint (uses ruff.toml)
+        run: ruff check . --output-format=github
 
       - name: Syntax check
         run: |
@@ -60,7 +56,8 @@ jobs:
           import ast, glob, sys
           bad = []
           for f in glob.glob("**/*.py", recursive=True):
-              if "__pycache__" in f: continue
+              if "__pycache__" in f:
+                  continue
               try:
                   ast.parse(open(f).read())
               except SyntaxError as e:
