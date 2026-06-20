@@ -7,9 +7,9 @@ import numpy as np
 from typing import List, Tuple, Optional
 
 
-LIGHT_COLORS = ["#1a4a8a", "#2196F3", "#42A5F5", "#90CAF9", "#0D47A1", "#1565C0"]
-DARK_COLORS  = ["#4f8ef7", "#22d3a5", "#f7934f", "#a78bfa", "#f77070", "#ffd43b"]
-GREEN_COLORS = ["#1a6b4a", "#2ecc71", "#27ae60", "#82e0aa", "#145a32", "#1e8449"]
+LIGHT_COLORS = ["#1565C0", "#0D47A1", "#B71C1C", "#1B5E20", "#4527A0", "#E65100"]
+DARK_COLORS  = ["#64B5F6", "#4DB6AC", "#FFB74D", "#CE93D8", "#EF9A9A", "#FFF176"]
+GREEN_COLORS = ["#1B5E20", "#2E7D32", "#388E3C", "#43A047", "#1A237E", "#0D47A1"]
 
 
 def _get_style(theme_name: str) -> dict:
@@ -28,14 +28,14 @@ def _get_style(theme_name: str) -> dict:
     else:
         return {
             "figure.facecolor": "#ffffff",
-            "axes.facecolor":   "#f8faff",
-            "axes.edgecolor":   "#d0d8f0",
-            "axes.labelcolor":  "#1e1e28",
-            "xtick.color":      "#646882",
-            "ytick.color":      "#646882",
-            "text.color":       "#1e1e28",
-            "grid.color":       "#e0e8f5",
-            "grid.alpha":       0.8,
+            "axes.facecolor":   "#F8FAFF",
+            "axes.edgecolor":   "#CBD5E1",
+            "axes.labelcolor":  "#0F172A",   # near-black for labels
+            "xtick.color":      "#0F172A",   # dark tick labels
+            "ytick.color":      "#0F172A",   # dark tick labels
+            "text.color":       "#0A1628",   # very dark for titles
+            "grid.color":       "#CBD5E1",
+            "grid.alpha":       0.5,
         }
 
 
@@ -95,7 +95,7 @@ def make_bar_chart(
              .head(top_n))
 
     org_avg = float(agg[y_col].mean())
-    bar_colors = [colors[0] if v >= org_avg else (colors[2] if len(colors) > 2 else colors[0])
+    bar_colors = [colors[0] if v >= org_avg else "#64748B"  # slate-500 — below avg
                   for v in agg[y_col]]
 
     fig, ax = plt.subplots(figsize=(10, 5))
@@ -278,7 +278,7 @@ def make_ranked_bar_chart(
              .head(15))
 
     org_avg = float(agg[y_col].mean())
-    bar_colors = [colors[0] if v >= org_avg else (colors[4] if len(colors) > 4 else colors[2])
+    bar_colors = [colors[0] if v >= org_avg else "#64748B"
                   for v in agg[y_col]]
 
     fig, ax = plt.subplots(figsize=(9, max(4, len(agg) * 0.45)))

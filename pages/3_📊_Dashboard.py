@@ -273,17 +273,24 @@ with tabs[tab_idx]:
                                     .tail(20))
                 fig = go.Figure(go.Bar(
                     x=gdata[col], y=gdata[cat], orientation="h",
-                    marker_color="#1B4FD8", opacity=0.85,
-                    text=[f"{v:,.1f}" for v in gdata[col]],
+                    marker_color="#1565C0", opacity=1.0,
+                    text=[f"{v:,.2f}" for v in gdata[col]],
                     textposition="outside",
+                    textfont=dict(size=11, color="#0F172A"),
                 ))
                 fig.update_layout(
-                    title=f"{agg} of {col} by {cat}",
+                    title=dict(text=f"{agg} of {col} by {cat}",
+                               font=dict(size=14, color="#0F172A", family="Arial Black")),
                     height=max(300, len(gdata) * 36 + 80),
-                    paper_bgcolor="white", plot_bgcolor="white",
-                    margin=dict(l=10, r=80, t=50, b=20),
-                    xaxis=dict(showgrid=True, gridcolor="#E2E8F0"),
-                    yaxis=dict(showgrid=False),
+                    paper_bgcolor="white", plot_bgcolor="#F8FAFF",
+                    margin=dict(l=10, r=90, t=55, b=20),
+                    font=dict(color="#0F172A", family="Arial"),
+                    xaxis=dict(showgrid=True, gridcolor="#CBD5E1",
+                               tickfont=dict(size=11, color="#0F172A"),
+                               title_font=dict(color="#0F172A")),
+                    yaxis=dict(showgrid=False,
+                               tickfont=dict(size=11, color="#0F172A"),
+                               title_font=dict(color="#0F172A")),
                 )
                 st.plotly_chart(fig, use_container_width=True,
                                 config={"displayModeBar": False})
@@ -295,7 +302,7 @@ with tabs[tab_idx]:
                                  index=min(1, len(num_cols)-1), key="ov_num2")
             try:
                 s = df_filtered[col2].dropna()
-                fig2 = px.histogram(s, nbins=25, color_discrete_sequence=["#1B4FD8"],
+                fig2 = px.histogram(s, nbins=25, color_discrete_sequence=["#1565C0"],
                                     labels={col2: col2, "count": "Frequency"})
                 mean_v = float(s.mean())
                 med_v = float(s.median())
