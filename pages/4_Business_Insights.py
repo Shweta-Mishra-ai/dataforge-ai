@@ -16,6 +16,16 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 
+def _style_fig(fig):
+    """Apply high-contrast fonts — readable on both light and dark Streamlit themes."""
+    fig.update_layout(font=dict(color="#0F172A", size=11))
+    fig.update_xaxes(tickfont=dict(color="#0F172A", size=10),
+                     title_font=dict(color="#0F172A"))
+    fig.update_yaxes(tickfont=dict(color="#0F172A", size=10),
+                     title_font=dict(color="#0F172A"))
+    return fig
+
+
 from core.session_manager import require_data, get_df, get_filename
 require_data()
 
@@ -569,7 +579,7 @@ with tabs[3]:
                 ))
                 fig.update_layout(height=400, paper_bgcolor="white", font=dict(color="#0F172A"),
                                   margin=dict(l=10,r=10,t=40,b=10))
-                st.plotly_chart(fig, use_container_width=True,
+                st.plotly_chart(_style_fig(fig), use_container_width=True,
                                 config={"displayModeBar": False})
                 st.caption("r = Spearman correlation. r² = shared variance. "
                            "Correlation ≠ causation.")

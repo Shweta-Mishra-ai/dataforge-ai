@@ -8,6 +8,16 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 
+def _style_fig(fig):
+    """Apply high-contrast fonts — readable on both light and dark Streamlit themes."""
+    fig.update_layout(font=dict(color="#0F172A", size=11))
+    fig.update_xaxes(tickfont=dict(color="#0F172A", size=10),
+                     title_font=dict(color="#0F172A"))
+    fig.update_yaxes(tickfont=dict(color="#0F172A", size=10),
+                     title_font=dict(color="#0F172A"))
+    return fig
+
+
 from core.session_manager import require_data, get_df, get_filename, cache_ml_result, get_cached_ml
 
 st.set_page_config(page_title="ML Predictions", layout="wide")
@@ -212,13 +222,13 @@ with tab1:
             title="Model Performance Comparison",
             barmode="group",
             paper_bgcolor="white",
-            plot_bgcolor="#f8faff",
-            font=dict(family="Helvetica", size=11),
+            plot_bgcolor="#F8FAFF",
+            font=dict(color="#0F172A", family="Helvetica", size=11),
             margin=dict(l=10, r=10, t=40, b=10),
             legend=dict(orientation="h", y=1.1),
             yaxis=dict(range=[0, 1.1]),
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(_style_fig(fig), use_container_width=True)
 
     # Best model highlight
     if report.best_model:
@@ -250,7 +260,7 @@ with tab1:
         )
         fig_pie.update_layout(paper_bgcolor="white",
                                margin=dict(l=10,r=10,t=40,b=10))
-        st.plotly_chart(fig_pie, use_container_width=True)
+        st.plotly_chart(_style_fig(fig_pie), use_container_width=True)
         if max(values) > 0.80:
             st.warning(
                 "Imbalanced classes detected ({:.0f}% dominant). "
@@ -291,13 +301,13 @@ with tab2:
         fig.update_layout(
             title="Feature Importance (% contribution)",
             paper_bgcolor="white",
-            plot_bgcolor="#f8faff",
-            font=dict(family="Helvetica", size=11),
+            plot_bgcolor="#F8FAFF",
+            font=dict(color="#0F172A", family="Helvetica", size=11),
             margin=dict(l=10, r=10, t=40, b=10),
             yaxis=dict(autorange="reversed"),
             height=max(300, len(fi) * 35),
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(_style_fig(fig), use_container_width=True)
 
         # Legend
         c1, c2, c3 = st.columns(3)
