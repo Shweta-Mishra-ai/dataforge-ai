@@ -225,7 +225,7 @@ if DOMAIN_DASH_AVAILABLE and domain != "general":
             # Show in pairs
             for idx in range(0, len(domain_charts), 2):
                 pair = domain_charts[idx:idx+2]
-                c1, c2 = st.columns(2 if len(pair) == 2 else [1, 0])
+                c1, c2 = st.columns(2)  # always 2 cols; single chart uses first only
                 for col_ui, (chart_title, fig) in zip([c1, c2], pair):
                     with col_ui:
                         st.plotly_chart(fig, use_container_width=True,
@@ -369,8 +369,12 @@ if dt_cols:
                         title=f"{agg2} of {val_col} over Time",
                         height=380, paper_bgcolor="white", plot_bgcolor="white",
                         margin=dict(l=10, r=10, t=50, b=20),
-                        xaxis=dict(showgrid=False),
-                        yaxis=dict(showgrid=True, gridcolor="#E2E8F0"),
+                        xaxis=dict(showgrid=False,
+                               tickfont=dict(color="#0F172A", size=10),
+                               title_font=dict(color="#0F172A")),
+                        yaxis=dict(showgrid=True, gridcolor="#CBD5E1",
+                               tickfont=dict(color="#0F172A", size=10),
+                               title_font=dict(color="#0F172A")),
                     )
                     st.plotly_chart(fig, use_container_width=True,
                                     config={"displayModeBar": False})

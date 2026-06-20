@@ -9,6 +9,16 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 
+def _style_fig(fig):
+    """Apply high-contrast fonts — readable on both light and dark Streamlit themes."""
+    fig.update_layout(font=dict(color="#0F172A", size=11))
+    fig.update_xaxes(tickfont=dict(color="#0F172A", size=10),
+                     title_font=dict(color="#0F172A"))
+    fig.update_yaxes(tickfont=dict(color="#0F172A", size=10),
+                     title_font=dict(color="#0F172A"))
+    return fig
+
+
 from core.session_manager import require_data, get_df, get_filename
 
 st.set_page_config(page_title="Business Intelligence", layout="wide")
@@ -137,7 +147,7 @@ with tab1:
             title="Distribution with Percentile Benchmarks: {}".format(sel),
             **PLOTLY_BASE
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(_style_fig(fig), use_container_width=True)
 
 # ── Tab 2: Root Cause Analysis ────────────────────────────
 with tab2:
@@ -208,7 +218,7 @@ with tab2:
                     xaxis_title="Factor", yaxis_title="Impact (%)",
                     **PLOTLY_BASE
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(_style_fig(fig), use_container_width=True)
 
         if rc.recommendations:
             st.markdown("#### Recommendations")
@@ -303,7 +313,7 @@ with tab3:
                 title="Avg '{}' by '{}' Cohort".format(metric_col, cohort_col),
                 **PLOTLY_BASE
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(_style_fig(fig), use_container_width=True)
 
             # Color guide
             c1, c2, c3 = st.columns(3)
@@ -388,7 +398,7 @@ with tab4:
                 **PLOTLY_BASE,
                 legend=dict(orientation="h", y=1.1),
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(_style_fig(fig), use_container_width=True)
 
             # Table
             st.dataframe(
@@ -518,7 +528,7 @@ with tab5:
                         title="Segment Comparison (100 = dataset average)",
                         **PLOTLY_BASE,
                     )
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(_style_fig(fig), use_container_width=True)
 
                 # Full metrics table
                 st.markdown("#### Metric Detail — {}".format(sel_seg))

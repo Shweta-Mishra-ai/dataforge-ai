@@ -1245,8 +1245,10 @@ with c_a:
             "threshold": {"line": {"color": "red", "width": 2},
                           "thickness": 0.75, "value": 60},
         }))
-    fig.update_layout(height=260, paper_bgcolor="white",
-                      font=dict(family="Inter, sans-serif", size=11))
+    fig.update_layout(
+        height=260,
+        paper_bgcolor="white",
+        font=dict(color="#0F172A", size=12))
     st.plotly_chart(fig, use_container_width=True)
 
 with c_b:

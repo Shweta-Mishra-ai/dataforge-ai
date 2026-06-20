@@ -116,9 +116,10 @@ with tab1:
 
         # Interpretation box
         st.markdown(
-            "<div style='background:#f0f4ff;border-left:4px solid #1a4a8a;"
-            "padding:14px 18px;border-radius:4px;margin-bottom:16px'>"
-            "<b>Interpretation:</b> {}</div>".format(r.interpretation),
+            "<div style='background:rgba(21,101,192,0.15);border-left:4px solid #90CAF9;"
+            "padding:14px 18px;border-radius:6px;margin-bottom:16px;"
+            "color:#E3F2FD;font-size:14px;line-height:1.6'>"
+            "<b style='color:#90CAF9'>Interpretation:</b> {}</div>".format(r.interpretation),
             unsafe_allow_html=True
         )
 
@@ -198,11 +199,18 @@ with tab1:
             row=1, col=2
         )
         fig.update_layout(
-            paper_bgcolor="white", plot_bgcolor="#f8faff",
-            font=dict(family="Helvetica", size=11),
+            paper_bgcolor="white", plot_bgcolor="#F8FAFF",
+            font=dict(family="Helvetica", size=11, color="#0F172A"),
+            title_font=dict(color="#0A1628"),
             margin=dict(l=10, r=10, t=40, b=10),
             showlegend=False, height=380,
         )
+        fig.update_xaxes(tickfont=dict(color="#0F172A", size=10),
+                         title_font=dict(color="#0F172A"),
+                         gridcolor="#CBD5E1")
+        fig.update_yaxes(tickfont=dict(color="#0F172A", size=10),
+                         title_font=dict(color="#0F172A"),
+                         gridcolor="#CBD5E1")
         st.plotly_chart(fig, use_container_width=True)
 
 # ── Tab 2: Correlations ───────────────────────────────────
@@ -284,7 +292,7 @@ with tab2:
             except Exception:
                 pass
             fig_sc.update_layout(
-                paper_bgcolor="white", plot_bgcolor="#f8faff",
+                paper_bgcolor="white", plot_bgcolor="#F8FAFF",
                 margin=dict(l=10, r=10, t=40, b=10),
             )
             st.plotly_chart(fig_sc, use_container_width=True)
@@ -346,7 +354,7 @@ with tab3:
                         points="outliers",
                     )
                     fig.update_layout(
-                        paper_bgcolor="white", plot_bgcolor="#f8faff",
+                        paper_bgcolor="white", plot_bgcolor="#F8FAFF",
                         margin=dict(l=10, r=10, t=40, b=10),
                         showlegend=False,
                     )
@@ -396,7 +404,7 @@ with tab4:
                       annotation_text="VIF=5 (warning)")
         fig.update_layout(
             title="VIF by Feature",
-            paper_bgcolor="white", plot_bgcolor="#f8faff",
+            paper_bgcolor="white", plot_bgcolor="#F8FAFF",
             font=dict(family="Helvetica", size=11),
             margin=dict(l=10, r=10, t=40, b=10),
             xaxis_tickangle=-30,
@@ -459,7 +467,7 @@ with tab5:
                             ts_data[val_col].mean())
                     )
                     fig.update_layout(
-                        paper_bgcolor="white", plot_bgcolor="#f8faff",
+                        paper_bgcolor="white", plot_bgcolor="#F8FAFF",
                         margin=dict(l=10, r=10, t=40, b=10),
                     )
                     st.plotly_chart(fig, use_container_width=True)
