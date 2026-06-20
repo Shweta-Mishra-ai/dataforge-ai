@@ -647,7 +647,7 @@ def build_health_pdf(df: pd.DataFrame, niche: str, health: dict,
             self.setFont(_BB, 9.5)
             self.drawString(8*mm, H - 11*mm, "DataForge AI  ·  Data Health & Business Insights")
             self.setFont(_BF, 7.5)
-            self.setFillColor(HexColor("#90CAF9"))
+            self.setFillColor(HexColor("#BBDEFB"))
             self.drawString(8*mm, H - 17.5*mm, fname[:60])
             self.setFillColor(white)
             self.drawRightString(W - 8*mm, H - 11*mm, now)
@@ -875,7 +875,7 @@ def build_health_pdf(df: pd.DataFrame, niche: str, health: dict,
             if n_charts == 1:
                 axes = [axes]
             fig.patch.set_facecolor("#ffffff")
-            palette = ["#1565C0","#2196F3","#42A5F5","#90CAF9"]
+            palette = ["#1565C0","#0D47A1","#1B5E20","#4527A0"]
             for idx2, (ax2, col) in enumerate(zip(axes, num_cols_list[:n_charts])):
                 s2 = df[col].dropna()
                 s2 = pd.to_numeric(s2, errors="coerce").dropna()
@@ -892,7 +892,7 @@ def build_health_pdf(df: pd.DataFrame, niche: str, health: dict,
                 ax2.set_facecolor("#f8faff")
                 ax2.spines["top"].set_visible(False)
                 ax2.spines["right"].set_visible(False)
-                ax2.tick_params(labelsize=6, colors="#646882")
+                ax2.tick_params(labelsize=6, colors="#0F172A")
             fig.tight_layout(pad=1.2)
             buf2 = _io.BytesIO()
             fig.savefig(buf2, format="png", dpi=160, bbox_inches="tight")
@@ -1129,7 +1129,7 @@ NICHE_META = {
     "sales":     {"emoji": "💰", "label": "Sales Performance",      "color": "#2E7D32"},
     "ecommerce": {"emoji": "🛒", "label": "E-Commerce Analytics",   "color": "#F4511E"},
     "finance":   {"emoji": "📊", "label": "Finance & Profitability", "color": "#0A1628"},
-    "general":   {"emoji": "🔬", "label": "General Analytics",      "color": "#646882"},
+    "general":   {"emoji": "🔬", "label": "General Analytics",      "color": "#334155"},
 }
 nm = NICHE_META.get(niche, NICHE_META["general"])
 
@@ -1245,7 +1245,7 @@ with c_a:
             "threshold": {"line": {"color": "red", "width": 2},
                           "thickness": 0.75, "value": 60},
         }))
-    fig.update_layout(height=260, paper_bgcolor="rgba(0,0,0,0)",
+    fig.update_layout(height=260, paper_bgcolor="white",
                       font=dict(family="Inter, sans-serif", size=11))
     st.plotly_chart(fig, use_container_width=True)
 
@@ -1262,7 +1262,7 @@ with c_b:
     ))
     fig2.update_layout(
         title="Health Dimension Breakdown", height=260,
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#f8faff",
+        paper_bgcolor="white", plot_bgcolor="#f8faff",
         font=dict(family="Inter, sans-serif", size=11),
         xaxis=dict(range=[0, 100]),
         margin=dict(l=10, r=10, t=40, b=10), showlegend=False,

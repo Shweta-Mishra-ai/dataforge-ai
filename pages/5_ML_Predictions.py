@@ -18,7 +18,7 @@ fname   = get_filename()
 
 from core.ml_engine import run_ml_pipeline, suggest_targets, detect_task, predict_what_if
 
-COLORS = ["#1a4a8a", "#2196F3", "#22d3a5", "#f7934f", "#a78bfa", "#f77070"]
+COLORS = ["#1565C0", "#0D47A1", "#B71C1C", "#1B5E20", "#4527A0", "#E65100"]
 
 st.markdown("## ML Predictions")
 st.caption("{} — {:,} rows, {} columns".format(fname, len(df), len(df.columns)))
@@ -66,7 +66,7 @@ if suggestions[:3]:
                 "<div style='background:#f0f4ff;border-radius:8px;"
                 "padding:10px 14px;border:1px solid #d0d8f0'>"
                 "<b>{}</b><br>"
-                "<span style='font-size:12px;color:#646882'>{} | {}</span>"
+                "<span style='font-size:12px;color:#1E293B'>{} | {}</span>"
                 "</div>".format(sug["column"], sug["task"].title(), sug["reason"]),
                 unsafe_allow_html=True
             )
@@ -211,7 +211,7 @@ with tab1:
         fig.update_layout(
             title="Model Performance Comparison",
             barmode="group",
-            paper_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="white",
             plot_bgcolor="#f8faff",
             font=dict(family="Helvetica", size=11),
             margin=dict(l=10, r=10, t=40, b=10),
@@ -248,7 +248,7 @@ with tab1:
             color_discrete_sequence=COLORS,
             hole=0.4,
         )
-        fig_pie.update_layout(paper_bgcolor="rgba(0,0,0,0)",
+        fig_pie.update_layout(paper_bgcolor="white",
                                margin=dict(l=10,r=10,t=40,b=10))
         st.plotly_chart(fig_pie, use_container_width=True)
         if max(values) > 0.80:
@@ -275,7 +275,7 @@ with tab2:
         feat_imp   = [f.importance * 100 for f in fi]
         feat_dir   = [f.direction for f in fi]
         bar_colors = [
-            "#2196F3" if d == "positive"
+            "#1565C0" if d == "positive"
             else "#f77070" if d == "negative"
             else "#a78bfa"
             for d in feat_dir
@@ -290,7 +290,7 @@ with tab2:
         ))
         fig.update_layout(
             title="Feature Importance (% contribution)",
-            paper_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="white",
             plot_bgcolor="#f8faff",
             font=dict(family="Helvetica", size=11),
             margin=dict(l=10, r=10, t=40, b=10),

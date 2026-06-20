@@ -112,10 +112,10 @@ with tab3:
             df, y=col,
             title=f"Box Plot: {col}",
             template="plotly_dark",
-            color_discrete_sequence=["#4f8ef7"],
+            color_discrete_sequence=["#1565C0"],
             points="outliers"
         )
-        fig.update_layout(paper_bgcolor="#07080f", plot_bgcolor="#0e0f1a")
+        fig.update_layout(paper_bgcolor="white", plot_bgcolor="#F8FAFF", font=dict(color="#0F172A"))
         st.plotly_chart(fig, use_container_width=True)
 
         if not outliers.empty:

@@ -18,7 +18,7 @@ fname = get_filename()
 
 from core.eda_engine import run_eda
 
-COLORS = ["#1a4a8a", "#2196F3", "#22d3a5", "#f7934f", "#a78bfa", "#f77070"]
+COLORS = ["#1565C0", "#0D47A1", "#B71C1C", "#1B5E20", "#4527A0", "#E65100"]
 
 st.markdown("## Deep EDA — Statistical Analysis")
 st.caption("{} — {:,} rows, {} columns".format(fname, len(df), len(df.columns)))
@@ -186,10 +186,10 @@ with tab1:
                          nbinsx=30),
             row=1, col=1
         )
-        fig.add_vline(x=r.mean, line_dash="dash", line_color="#f7934f",
+        fig.add_vline(x=r.mean, line_dash="dash", line_color="#E65100",
                       annotation_text="Mean={:.2f}".format(r.mean),
                       row=1, col=1)
-        fig.add_vline(x=r.median, line_dash="dot", line_color="#22d3a5",
+        fig.add_vline(x=r.median, line_dash="dot", line_color="#00695C",
                       annotation_text="Median={:.2f}".format(r.median),
                       row=1, col=1)
         fig.add_trace(
@@ -198,7 +198,7 @@ with tab1:
             row=1, col=2
         )
         fig.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#f8faff",
+            paper_bgcolor="white", plot_bgcolor="#f8faff",
             font=dict(family="Helvetica", size=11),
             margin=dict(l=10, r=10, t=40, b=10),
             showlegend=False, height=380,
@@ -249,7 +249,7 @@ with tab2:
                 title="Correlation Heatmap",
             )
             fig.update_layout(
-                paper_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="white",
                 margin=dict(l=10, r=10, t=40, b=10),
             )
             st.plotly_chart(fig, use_container_width=True)
@@ -284,7 +284,7 @@ with tab2:
             except Exception:
                 pass
             fig_sc.update_layout(
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#f8faff",
+                paper_bgcolor="white", plot_bgcolor="#f8faff",
                 margin=dict(l=10, r=10, t=40, b=10),
             )
             st.plotly_chart(fig_sc, use_container_width=True)
@@ -346,7 +346,7 @@ with tab3:
                         points="outliers",
                     )
                     fig.update_layout(
-                        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#f8faff",
+                        paper_bgcolor="white", plot_bgcolor="#f8faff",
                         margin=dict(l=10, r=10, t=40, b=10),
                         showlegend=False,
                     )
@@ -390,13 +390,13 @@ with tab4:
             text=["{:.1f}".format(r.vif) for r in report.multicollinearity],
             textposition="outside",
         ))
-        fig.add_hline(y=10, line_dash="dash", line_color="#f77070",
+        fig.add_hline(y=10, line_dash="dash", line_color="#B71C1C",
                       annotation_text="VIF=10 (critical threshold)")
-        fig.add_hline(y=5, line_dash="dot", line_color="#f7934f",
+        fig.add_hline(y=5, line_dash="dot", line_color="#E65100",
                       annotation_text="VIF=5 (warning)")
         fig.update_layout(
             title="VIF by Feature",
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#f8faff",
+            paper_bgcolor="white", plot_bgcolor="#f8faff",
             font=dict(family="Helvetica", size=11),
             margin=dict(l=10, r=10, t=40, b=10),
             xaxis_tickangle=-30,
@@ -454,12 +454,12 @@ with tab5:
                     fig.update_traces(line_color=COLORS[0], line_width=2)
                     fig.add_hline(
                         y=float(ts_data[val_col].mean()),
-                        line_dash="dash", line_color="#f7934f",
+                        line_dash="dash", line_color="#E65100",
                         annotation_text="Mean={:.2f}".format(
                             ts_data[val_col].mean())
                     )
                     fig.update_layout(
-                        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#f8faff",
+                        paper_bgcolor="white", plot_bgcolor="#f8faff",
                         margin=dict(l=10, r=10, t=40, b=10),
                     )
                     st.plotly_chart(fig, use_container_width=True)
