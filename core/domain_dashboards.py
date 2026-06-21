@@ -958,7 +958,7 @@ def _sales_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
 
 def _general_kpis(df: pd.DataFrame) -> List[Dict]:
     num_cols = df.select_dtypes(include="number").columns.tolist()
-    cat_cols = df.select_dtypes(include="object").columns.tolist()
+    cat_cols = df.select_dtypes(include=["object", "string"]).columns.tolist()
     miss_pct = float(df.isna().mean().mean() * 100)
     dup_n    = int(df.duplicated().sum())
     kpis = [

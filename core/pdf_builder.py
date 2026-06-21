@@ -709,7 +709,7 @@ def _dq_note(story, s, T, df: pd.DataFrame, profile, CW):
         {"label": "COLUMNS",       "value": str(df.shape[1]),
          "sub": "{} num · {} cat".format(
              len(df.select_dtypes(include="number").columns),
-             len(df.select_dtypes(include="object").columns)),
+             len(df.select_dtypes(include=["object", "string"]).columns)),
          "color": T["accent"]},
         {"label": "MISSING DATA",  "value": "{:.1f}%".format(miss_pct),
          "sub": "0% = perfect",
@@ -924,7 +924,7 @@ def _dataset_overview(story, s, T, df, profile, CW):
          "Column breakdown and statistical summary")
 
     num_cols = df.select_dtypes(include="number").columns.tolist()
-    cat_cols = df.select_dtypes(include="object").columns.tolist()
+    cat_cols = df.select_dtypes(include=["object", "string"]).columns.tolist()
     dt_cols  = df.select_dtypes(include="datetime").columns.tolist()
 
     _gtable(story, T,
@@ -1180,10 +1180,6 @@ def _finance_page(story, s, T, df, config, CW, profile=None):
     from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
     from reportlab.lib.units import mm
     import pandas as pd
-
-    def _c(hex_str):
-        from reportlab.lib import colors
-        return colors.HexColor(hex_str)
 
     def _find(keywords, exclude=None):
         excl = exclude or []

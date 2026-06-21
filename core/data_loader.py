@@ -260,7 +260,7 @@ def _smart_dtype_inference(df: pd.DataFrame) -> pd.DataFrame:
     skip_keywords = ["id", "name", "code", "sku", "url", "link",
                      "image", "description", "address", "email", "phone"]
 
-    for col in df.select_dtypes(include="object").columns:
+    for col in df.select_dtypes(include=["object", "string"]).columns:
         col_lower = col.lower()
 
         # Skip ID-like columns

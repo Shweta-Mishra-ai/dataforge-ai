@@ -197,7 +197,7 @@ def prepare_features(
 
     # Encode categorical columns
     label_encoders = {}
-    for col in df.select_dtypes(include="object").columns:
+    for col in df.select_dtypes(include=["object", "string"]).columns:
         le = LabelEncoder()
         df[col] = df[col].fillna("Unknown")
         df[col] = le.fit_transform(df[col].astype(str))

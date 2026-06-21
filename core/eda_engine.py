@@ -635,7 +635,7 @@ def analyze_time_series(
 
     try:
         ts = (df.set_index(date_col)[value_col]
-                .resample("M").mean()
+                .resample("ME").mean()
                 .dropna())
 
         if len(ts) < 10:
@@ -768,7 +768,7 @@ def run_eda(df: pd.DataFrame, max_rows: int = 50_000) -> EDAReport:
         df = df.sample(n=max_rows, random_state=42).reset_index(drop=True)
 
     num_cols  = df.select_dtypes(include="number").columns.tolist()
-    cat_cols  = df.select_dtypes(include="object").columns.tolist()
+    cat_cols  = df.select_dtypes(include=["object", "string"]).columns.tolist()
     dt_cols   = df.select_dtypes(include="datetime").columns.tolist()
 
     report = EDAReport(

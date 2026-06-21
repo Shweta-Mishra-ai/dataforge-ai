@@ -82,7 +82,7 @@ def analyze(df: pd.DataFrame) -> DatasetStats:
     Runs proper stats — not just describe().
     """
     num_cols  = df.select_dtypes(include="number").columns.tolist()
-    cat_cols  = df.select_dtypes(include="object").columns.tolist()
+    cat_cols  = df.select_dtypes(include=["object", "string"]).columns.tolist()
     dt_cols   = df.select_dtypes(include="datetime").columns.tolist()
 
     ds = DatasetStats(

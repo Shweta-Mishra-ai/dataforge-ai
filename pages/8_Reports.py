@@ -185,7 +185,7 @@ if gen_btn:
         except Exception:
             # Rule-based fallback — real, specific, not just boilerplate
             num_cols  = df.select_dtypes(include="number").columns.tolist()
-            cat_cols  = df.select_dtypes(include="object").columns.tolist()
+            cat_cols  = df.select_dtypes(include=["object", "string"]).columns.tolist()
             miss_pct  = round(df.isna().mean().mean() * 100, 1)
             dup_count = int(df.duplicated().sum())
 
@@ -277,7 +277,23 @@ if gen_btn:
                         from ai.report_narrator import generate_chart_narrative
                         narrative = generate_chart_narrative(df, title, groq_key, domain_name)
                     except Exception:
-                        narrative = "Chart analysis computed from dataset statistics."
+                        # Real-stats fallback — not boilerplate
+                        try:
+                            num_cols_n = df.select_dtypes(include="number").columns.tolist()
+                            if num_cols_n:
+                                col = num_cols_n[0]
+                                mean_v = df[col].mean()
+                                std_v = df[col].std()
+                                narrative = (
+                                    f"Chart shows '{title}'. "
+                                    f"Primary metric '{col}': mean={mean_v:.2f}, "
+                                    f"std={std_v:.2f} (CV={std_v/mean_v*100:.0f}% variability). "
+                                    f"Dataset: {len(df):,} rows."
+                                )
+                            else:
+                                narrative = f"Visual summary of '{title}' — {len(df):,} records analysed."
+                        except Exception:
+                            narrative = f"Chart: {title}."
                     chart_data.append((title, img_bytes, narrative))
         except Exception as e:
             st.warning(f"Charts skipped: {e}")

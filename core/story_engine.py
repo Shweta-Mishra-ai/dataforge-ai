@@ -38,7 +38,7 @@ def detect_domain(df: pd.DataFrame) -> Tuple[str, float]:
 
     # Also scan actual sample values from categorical columns
     sample_text = ""
-    for col in df.select_dtypes(include="object").columns[:6]:
+    for col in df.select_dtypes(include=["object", "string"]).columns[:6]:
         try:
             sample = df[col].dropna().astype(str).head(20).str.lower().tolist()
             sample_text += " ".join(sample) + " "
@@ -249,7 +249,7 @@ def _run_attrition(df: pd.DataFrame) -> Optional[AttritionAnalysis]:
             continue
 
     # Categorical drivers
-    cat_cols = [c for c in df.select_dtypes(include="object").columns
+    cat_cols = [c for c in df.select_dtypes(include=["object", "string"]).columns
                 if c != attr_col and df[c].nunique() <= 20]
     for col in cat_cols[:6]:
         try:
@@ -631,7 +631,7 @@ def _insights_ecommerce(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
     _actual_col = next((c for c in df.columns
                        if "actual_price" in c.lower() or "mrp" in c.lower()), None)
     disc_col   = next((c for c in df.columns if "discount" in c.lower() and c in stats), None)
-    cat_col    = next((c for c in df.select_dtypes(include="object").columns
+    cat_col    = next((c for c in df.select_dtypes(include=["object", "string"]).columns
                        if "category" in c.lower() and df[c].nunique()<=30), None)
     rev_col    = next((c for c in df.columns
                        if any(k in c.lower() for k in ["revenue","sales","amount"]) and c in stats), None)
@@ -818,13 +818,13 @@ def _insights_sales(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
     target_col = next((c for c in df.columns
                        if any(k in c.lower() for k in ["target","quota","goal"])
                        and c in stats), None)
-    region_col = next((c for c in df.select_dtypes(include="object").columns
+    region_col = next((c for c in df.select_dtypes(include=["object", "string"]).columns
                        if any(k in c.lower() for k in ["region","territory","zone","area"])
                        and df[c].nunique()<=25), None)
-    product_col= next((c for c in df.select_dtypes(include="object").columns
+    product_col= next((c for c in df.select_dtypes(include=["object", "string"]).columns
                        if any(k in c.lower() for k in ["product","category","segment"])
                        and df[c].nunique()<=30), None)
-    _rep_col    = next((c for c in df.select_dtypes(include="object").columns
+    _rep_col    = next((c for c in df.select_dtypes(include=["object", "string"]).columns
                        if any(k in c.lower() for k in ["rep","salesperson","agent","owner"])
                        and df[c].nunique()<=50), None)
 

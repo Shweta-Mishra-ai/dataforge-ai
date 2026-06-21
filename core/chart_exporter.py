@@ -11,6 +11,10 @@ LIGHT_COLORS = ["#1565C0", "#0D47A1", "#B71C1C", "#1B5E20", "#4527A0", "#E65100"
 DARK_COLORS  = ["#64B5F6", "#4DB6AC", "#FFB74D", "#CE93D8", "#EF9A9A", "#FFF176"]
 GREEN_COLORS = ["#1B5E20", "#2E7D32", "#388E3C", "#43A047", "#1A237E", "#0D47A1"]
 
+# Must be defined at module level before any function references it
+_SCORE_KEYWORDS = {"satisfaction", "rating", "score", "evaluation", "performance",
+                   "sentiment", "nps", "csat", "quality", "health", "level", "index"}
+
 
 def _get_style(theme_name: str) -> dict:
     if theme_name == "Dark Tech":
@@ -166,7 +170,7 @@ def make_line_chart(
     if x_is_datetime:
         # Aggregate by month
         data[x_col] = pd.to_datetime(data[x_col])
-        data = data.set_index(x_col).resample("M")[y_col].mean().reset_index()
+        data = data.set_index(x_col).resample("ME")[y_col].mean().reset_index()
         x_vals = range(len(data))
         y_vals = data[y_col].values
         labels = [str(d)[:7] for d in data[x_col]]
@@ -437,9 +441,6 @@ def make_box_plot(
     fig.tight_layout()
     return fig_to_bytes(fig)
 
-
-_SCORE_KEYWORDS = {"satisfaction","rating","score","evaluation","performance",
-                   "sentiment","nps","csat","quality","health","level","index"}
 
 
 def _pick_best_metric(num_cols, cat_cols=None):

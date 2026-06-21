@@ -63,7 +63,7 @@ if report.key_insights:
 st.divider()
 
 num_cols = df.select_dtypes(include="number").columns.tolist()
-cat_cols = [c for c in df.select_dtypes(include="object").columns
+cat_cols = [c for c in df.select_dtypes(include=["object", "string"]).columns
             if 2 <= df[c].nunique() <= 25]
 
 # ══════════════════════════════════════════════════════════

@@ -405,10 +405,13 @@ with tab4:
         fig.update_layout(
             title="VIF by Feature",
             paper_bgcolor="white", plot_bgcolor="#F8FAFF",
-            font=dict(family="Helvetica", size=11),
+            font=dict(family="Helvetica", size=11, color="#0F172A"),
+            title_font=dict(color="#0A1628", size=13),
             margin=dict(l=10, r=10, t=40, b=10),
             xaxis_tickangle=-30,
         )
+        fig.update_xaxes(tickfont=dict(color="#0F172A"), title_font=dict(color="#0F172A"))
+        fig.update_yaxes(tickfont=dict(color="#0F172A"), title_font=dict(color="#0F172A"))
         st.plotly_chart(fig, use_container_width=True)
 
         # Guide
@@ -451,7 +454,7 @@ with tab5:
                     dt_col  = ts.date_col
                     val_col = ts.column
                     ts_data = (df.set_index(dt_col)[val_col]
-                                 .resample("M").mean()
+                                 .resample("ME").mean()
                                  .reset_index()
                                  .dropna())
                     fig = px.line(

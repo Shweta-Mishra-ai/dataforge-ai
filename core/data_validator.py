@@ -144,7 +144,7 @@ def validate_dataframe(df: pd.DataFrame) -> ValidationResult:
                 inf_count))
 
     # Mixed type columns (mostly numeric but some strings)
-    for col in df.select_dtypes(include="object").columns[:20]:
+    for col in df.select_dtypes(include=["object", "string"]).columns[:20]:
         sample = df[col].dropna().head(100)
         if len(sample) == 0:
             continue

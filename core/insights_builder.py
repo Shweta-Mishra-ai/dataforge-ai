@@ -51,7 +51,7 @@ def build_top_insights(
 
     # Build from scratch using df
     num_cols = df.select_dtypes(include="number").columns.tolist()
-    cat_cols = df.select_dtypes(include="object").columns.tolist()
+    cat_cols = df.select_dtypes(include=["object", "string"]).columns.tolist()
 
     # ── Attrition insight (HR) ────────────────────────────────────────────
     if attrition and getattr(attrition, "rate", 0) > 0:

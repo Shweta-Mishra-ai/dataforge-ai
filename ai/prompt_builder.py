@@ -474,7 +474,7 @@ OUTPUT: The corrected text only. No explanation of changes.
 
 def build_chat_system_prompt(df: pd.DataFrame) -> str:
     num_cols  = df.select_dtypes(include="number").columns.tolist()
-    cat_cols  = df.select_dtypes(include="object").columns.tolist()
+    cat_cols  = df.select_dtypes(include=["object", "string"]).columns.tolist()
     date_cols = df.select_dtypes(include="datetime").columns.tolist()
 
     # Translate column names
