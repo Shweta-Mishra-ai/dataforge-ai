@@ -10,6 +10,8 @@ import pandas as pd
 import numpy as np
 from dataclasses import dataclass, field
 from typing import Optional, List
+import logging
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -129,6 +131,7 @@ def _load_csv(f, warnings: list) -> Optional[pd.DataFrame]:
                         warnings.append("Separator detected: '{}'".format(sep))
                     return df
             except Exception:
+                logger.debug("%s skip", exc_info=True)
                 continue
 
     # Last resort — no separator detection
@@ -243,7 +246,7 @@ def _sanitize(df: pd.DataFrame, warnings: list) -> pd.DataFrame:
                 warnings.append(
                     "{:,} infinite values replaced with blank.".format(int(inf_count)))
     except Exception:
-        pass
+        logger.debug("%s silent skip", exc_info=True)
 
     # Try to improve dtypes for object columns (safe — won't break values)
     df = _smart_dtype_inference(df)
@@ -260,7 +263,7 @@ def _smart_dtype_inference(df: pd.DataFrame) -> pd.DataFrame:
     skip_keywords = ["id", "name", "code", "sku", "url", "link",
                      "image", "description", "address", "email", "phone"]
 
-    for col in df.select_dtypes(include="object").columns:
+    for col in df.select_dtypes(include=["object", "string"]).columns:
         col_lower = col.lower()
 
         # Skip ID-like columns
@@ -275,7 +278,7 @@ def _smart_dtype_inference(df: pd.DataFrame) -> pd.DataFrame:
                 df[col] = converted
                 continue
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
         # Try datetime (only for date-named columns)
         date_keywords = ["date", "time", "created", "updated", "timestamp"]
@@ -287,6 +290,6 @@ def _smart_dtype_inference(df: pd.DataFrame) -> pd.DataFrame:
                 if success_rate > 0.70:
                     df[col] = converted
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
 
     return df

@@ -5,11 +5,17 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from typing import List, Tuple, Optional
+import logging
+logger = logging.getLogger(__name__)
 
 
 LIGHT_COLORS = ["#1565C0", "#0D47A1", "#B71C1C", "#1B5E20", "#4527A0", "#E65100"]
 DARK_COLORS  = ["#64B5F6", "#4DB6AC", "#FFB74D", "#CE93D8", "#EF9A9A", "#FFF176"]
 GREEN_COLORS = ["#1B5E20", "#2E7D32", "#388E3C", "#43A047", "#1A237E", "#0D47A1"]
+
+# Must be defined at module level before any function references it
+_SCORE_KEYWORDS = {"satisfaction", "rating", "score", "evaluation", "performance",
+                   "sentiment", "nps", "csat", "quality", "health", "level", "index"}
 
 
 def _get_style(theme_name: str) -> dict:
@@ -166,7 +172,7 @@ def make_line_chart(
     if x_is_datetime:
         # Aggregate by month
         data[x_col] = pd.to_datetime(data[x_col])
-        data = data.set_index(x_col).resample("M")[y_col].mean().reset_index()
+        data = data.set_index(x_col).resample("ME")[y_col].mean().reset_index()
         x_vals = range(len(data))
         y_vals = data[y_col].values
         labels = [str(d)[:7] for d in data[x_col]]
@@ -438,9 +444,6 @@ def make_box_plot(
     return fig_to_bytes(fig)
 
 
-_SCORE_KEYWORDS = {"satisfaction","rating","score","evaluation","performance",
-                   "sentiment","nps","csat","quality","health","level","index"}
-
 
 def _pick_best_metric(num_cols, cat_cols=None):
     """Prefer score/rating columns for headline charts over raw counts/IDs."""
@@ -480,7 +483,7 @@ def generate_all_charts(
                 df, best_cat, best_metric, title, theme_name
             )))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # 2. Second view — datetime trend OR second categorical breakdown
     #    (avoids numeric-binned x-axis with unreadable labels like "(0.089, 0.)")
@@ -491,7 +494,7 @@ def generate_all_charts(
                 df, date_cols[0], best_metric, title, theme_name
             )))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
     else:
         second_cat = next(
             (c for c in cat_cols if c != best_cat and 2 <= df[c].nunique() <= 12),
@@ -504,7 +507,7 @@ def generate_all_charts(
                     df, second_cat, best_metric, title, theme_name
                 )))
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
         elif len(num_cols) >= 2:
             second_metric = next((c for c in num_cols if c != best_metric), num_cols[0])
             title = "Distribution: {}".format(second_metric.replace("_", " ").title())
@@ -513,7 +516,7 @@ def generate_all_charts(
                     df, second_metric, title, theme_name
                 )))
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
 
     # 3. Histogram — distribution of primary metric
     if best_metric:
@@ -523,7 +526,7 @@ def generate_all_charts(
                 df, best_metric, title, theme_name
             )))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # 4. Correlation heatmap
     if len(num_cols) >= 3:
@@ -532,7 +535,7 @@ def generate_all_charts(
                 df, "Correlation Matrix", theme_name
             )))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # 5. Ranked horizontal bar — clearer comparison than a pie for many categories
     if best_cat and best_metric:
@@ -548,6 +551,6 @@ def generate_all_charts(
                     df, best_cat, best_metric, title, theme_name
                 )))
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
 
     return charts[:max_charts]

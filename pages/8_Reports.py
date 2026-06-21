@@ -23,6 +23,8 @@ from core.pdf_builder    import build_pdf, THEMES
 from core.chart_exporter import generate_all_charts
 from core.story_engine   import generate_story, detect_domain
 from core.data_profiler  import profile_dataset
+import logging
+logger = logging.getLogger(__name__)
 
 
 @st.cache_data(show_spinner=False)
@@ -185,7 +187,7 @@ if gen_btn:
         except Exception:
             # Rule-based fallback — real, specific, not just boilerplate
             num_cols  = df.select_dtypes(include="number").columns.tolist()
-            cat_cols  = df.select_dtypes(include="object").columns.tolist()
+            cat_cols  = df.select_dtypes(include=["object", "string"]).columns.tolist()
             miss_pct  = round(df.isna().mean().mean() * 100, 1)
             dup_count = int(df.duplicated().sum())
 
@@ -202,7 +204,7 @@ if gen_btn:
                     if abs(sk) > 1.5:
                         findings_list.append(f"'{col}' is right-skewed (skew={sk:.2f}) — use median for reporting, not mean")
                 except Exception:
-                    pass
+                    logger.debug("%s silent skip", exc_info=True)
 
             exec_summary = (
                 f"This report analyses {len(df):,} records across {len(df.columns)} variables "
@@ -245,7 +247,7 @@ if gen_btn:
             try:
                 stats_report = stats_cached or __import__("core.stats_engine", fromlist=["analyze"]).analyze(df)
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
 
         # 6. BI
         progress.progress(52, text="Running business intelligence...")
@@ -255,7 +257,7 @@ if gen_btn:
                 from core.bi_engine import run_bi
                 bi_report = run_bi(df)
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
 
         # 7. ML
         ml_report = ml_cached if include_ml else None
@@ -277,7 +279,23 @@ if gen_btn:
                         from ai.report_narrator import generate_chart_narrative
                         narrative = generate_chart_narrative(df, title, groq_key, domain_name)
                     except Exception:
-                        narrative = "Chart analysis computed from dataset statistics."
+                        # Real-stats fallback — not boilerplate
+                        try:
+                            num_cols_n = df.select_dtypes(include="number").columns.tolist()
+                            if num_cols_n:
+                                col = num_cols_n[0]
+                                mean_v = df[col].mean()
+                                std_v = df[col].std()
+                                narrative = (
+                                    f"Chart shows '{title}'. "
+                                    f"Primary metric '{col}': mean={mean_v:.2f}, "
+                                    f"std={std_v:.2f} (CV={std_v/mean_v*100:.0f}% variability). "
+                                    f"Dataset: {len(df):,} rows."
+                                )
+                            else:
+                                narrative = f"Visual summary of '{title}' — {len(df):,} records analysed."
+                        except Exception:
+                            narrative = f"Chart: {title}."
                     chart_data.append((title, img_bytes, narrative))
         except Exception as e:
             st.warning(f"Charts skipped: {e}")

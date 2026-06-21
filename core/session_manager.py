@@ -14,6 +14,8 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 from typing import Optional, Dict, Any
+import logging
+logger = logging.getLogger(__name__)
 
 
 # ── Session Keys ──────────────────────────────────────────
@@ -166,7 +168,7 @@ def _hash_df(df: pd.DataFrame) -> str:
             parts.append(str(df.iloc[0].astype(str).tolist())  if len(df) > 0 else "")
             parts.append(str(df.iloc[-1].astype(str).tolist()) if len(df) > 0 else "")
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
         content = "|".join(parts)
         return hashlib.md5(content.encode("utf-8", errors="replace")).hexdigest()
     except Exception:

@@ -111,11 +111,17 @@ with tab3:
         fig = px.box(
             df, y=col,
             title=f"Box Plot: {col}",
-            template="plotly_dark",
+            template="plotly_white",
             color_discrete_sequence=["#1565C0"],
             points="outliers"
         )
-        fig.update_layout(paper_bgcolor="white", plot_bgcolor="#F8FAFF", font=dict(color="#0F172A"))
+        fig.update_layout(
+            paper_bgcolor="white", plot_bgcolor="#F8FAFF",
+            font=dict(color="#0F172A", size=11),
+            title_font=dict(color="#0A1628", size=14),
+        )
+        fig.update_xaxes(tickfont=dict(color="#0F172A"), title_font=dict(color="#0F172A"))
+        fig.update_yaxes(tickfont=dict(color="#0F172A"), title_font=dict(color="#0F172A"))
         st.plotly_chart(fig, use_container_width=True)
 
         if not outliers.empty:

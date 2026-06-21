@@ -82,7 +82,7 @@ def analyze(df: pd.DataFrame) -> DatasetStats:
     Runs proper stats — not just describe().
     """
     num_cols  = df.select_dtypes(include="number").columns.tolist()
-    cat_cols  = df.select_dtypes(include="object").columns.tolist()
+    cat_cols  = df.select_dtypes(include=["object", "string"]).columns.tolist()
     dt_cols   = df.select_dtypes(include="datetime").columns.tolist()
 
     ds = DatasetStats(
@@ -266,6 +266,7 @@ def _correlation_analysis(
                 pearson_r, p_val = scipy_stats.pearsonr(x, y)
                 spearman_r, _    = scipy_stats.spearmanr(x, y)
             except Exception:
+                logger.debug("%s skip", exc_info=True)
                 continue
 
             abs_r = abs(pearson_r)

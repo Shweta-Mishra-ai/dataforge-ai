@@ -13,6 +13,8 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
 from typing import List, Dict, Optional, Tuple
+import logging
+logger = logging.getLogger(__name__)
 
 
 # ── Palette (matches chart_theme.py) ─────────────────────────────────────────
@@ -72,7 +74,7 @@ def get_domain_kpis(df: pd.DataFrame, domain: str) -> List[Dict]:
         if domain == "ecommerce":   return _ecommerce_kpis(df)
         if domain == "sales":       return _sales_kpis(df)
     except Exception:
-        pass
+        logger.debug("%s silent skip", exc_info=True)
     return _general_kpis(df)
 
 
@@ -84,7 +86,7 @@ def get_domain_charts(df: pd.DataFrame, domain: str) -> List[Tuple[str, go.Figur
         if domain == "ecommerce":   return _ecommerce_charts(df)
         if domain == "sales":       return _sales_charts(df)
     except Exception:
-        pass
+        logger.debug("%s silent skip", exc_info=True)
     return _general_charts(df)
 
 
@@ -142,7 +144,7 @@ def _hr_kpis(df: pd.DataFrame) -> List[Dict]:
                          "sub": f"Low: {lo_rate:.1f}% | High: {hi_rate:.1f}%",
                          "color": C_AMBER if lo_rate - hi_rate > 10 else C_SLATE, "delta": None})
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     return kpis[:6]
 
@@ -183,7 +185,7 @@ def _hr_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
                               xaxis_title="Attrition Rate (%)")
             charts.append(("Attrition by Department", fig))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # Chart 2: Tenure Cohort Attrition
     if ten_col and atr_col:
@@ -215,7 +217,7 @@ def _hr_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
             fig.update_layout(height=380, yaxis_title="Attrition Rate (%)")
             charts.append(("Tenure Cohort Attrition", fig))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # Chart 3: Satisfaction Distribution
     if sat_col:
@@ -236,7 +238,7 @@ def _hr_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
                               yaxis_title="Employee Count")
             charts.append(("Satisfaction Distribution", fig))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # Chart 4: Satisfaction vs Attrition scatter
     if sat_col and atr_col:
@@ -273,7 +275,7 @@ def _hr_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
                               yaxis_title="Attrition Rate (%)")
             charts.append(("Satisfaction vs Attrition", fig))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # Chart 5: Tenure × Salary Heatmap
     if ten_col and sal_col and atr_col:
@@ -306,7 +308,7 @@ def _hr_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
             fig.update_layout(height=320)
             charts.append(("Tenure × Salary Heatmap", fig))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     return charts
 
@@ -340,7 +342,7 @@ def _finance_kpis(df: pd.DataFrame) -> List[Dict]:
                          "sub": f"Revenue: {total_r:,.0f} | COGS: {total_c:,.0f}",
                          "color": color, "delta": None})
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     if profit_col:
         total_p   = float(df[profit_col].sum())
@@ -361,7 +363,7 @@ def _finance_kpis(df: pd.DataFrame) -> List[Dict]:
                              "sub": "Avg actual vs budget across all rows",
                              "color": color, "delta": f"{var_pct:+.1f}%"})
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     if opex_col and rev_col:
         try:
@@ -371,7 +373,7 @@ def _finance_kpis(df: pd.DataFrame) -> List[Dict]:
                          "sub": "Operating expenses as % of revenue",
                          "color": color, "delta": None})
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     return kpis[:6]
 
@@ -398,7 +400,7 @@ def _finance_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
             try:
                 period_data = period_data.sort_values(period_col)
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
 
             fig = go.Figure()
             fig.add_trace(go.Bar(
@@ -432,7 +434,7 @@ def _finance_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
             fig.update_layout(height=380, xaxis_title=period_col, yaxis_title="Amount")
             charts.append(("Revenue vs Cost by Period", fig))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # Chart 2: Budget vs Actual
     if budget_col and actual_col and budget_col != actual_col:
@@ -443,7 +445,7 @@ def _finance_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
                 try:
                     agg = agg.sort_values(actual_col, ascending=False).head(15)
                 except Exception:
-                    pass
+                    logger.debug("%s silent skip", exc_info=True)
                 agg["variance_pct"] = ((agg[actual_col] - agg[budget_col]) /
                                         agg[budget_col].replace(0, np.nan) * 100)
 
@@ -465,7 +467,7 @@ def _finance_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
                 fig.update_layout(height=360, yaxis_title="Amount")
                 charts.append(("Budget vs Actual", fig))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # Chart 3: Cost / Expense by Category
     if cat_col and val_col:
@@ -489,7 +491,7 @@ def _finance_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
                               xaxis_title="Total Amount")
             charts.append(("Cost by Category", fig))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # Chart 4: Profit / Margin Trend
     if period_col and profit_col:
@@ -498,7 +500,7 @@ def _finance_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
             try:
                 trend = trend.sort_values(period_col)
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
             colors_t = [C_GREEN if v >= 0 else C_RED for v in trend[profit_col]]
             fig = go.Figure()
             fig.add_trace(go.Bar(
@@ -512,7 +514,7 @@ def _finance_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
             fig.update_layout(height=340, yaxis_title="Profit Amount")
             charts.append(("Profit by Period", fig))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # Chart 5: Revenue Waterfall (top categories)
     if cat_col and rev_col:
@@ -530,7 +532,7 @@ def _finance_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
             fig.update_layout(height=340, yaxis_title="Revenue")
             charts.append(("Revenue by Category", fig))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     return charts
 
@@ -626,7 +628,7 @@ def _ecommerce_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
                               xaxis_title="Average Rating", xaxis=dict(range=[0, 5.5]))
             charts.append(("Rating by Category", fig))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # Chart 2: Discount vs Rating scatter
     if disc_col and rating_col:
@@ -647,7 +649,7 @@ def _ecommerce_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
                               xaxis_title="Discount (%)", yaxis_title="Rating")
             charts.append(("Discount vs Rating", fig))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # Chart 3: Price distribution
     if price_col:
@@ -667,7 +669,7 @@ def _ecommerce_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
             fig.update_layout(height=320, xaxis_title=price_col, yaxis_title="Product Count")
             charts.append(("Price Distribution", fig))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # Chart 4: Revenue by Category
     if cat_col and rev_col:
@@ -686,7 +688,7 @@ def _ecommerce_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
             fig.update_layout(height=380)
             charts.append(("Revenue by Category", fig))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # Chart 5: Price band heatmap (price range vs rating)
     if price_col and rating_col:
@@ -715,7 +717,7 @@ def _ecommerce_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
                               xaxis_title="Rating Band", yaxis_title="Price Tier")
             charts.append(("Price Band vs Rating", fig))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     return charts
 
@@ -756,7 +758,7 @@ def _sales_kpis(df: pd.DataFrame) -> List[Dict]:
                          "sub": f"Actual: {total_r:,.0f} vs Target: {total_t:,.0f}",
                          "color": color, "delta": f"{ach - 100:+.1f}pp vs target"})
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     if rep_col and rev_col:
         try:
@@ -770,7 +772,7 @@ def _sales_kpis(df: pd.DataFrame) -> List[Dict]:
                          "sub": f"'{top_rep[:18]}' drives {top_pct:.1f}% of revenue · {n_reps} reps",
                          "color": color, "delta": None})
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     if margin_col:
         mean_m = float(df[margin_col].mean())
@@ -792,7 +794,7 @@ def _sales_kpis(df: pd.DataFrame) -> List[Dict]:
                              "sub": f"{won_n:,} won of {len(df):,} total",
                              "color": color, "delta": None})
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     return kpis[:6]
 
@@ -843,7 +845,7 @@ def _sales_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
                               xaxis_title="Revenue")
             charts.append(("Revenue by Rep", fig))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # Chart 2: Revenue vs Target by Region
     if region_col and rev_col and target_col:
@@ -870,7 +872,7 @@ def _sales_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
             fig.update_layout(height=360, yaxis_title="Amount")
             charts.append(("Revenue vs Target by Region", fig))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # Chart 3: Revenue Trend
     if period_col and rev_col:
@@ -883,7 +885,7 @@ def _sales_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
             try:
                 trend = trend.sort_values(period_col)
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
 
             fig = go.Figure()
             fig.add_trace(go.Scatter(
@@ -903,7 +905,7 @@ def _sales_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
             fig.update_layout(height=340, yaxis_title="Revenue")
             charts.append(("Revenue Trend", fig))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # Chart 4: Deal Size Distribution
     if rev_col:
@@ -923,7 +925,7 @@ def _sales_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
             fig.update_layout(height=320, xaxis_title=rev_col, yaxis_title="Count")
             charts.append(("Deal Size Distribution", fig))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # Chart 5: Margin by Product / Category
     if margin_col and (prod_col or region_col):
@@ -947,7 +949,7 @@ def _sales_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
                               xaxis_title="Average Margin (%)")
             charts.append(("Margin by Segment", fig))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     return charts
 
@@ -958,7 +960,7 @@ def _sales_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
 
 def _general_kpis(df: pd.DataFrame) -> List[Dict]:
     num_cols = df.select_dtypes(include="number").columns.tolist()
-    cat_cols = df.select_dtypes(include="object").columns.tolist()
+    cat_cols = df.select_dtypes(include=["object", "string"]).columns.tolist()
     miss_pct = float(df.isna().mean().mean() * 100)
     dup_n    = int(df.duplicated().sum())
     kpis = [
@@ -990,6 +992,5 @@ def _general_charts(df: pd.DataFrame) -> List[Tuple[str, go.Figure]]:
             fig.update_layout(height=300)
             charts.append((f"Distribution: {col}", fig))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
     return charts
-

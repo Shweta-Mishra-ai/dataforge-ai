@@ -8,6 +8,8 @@ import numpy as np
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Tuple
 from scipy import stats as scipy_stats
+import logging
+logger = logging.getLogger(__name__)
 
 
 # ══════════════════════════════════════════════════════════
@@ -38,12 +40,12 @@ def detect_domain(df: pd.DataFrame) -> Tuple[str, float]:
 
     # Also scan actual sample values from categorical columns
     sample_text = ""
-    for col in df.select_dtypes(include="object").columns[:6]:
+    for col in df.select_dtypes(include=["object", "string"]).columns[:6]:
         try:
             sample = df[col].dropna().astype(str).head(20).str.lower().tolist()
             sample_text += " ".join(sample) + " "
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # Column names score (primary signal)
     col_scores = {}
@@ -73,7 +75,7 @@ def detect_domain(df: pd.DataFrame) -> Tuple[str, float]:
                 score = col_scores[best]
                 break
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     return (best, round(score, 2)) if score > 0.04 else ("general", 0.0)
 
@@ -189,6 +191,7 @@ def _correlations(df: pd.DataFrame) -> List[Dict]:
                         "direction": "positive" if r>0 else "negative",
                     })
             except Exception:
+                logger.debug("%s skip", exc_info=True)
                 continue
     return sorted(results, key=lambda x: abs(x["r"]), reverse=True)
 
@@ -246,10 +249,11 @@ def _run_attrition(df: pd.DataFrame) -> Optional[AttritionAnalysis]:
                         lv.mean(), sv.mean(), diff_pct),
                 })
         except Exception:
+            logger.debug("%s skip", exc_info=True)
             continue
 
     # Categorical drivers
-    cat_cols = [c for c in df.select_dtypes(include="object").columns
+    cat_cols = [c for c in df.select_dtypes(include=["object", "string"]).columns
                 if c != attr_col and df[c].nunique() <= 20]
     for col in cat_cols[:6]:
         try:
@@ -271,6 +275,7 @@ def _run_attrition(df: pd.DataFrame) -> Optional[AttritionAnalysis]:
                         worst, rates[worst], best, rates[best]),
                 })
         except Exception:
+            logger.debug("%s skip", exc_info=True)
             continue
 
     top_drivers.sort(key=lambda x: x["impact"], reverse=True)
@@ -631,7 +636,7 @@ def _insights_ecommerce(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
     _actual_col = next((c for c in df.columns
                        if "actual_price" in c.lower() or "mrp" in c.lower()), None)
     disc_col   = next((c for c in df.columns if "discount" in c.lower() and c in stats), None)
-    cat_col    = next((c for c in df.select_dtypes(include="object").columns
+    cat_col    = next((c for c in df.select_dtypes(include=["object", "string"]).columns
                        if "category" in c.lower() and df[c].nunique()<=30), None)
     rev_col    = next((c for c in df.columns
                        if any(k in c.lower() for k in ["revenue","sales","amount"]) and c in stats), None)
@@ -818,13 +823,13 @@ def _insights_sales(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
     target_col = next((c for c in df.columns
                        if any(k in c.lower() for k in ["target","quota","goal"])
                        and c in stats), None)
-    region_col = next((c for c in df.select_dtypes(include="object").columns
+    region_col = next((c for c in df.select_dtypes(include=["object", "string"]).columns
                        if any(k in c.lower() for k in ["region","territory","zone","area"])
                        and df[c].nunique()<=25), None)
-    product_col= next((c for c in df.select_dtypes(include="object").columns
+    product_col= next((c for c in df.select_dtypes(include=["object", "string"]).columns
                        if any(k in c.lower() for k in ["product","category","segment"])
                        and df[c].nunique()<=30), None)
-    _rep_col    = next((c for c in df.select_dtypes(include="object").columns
+    _rep_col    = next((c for c in df.select_dtypes(include=["object", "string"]).columns
                        if any(k in c.lower() for k in ["rep","salesperson","agent","owner"])
                        and df[c].nunique()<=50), None)
 
@@ -1094,7 +1099,7 @@ def _insights_finance(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
                 findings.append(f"Gross margin ranges from {min_margin:.1f}% to {float(margin_series.max()):.1f}% — high variability")
 
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # ── 2. REVENUE TREND (period analysis) ───────────────────────────────
     if period_col and rev_col:
@@ -1105,7 +1110,7 @@ def _insights_finance(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
                 try:
                     period_rev = period_rev.sort_index()
                 except Exception:
-                    pass
+                    logger.debug("%s silent skip", exc_info=True)
 
                 first_half_mean  = float(period_rev.iloc[:len(period_rev)//2].mean())
                 second_half_mean = float(period_rev.iloc[len(period_rev)//2:].mean())
@@ -1149,7 +1154,7 @@ def _insights_finance(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
                 findings.append(f"Revenue across {len(period_rev)} periods: peak {peak_val:,.0f} in {best_period}, "
                                  f"trough {trough_val:,.0f} in {worst_period}")
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # ── 3. BUDGET VS ACTUAL ───────────────────────────────────────────────
     if budget_col and actual_col and budget_col != actual_col:
@@ -1195,7 +1200,7 @@ def _insights_finance(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
                     severity = bv_sev, category = "budget_variance"
                 ))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # ── 4. COST CATEGORY CONCENTRATION ───────────────────────────────────
     if cat_col and (cost_col or expense_col or amt_col):
@@ -1239,7 +1244,7 @@ def _insights_finance(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
                         f"review whether these activities generate sufficient return"
                     )
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # ── 5. OPERATING EXPENSE RATIO ────────────────────────────────────────
     if opex_col and rev_col:
@@ -1273,7 +1278,7 @@ def _insights_finance(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
                     severity = opex_sev, category = "opex_ratio"
                 ))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # ── 6. REVENUE CONCENTRATION (category) ──────────────────────────────
     if cat_col and rev_col:
@@ -1299,7 +1304,7 @@ def _insights_finance(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
                         f"Top 3 categories = {top3_rev_pct:.1f}% of revenue — moderate concentration risk"
                     )
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # ── 7. PERIOD-OVER-PERIOD COST GROWTH ─────────────────────────────────
     if period_col and cost_col and rev_col:
@@ -1308,7 +1313,7 @@ def _insights_finance(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
             try:
                 period_data = period_data.sort_index()
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
             if len(period_data) >= 3:
                 rev_growth  = period_data[rev_col].pct_change().mean() * 100
                 cost_growth = period_data[cost_col].pct_change().mean() * 100
@@ -1332,7 +1337,7 @@ def _insights_finance(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
                         f"Avg period cost growth: {cost_growth:.1f}%"
                     )
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # ── Actions ───────────────────────────────────────────────────────────
     if not actions:
@@ -1471,11 +1476,29 @@ def generate_story(df: pd.DataFrame) -> StoryReport:
             seen.add(ins.title)
             deduped.append(ins)
 
-    critical  = [i for i in deduped if i.severity=="critical"]
-    positive  = [i for i in deduped if i.severity=="positive"]
+    critical  = [i for i in deduped if i.severity == "critical"]
+    positive  = [i for i in deduped if i.severity == "positive"]
 
     # Flat lists for PDF
+    # If domain-specific analysis didn't populate findings separately,
+    # synthesise them from the insight titles so Key Findings is never empty.
     findings_flat = raw["findings"][:6]
+    if not findings_flat and deduped:
+        findings_flat = [
+            "{}: {}".format(ins.severity.upper(), ins.title)
+            for ins in deduped[:6]
+        ]
+    # Always add a data-shape finding so the section has at least one line
+    if not findings_flat:
+        num_c = len(df.select_dtypes(include="number").columns)
+        cat_c = len(df.select_dtypes(include=["object", "string"]).columns)
+        miss  = round(df.isna().mean().mean() * 100, 1)
+        findings_flat = [
+            "{:,} records x {} columns analysed ({} numeric, {} categorical)".format(
+                len(df), len(df.columns), num_c, cat_c),
+            "Missing data: {:.1f}% {}".format(
+                miss, "- fully complete" if miss == 0 else "- imputation applied"),
+        ]
     risks_flat    = raw["risks"][:6]
     opps_flat     = raw["opportunities"][:4]
     actions_flat  = ["[{}] {}".format(
@@ -1489,14 +1512,43 @@ def generate_story(df: pd.DataFrame) -> StoryReport:
         "sales": "Sales", "finance": "Finance", "general": "Business",
     }
     domain_label = domain_labels.get(domain, domain.title())
-    exec_s = "This {:,}-row {} dataset analysis identified {} critical issue(s) and {} risk(s). ".format(
-        len(df), domain_label, n_crit, len(risks_flat))
+
+    num_c  = len(df.select_dtypes(include="number").columns)
+    cat_c  = len(df.select_dtypes(include=["object", "string"]).columns)
+    miss_v = round(df.isna().mean().mean() * 100, 1)
+
+    exec_s = (
+        "DataForge AI analysed {:,} records across {} variables "
+        "({} numeric, {} categorical) in this {} dataset. "
+    ).format(len(df), len(df.columns), num_c, cat_c, domain_label)
+
+    if miss_v == 0:
+        exec_s += "Data completeness: 100% — no missing values detected. "
+    else:
+        exec_s += "Missing data rate: {:.1f}% — imputation applied before analysis. ".format(miss_v)
+
+    if n_crit > 0:
+        exec_s += "{} critical issue(s) require immediate attention. ".format(n_crit)
+    if risks_flat:
+        exec_s += "{} business risk(s) identified. ".format(len(risks_flat))
+
     if attrition:
-        exec_s += "Attrition: {:.1f}% ({} severity). ".format(
-            attrition.rate, attrition.severity.upper())
+        exec_s += (
+            "Attrition rate: {:.1f}% ({} severity) — "
+            "{:,} of {:,} employees left. "
+            "{:,} remaining staff flagged as flight risk. "
+        ).format(
+            attrition.rate, attrition.severity.upper(),
+            attrition.n_left, attrition.n_total,
+            attrition.n_flight_risk,
+        )
+
     if deduped:
-        exec_s += "Priority: {}. ".format(deduped[0].title)
-    exec_s += "{} actionable recommendations provided.".format(len(actions_flat))
+        exec_s += "Top priority: {}. ".format(deduped[0].title)
+
+    exec_s += "{} actionable recommendations provided, prioritised by urgency.".format(
+        len(actions_flat)
+    )
 
     headline = ("CRITICAL: " + critical[0].title) if critical else (
         deduped[0].title if deduped else "Analysis complete")

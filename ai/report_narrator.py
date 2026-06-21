@@ -79,7 +79,7 @@ def clean_col(col: str) -> str:
         from ai.prompt_builder import translate_column_name
         return translate_column_name(col)
     except Exception:
-        pass
+        logger.debug("%s silent skip", exc_info=True)
     return " ".join(w.capitalize()
                     for w in col.replace("_", " ").replace("montly", "Monthly").split())
 
@@ -487,7 +487,7 @@ def _build_insight_prompt(df: pd.DataFrame, domain: str) -> str:
 def _build_raw_summary(df: pd.DataFrame, domain: str) -> str:
     """Rich pre-computed stats for executive prompt injection."""
     num_cols = df.select_dtypes(include="number").columns.tolist()
-    cat_cols = df.select_dtypes(include="object").columns.tolist()
+    cat_cols = df.select_dtypes(include=["object", "string"]).columns.tolist()
     lines    = [
         f"Dataset: {len(df):,} rows, {len(df.columns)} columns — {domain.upper()} domain",
         "",
@@ -507,6 +507,7 @@ def _build_raw_summary(df: pd.DataFrame, domain: str) -> str:
                 + (" [SKEWED — use median]" if abs(skew) > 0.5 else "")
             )
         except Exception:
+            logger.debug("%s skip", exc_info=True)
             continue
 
     lines.append("")
@@ -519,6 +520,7 @@ def _build_raw_summary(df: pd.DataFrame, domain: str) -> str:
                 " | ".join([f"{k}: {v*100:.0f}%" for k, v in vc.items()])
             )
         except Exception:
+            logger.debug("%s skip", exc_info=True)
             continue
 
     # HR-specific attrition
@@ -658,7 +660,7 @@ def generate_chart_narrative(
     try:
         title = chart_title.lower()
         num   = df.select_dtypes(include="number").columns.tolist()
-        cat   = df.select_dtypes(include="object").columns.tolist()
+        cat   = df.select_dtypes(include=["object", "string"]).columns.tolist()
 
         # ── Correlation ───────────────────────────────────
         if "correlation" in title or "heatmap" in title:
@@ -752,7 +754,7 @@ def generate_chart_narrative(
         # Last resort — never return generic text
         try:
             num = df.select_dtypes(include="number").columns.tolist()
-            cat = df.select_dtypes(include="object").columns.tolist()
+            cat = df.select_dtypes(include=["object", "string"]).columns.tolist()
             if cat and num:
                 s = _bar_stats(df, cat[0], num[0])
                 return _fb_bar(s)
@@ -760,7 +762,7 @@ def generate_chart_narrative(
                 s = _hist_stats(df, num[0])
                 return _fb_hist(s, domain=domain)
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
         return (f"Analysis of {chart_title}: "
                 f"dataset contains {len(df):,} records across "
                 f"{len(df.columns)} variables.")

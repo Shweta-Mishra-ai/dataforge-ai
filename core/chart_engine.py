@@ -22,6 +22,8 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from typing import List, Tuple, Optional, Dict
+import logging
+logger = logging.getLogger(__name__)
 
 PALETTE  = ["#1565C0", "#0D47A1", "#B71C1C", "#1B5E20",
             "#f77070", "#ffd43b", "#38bdf8", "#fb7185"]
@@ -37,8 +39,6 @@ _THEME_TEMPLATE_MAP = {
 
 def _get_template(theme_name: str = "Corporate Light") -> str:
     return _THEME_TEMPLATE_MAP.get(theme_name, "plotly_white")
-
-TEMPLATE = "plotly_white"  # default fallback for legacy direct references
 
 
 # ══════════════════════════════════════════════════════════
@@ -103,7 +103,7 @@ def _is_identifier(col_name: str, series: pd.Series, n_rows: int) -> bool:
             if (diffs == 1).mean() > 0.95:
                 return True
     except Exception:
-        pass
+        logger.debug("%s silent skip", exc_info=True)
 
     return False
 
@@ -111,7 +111,7 @@ def _is_identifier(col_name: str, series: pd.Series, n_rows: int) -> bool:
 def _get_analysis_columns(df: pd.DataFrame) -> Dict:
     n_rows = len(df)
     numeric_cols = df.select_dtypes(include="number").columns.tolist()
-    cat_cols = df.select_dtypes(include="object").columns.tolist()
+    cat_cols = df.select_dtypes(include=["object", "string"]).columns.tolist()
     date_cols = df.select_dtypes(include="datetime").columns.tolist()
 
     id_cols = []
@@ -295,7 +295,7 @@ def recommend_charts(
         date_col = date_cols[0]
         try:
             trend = (
-                df.groupby(pd.Grouper(key=date_col, freq="M"))[primary_metric]
+                df.groupby(pd.Grouper(key=date_col, freq="ME"))[primary_metric]
                 .mean()
                 .reset_index()
             )
@@ -312,7 +312,7 @@ def recommend_charts(
                 )
                 charts.append(("Trend Over Time", _apply_contrast(fig, theme_name)))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # Chart 3: Distribution histogram
     if primary_metric:
@@ -389,11 +389,11 @@ def make_bar(df: pd.DataFrame, x: str, y: str, title: str = "", theme_name: str 
         .head(20)
     )
     agg[y] = agg[y].round(4 if is_score else 0)
-    return _style(px.bar(
+    return _apply_contrast(px.bar(
         agg, x=x, y=y,
         title=title or f"{'Avg' if is_score else 'Total'} {y} by {x}",
         template=_get_template(theme_name), color=y, color_continuous_scale="Blues",
-    ))
+    ), theme_name)
 
 
 def make_horizontal_bar(
@@ -406,40 +406,40 @@ def make_horizontal_bar(
         .reset_index()
         .sort_values(y, ascending=True).head(20)
     )
-    return _style(px.bar(
+    return _apply_contrast(px.bar(
         agg, x=y, y=x, orientation="h",
         title=title or f"{y} Ranking by {x}",
         template=_get_template(theme_name), color=y, color_continuous_scale="Blues",
-    ))
+    ), theme_name)
 
 
 def make_line(df: pd.DataFrame, x: str, y: str, title: str = "", theme_name: str = "Corporate Light") -> go.Figure:
-    return _style(px.line(
+    return _apply_contrast(px.line(
         df.sort_values(x), x=x, y=y,
         title=title or f"{y} over {x}",
-        template=_get_template(theme_name), color_discrete_sequence=["#1565C0","#B71C1C","#1B5E20","#4527A0"], markers=True,
-    ))
+        template=_get_template(theme_name), color_discrete_sequence=["#1565C0", "#B71C1C", "#1B5E20", "#4527A0"], markers=True,
+    ), theme_name)
 
 
 def make_scatter(
     df: pd.DataFrame, x: str, y: str,
     color: Optional[str] = None, title: str = "", theme_name: str = "Corporate Light"
 ) -> go.Figure:
-    return _style(px.scatter(
+    return _apply_contrast(px.scatter(
         df.head(3000), x=x, y=y, color=color,
         title=title or f"{x} vs {y}",
         template=_get_template(theme_name), color_discrete_sequence=PALETTE, opacity=0.7,
-    ))
+    ), theme_name)
 
 
 def make_histogram(
     df: pd.DataFrame, col: str, nbins: int = 40, title: str = "", theme_name: str = "Corporate Light"
 ) -> go.Figure:
-    return _style(px.histogram(
+    return _apply_contrast(px.histogram(
         df, x=col, nbins=nbins, marginal="box",
         title=title or f"Distribution: {col}",
         template=_get_template(theme_name), color_discrete_sequence=PALETTE,
-    ))
+    ), theme_name)
 
 
 def make_pie(
@@ -453,11 +453,11 @@ def make_pie(
             theme_name=theme_name,
         )
     agg = df.groupby(names_col)[values_col].sum().reset_index().head(10)
-    return _style(px.pie(
+    return _apply_contrast(px.pie(
         agg, names=names_col, values=values_col,
         title=title or f"{values_col} Share by {names_col}",
         template=_get_template(theme_name), color_discrete_sequence=PALETTE,
-    ))
+    ), theme_name)
 
 
 def make_heatmap(df: pd.DataFrame, domain: str = "general", theme_name: str = "Corporate Light") -> go.Figure:
@@ -467,10 +467,10 @@ def make_heatmap(df: pd.DataFrame, domain: str = "general", theme_name: str = "C
     if len(metric_cols) < 2:
         metric_cols = df.select_dtypes(include="number").columns.tolist()
     corr = df[metric_cols].corr().round(2)
-    return _style(px.imshow(
+    return _apply_contrast(px.imshow(
         corr, text_auto=True, title="Correlation Matrix",
         template=_get_template(theme_name), color_continuous_scale="RdBu_r", zmin=-1, zmax=1,
-    ))
+    ), theme_name)
 
 
 # ══════════════════════════════════════════════════════════

@@ -39,6 +39,8 @@ from reportlab.platypus import (
     Image, HRFlowable, PageBreak, KeepTogether,
 )
 from reportlab.pdfgen import canvas as CV
+import logging
+logger = logging.getLogger(__name__)
 
 W, H = A4
 CW_DEFAULT = W - 36 * mm   # content width (18mm each side)
@@ -317,9 +319,9 @@ def _build_cover(T: dict, config: dict, kpis_preview: list) -> bytes:
             try:
                 os.unlink(_tmp.name)
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     if not _logo_drawn and logo_path and os.path.exists(logo_path):
         try:
@@ -709,7 +711,7 @@ def _dq_note(story, s, T, df: pd.DataFrame, profile, CW):
         {"label": "COLUMNS",       "value": str(df.shape[1]),
          "sub": "{} num · {} cat".format(
              len(df.select_dtypes(include="number").columns),
-             len(df.select_dtypes(include="object").columns)),
+             len(df.select_dtypes(include=["object", "string"]).columns)),
          "color": T["accent"]},
         {"label": "MISSING DATA",  "value": "{:.1f}%".format(miss_pct),
          "sub": "0% = perfect",
@@ -814,7 +816,7 @@ def _benchmark_section(story, s, T, domain, CW, df=None):
                              f"Dataset median: {med_v:.2f}",
                              "Dataset computed"])
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
 
     if not rows:
         story.append(Paragraph(
@@ -924,7 +926,7 @@ def _dataset_overview(story, s, T, df, profile, CW):
          "Column breakdown and statistical summary")
 
     num_cols = df.select_dtypes(include="number").columns.tolist()
-    cat_cols = df.select_dtypes(include="object").columns.tolist()
+    cat_cols = df.select_dtypes(include=["object", "string"]).columns.tolist()
     dt_cols  = df.select_dtypes(include="datetime").columns.tolist()
 
     _gtable(story, T,
@@ -950,7 +952,7 @@ def _dataset_overview(story, s, T, df, profile, CW):
                     if (diffs == 1).mean() > 0.90:
                         return True
                 except Exception:
-                    pass
+                    logger.debug("%s silent skip", exc_info=True)
             return False
         filtered_num = [c for c in num_cols if not _is_id_col(c, df[c])]
         show = filtered_num[:5] if filtered_num else num_cols[:5]
@@ -989,7 +991,7 @@ def _dataset_overview(story, s, T, df, profile, CW):
                         "use median not mean for reporting.".format(col, sk),
                         s["note"]))
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
 
 
 # ══════════════════════════════════════════════════════════
@@ -1075,8 +1077,39 @@ def _bi_section(story, s, T, bi_report, CW):
                  bm.benchmark_label.split("—")[0].strip()[:15]]
                 for bm in bms[:4]]
         _gtable(story, T,
-                ["Metric","Mean","Median","Top 10%","Bottom 10%","Variation"],
-                rows, [CW*x for x in [0.22,0.12,0.12,0.12,0.13,0.29]])
+                ["Metric", "Mean", "Median", "Top 10%", "Bottom 10%", "Variation"],
+                rows, [CW*x for x in [0.22, 0.12, 0.12, 0.12, 0.13, 0.29]])
+
+    # Segment performance
+    segs = getattr(bi_report, "segments", [])
+    if segs:
+        story.append(Spacer(1, 2*mm))
+        story.append(Paragraph("Segment Performance", s["h3"]))
+        seg_rows = []
+        for seg in segs[:8]:
+            strengths_str = ", ".join(seg.strengths[:2]) if seg.strengths else "—"
+            weakness_str  = ", ".join(seg.weaknesses[:2]) if seg.weaknesses else "—"
+            seg_rows.append([
+                str(seg.segment_name)[:18],
+                str(seg.n),
+                "{:.0f}".format(seg.health_score),
+                strengths_str[:30],
+                weakness_str[:30],
+            ])
+        _gtable(story, T,
+                ["Segment", "N", "Score", "Strengths", "Weaknesses"],
+                seg_rows,
+                [CW*x for x in [0.20, 0.07, 0.08, 0.32, 0.33]])
+
+        # Opportunities callout
+        opps = [seg for seg in segs if seg.weaknesses]
+        if opps:
+            story.append(Spacer(1, 2*mm))
+            story.append(Paragraph("Segment Opportunities", s["h3"]))
+            for seg in opps[:3]:
+                story.append(Paragraph(
+                    "• {}: {}".format(seg.segment_name, seg.opportunity),
+                    s["bl"]))
 
     # Cohorts
     sig_c = [c for c in getattr(bi_report, "cohorts", [])
@@ -1107,7 +1140,7 @@ def _chart_page(story, s, T, img_bytes, title, narrative, num, CW):
                         width=CW, height=CW * 0.48)
             story.append(KeepTogether([img, Spacer(1, 3*mm)]))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
     if narrative:
         story.append(Paragraph("Analysis", s["h3"]))
         _narrative_box(story, s, T, narrative)
@@ -1180,10 +1213,6 @@ def _finance_page(story, s, T, df, config, CW, profile=None):
     from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
     from reportlab.lib.units import mm
     import pandas as pd
-
-    def _c(hex_str):
-        from reportlab.lib import colors
-        return colors.HexColor(hex_str)
 
     def _find(keywords, exclude=None):
         excl = exclude or []
@@ -1402,7 +1431,7 @@ def _finance_page(story, s, T, df, config, CW, profile=None):
             try:
                 period_rev = period_rev.sort_index()
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
 
             if len(period_rev) >= 2:
                 period_rows = [[str(idx)[:20], f"{val:,.0f}",

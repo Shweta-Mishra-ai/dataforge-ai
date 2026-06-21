@@ -10,6 +10,8 @@ from typing import List, Dict, Optional, Tuple
 import warnings
 warnings.filterwarnings("ignore")
 from scipy import stats as scipy_stats
+import logging
+logger = logging.getLogger(__name__)
 
 
 # ══════════════════════════════════════════════════════════
@@ -221,10 +223,11 @@ def analyze_root_cause(
                     "dtype":     "numeric",
                 })
         except Exception:
+            logger.debug("%s skip", exc_info=True)
             continue
 
     # Categorical features — compare distributions
-    cat_cols = [c for c in df.select_dtypes(include="object").columns
+    cat_cols = [c for c in df.select_dtypes(include=["object", "string"]).columns
                 if 2 <= df[c].nunique() <= 20]
     for col in cat_cols[:8]:
         try:
@@ -265,6 +268,7 @@ def analyze_root_cause(
                 "dtype":       "categorical",
             })
         except Exception:
+            logger.debug("%s skip", exc_info=True)
             continue
 
     # Sort by impact
@@ -558,9 +562,9 @@ def analyze_segment_health(
 
         health_score = round(float(np.mean(scores)), 1) if scores else 50.0
         strengths    = [col for col, m in metrics.items()
-                        if m["vs_avg"] > 10]
+                        if m["vs_avg"] > 5]
         weaknesses   = [col for col, m in metrics.items()
-                        if m["vs_avg"] < -10]
+                        if m["vs_avg"] < -5]
 
         # Opportunity
         if weaknesses:
@@ -676,7 +680,7 @@ def run_bi(df: pd.DataFrame, max_rows: int = 50_000) -> BIReport:
         df = df.sample(n=max_rows, random_state=42).reset_index(drop=True)
 
     num_cols = df.select_dtypes(include="number").columns.tolist()
-    cat_cols = [c for c in df.select_dtypes(include="object").columns
+    cat_cols = [c for c in df.select_dtypes(include=["object", "string"]).columns
                 if 2 <= df[c].nunique() <= 25]
 
     report = BIReport()
@@ -686,6 +690,7 @@ def run_bi(df: pd.DataFrame, max_rows: int = 50_000) -> BIReport:
         try:
             report.benchmarks.append(analyze_benchmark(df, col))
         except Exception:
+            logger.debug("%s skip", exc_info=True)
             continue
 
     # 2. Root cause — top numeric as target
@@ -694,6 +699,7 @@ def run_bi(df: pd.DataFrame, max_rows: int = 50_000) -> BIReport:
             report.root_causes.append(
                 analyze_root_cause(df, col, threshold_pct=25))
         except Exception:
+            logger.debug("%s skip", exc_info=True)
             continue
 
     # 3. Cohort analysis — top cat × top numeric
@@ -702,6 +708,7 @@ def run_bi(df: pd.DataFrame, max_rows: int = 50_000) -> BIReport:
             try:
                 report.cohorts.append(analyze_cohort(df, cat, num))
             except Exception:
+                logger.debug("%s skip", exc_info=True)
                 continue
 
     # 4. Pareto — top cat × top numeric
@@ -712,6 +719,7 @@ def run_bi(df: pd.DataFrame, max_rows: int = 50_000) -> BIReport:
                       or "rating" in num.lower() else "sum"
                 report.pareto.append(analyze_pareto(df, cat, num, agg))
             except Exception:
+                logger.debug("%s skip", exc_info=True)
                 continue
 
     # 5. Segment health
@@ -720,10 +728,9 @@ def run_bi(df: pd.DataFrame, max_rows: int = 50_000) -> BIReport:
             report.segments = analyze_segment_health(
                 df, cat_cols[0], num_cols[:4])
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # 6. Key insights + brief
     report.key_insights, report.executive_brief = _generate_key_insights(report, df)
 
     return report
-
