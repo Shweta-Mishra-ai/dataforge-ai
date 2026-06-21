@@ -558,9 +558,9 @@ def analyze_segment_health(
 
         health_score = round(float(np.mean(scores)), 1) if scores else 50.0
         strengths    = [col for col, m in metrics.items()
-                        if m["vs_avg"] > 10]
+                        if m["vs_avg"] > 5]
         weaknesses   = [col for col, m in metrics.items()
-                        if m["vs_avg"] < -10]
+                        if m["vs_avg"] < -5]
 
         # Opportunity
         if weaknesses:

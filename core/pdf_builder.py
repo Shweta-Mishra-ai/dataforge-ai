@@ -1075,8 +1075,39 @@ def _bi_section(story, s, T, bi_report, CW):
                  bm.benchmark_label.split("—")[0].strip()[:15]]
                 for bm in bms[:4]]
         _gtable(story, T,
-                ["Metric","Mean","Median","Top 10%","Bottom 10%","Variation"],
-                rows, [CW*x for x in [0.22,0.12,0.12,0.12,0.13,0.29]])
+                ["Metric", "Mean", "Median", "Top 10%", "Bottom 10%", "Variation"],
+                rows, [CW*x for x in [0.22, 0.12, 0.12, 0.12, 0.13, 0.29]])
+
+    # Segment performance
+    segs = getattr(bi_report, "segments", [])
+    if segs:
+        story.append(Spacer(1, 2*mm))
+        story.append(Paragraph("Segment Performance", s["h3"]))
+        seg_rows = []
+        for seg in segs[:8]:
+            strengths_str = ", ".join(seg.strengths[:2]) if seg.strengths else "—"
+            weakness_str  = ", ".join(seg.weaknesses[:2]) if seg.weaknesses else "—"
+            seg_rows.append([
+                str(seg.segment_name)[:18],
+                str(seg.n),
+                "{:.0f}".format(seg.health_score),
+                strengths_str[:30],
+                weakness_str[:30],
+            ])
+        _gtable(story, T,
+                ["Segment", "N", "Score", "Strengths", "Weaknesses"],
+                seg_rows,
+                [CW*x for x in [0.20, 0.07, 0.08, 0.32, 0.33]])
+
+        # Opportunities callout
+        opps = [seg for seg in segs if seg.weaknesses]
+        if opps:
+            story.append(Spacer(1, 2*mm))
+            story.append(Paragraph("Segment Opportunities", s["h3"]))
+            for seg in opps[:3]:
+                story.append(Paragraph(
+                    "• {}: {}".format(seg.segment_name, seg.opportunity),
+                    s["bl"]))
 
     # Cohorts
     sig_c = [c for c in getattr(bi_report, "cohorts", [])

@@ -1471,11 +1471,29 @@ def generate_story(df: pd.DataFrame) -> StoryReport:
             seen.add(ins.title)
             deduped.append(ins)
 
-    critical  = [i for i in deduped if i.severity=="critical"]
-    positive  = [i for i in deduped if i.severity=="positive"]
+    critical  = [i for i in deduped if i.severity == "critical"]
+    positive  = [i for i in deduped if i.severity == "positive"]
 
     # Flat lists for PDF
+    # If domain-specific analysis didn't populate findings separately,
+    # synthesise them from the insight titles so Key Findings is never empty.
     findings_flat = raw["findings"][:6]
+    if not findings_flat and deduped:
+        findings_flat = [
+            "{}: {}".format(ins.severity.upper(), ins.title)
+            for ins in deduped[:6]
+        ]
+    # Always add a data-shape finding so the section has at least one line
+    if not findings_flat:
+        num_c = len(df.select_dtypes(include="number").columns)
+        cat_c = len(df.select_dtypes(include=["object", "string"]).columns)
+        miss  = round(df.isna().mean().mean() * 100, 1)
+        findings_flat = [
+            "{:,} records x {} columns analysed ({} numeric, {} categorical)".format(
+                len(df), len(df.columns), num_c, cat_c),
+            "Missing data: {:.1f}% {}".format(
+                miss, "- fully complete" if miss == 0 else "- imputation applied"),
+        ]
     risks_flat    = raw["risks"][:6]
     opps_flat     = raw["opportunities"][:4]
     actions_flat  = ["[{}] {}".format(
@@ -1489,14 +1507,43 @@ def generate_story(df: pd.DataFrame) -> StoryReport:
         "sales": "Sales", "finance": "Finance", "general": "Business",
     }
     domain_label = domain_labels.get(domain, domain.title())
-    exec_s = "This {:,}-row {} dataset analysis identified {} critical issue(s) and {} risk(s). ".format(
-        len(df), domain_label, n_crit, len(risks_flat))
+
+    num_c  = len(df.select_dtypes(include="number").columns)
+    cat_c  = len(df.select_dtypes(include=["object", "string"]).columns)
+    miss_v = round(df.isna().mean().mean() * 100, 1)
+
+    exec_s = (
+        "DataForge AI analysed {:,} records across {} variables "
+        "({} numeric, {} categorical) in this {} dataset. "
+    ).format(len(df), len(df.columns), num_c, cat_c, domain_label)
+
+    if miss_v == 0:
+        exec_s += "Data completeness: 100% — no missing values detected. "
+    else:
+        exec_s += "Missing data rate: {:.1f}% — imputation applied before analysis. ".format(miss_v)
+
+    if n_crit > 0:
+        exec_s += "{} critical issue(s) require immediate attention. ".format(n_crit)
+    if risks_flat:
+        exec_s += "{} business risk(s) identified. ".format(len(risks_flat))
+
     if attrition:
-        exec_s += "Attrition: {:.1f}% ({} severity). ".format(
-            attrition.rate, attrition.severity.upper())
+        exec_s += (
+            "Attrition rate: {:.1f}% ({} severity) — "
+            "{:,} of {:,} employees left. "
+            "{:,} remaining staff flagged as flight risk. "
+        ).format(
+            attrition.rate, attrition.severity.upper(),
+            attrition.n_left, attrition.n_total,
+            attrition.n_flight_risk,
+        )
+
     if deduped:
-        exec_s += "Priority: {}. ".format(deduped[0].title)
-    exec_s += "{} actionable recommendations provided.".format(len(actions_flat))
+        exec_s += "Top priority: {}. ".format(deduped[0].title)
+
+    exec_s += "{} actionable recommendations provided, prioritised by urgency.".format(
+        len(actions_flat)
+    )
 
     headline = ("CRITICAL: " + critical[0].title) if critical else (
         deduped[0].title if deduped else "Analysis complete")

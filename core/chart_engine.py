@@ -38,8 +38,6 @@ _THEME_TEMPLATE_MAP = {
 def _get_template(theme_name: str = "Corporate Light") -> str:
     return _THEME_TEMPLATE_MAP.get(theme_name, "plotly_white")
 
-TEMPLATE = "plotly_white"  # default fallback for legacy direct references
-
 
 # ══════════════════════════════════════════════════════════
 #  FIX-001: COLUMN ROLE DETECTION
