@@ -266,6 +266,7 @@ def _correlation_analysis(
                 pearson_r, p_val = scipy_stats.pearsonr(x, y)
                 spearman_r, _    = scipy_stats.spearmanr(x, y)
             except Exception:
+                logger.debug("%s skip", exc_info=True)
                 continue
 
             abs_r = abs(pearson_r)

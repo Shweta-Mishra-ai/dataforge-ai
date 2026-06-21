@@ -39,6 +39,8 @@ from reportlab.platypus import (
     Image, HRFlowable, PageBreak, KeepTogether,
 )
 from reportlab.pdfgen import canvas as CV
+import logging
+logger = logging.getLogger(__name__)
 
 W, H = A4
 CW_DEFAULT = W - 36 * mm   # content width (18mm each side)
@@ -317,9 +319,9 @@ def _build_cover(T: dict, config: dict, kpis_preview: list) -> bytes:
             try:
                 os.unlink(_tmp.name)
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     if not _logo_drawn and logo_path and os.path.exists(logo_path):
         try:
@@ -814,7 +816,7 @@ def _benchmark_section(story, s, T, domain, CW, df=None):
                              f"Dataset median: {med_v:.2f}",
                              "Dataset computed"])
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
 
     if not rows:
         story.append(Paragraph(
@@ -950,7 +952,7 @@ def _dataset_overview(story, s, T, df, profile, CW):
                     if (diffs == 1).mean() > 0.90:
                         return True
                 except Exception:
-                    pass
+                    logger.debug("%s silent skip", exc_info=True)
             return False
         filtered_num = [c for c in num_cols if not _is_id_col(c, df[c])]
         show = filtered_num[:5] if filtered_num else num_cols[:5]
@@ -989,7 +991,7 @@ def _dataset_overview(story, s, T, df, profile, CW):
                         "use median not mean for reporting.".format(col, sk),
                         s["note"]))
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
 
 
 # ══════════════════════════════════════════════════════════
@@ -1138,7 +1140,7 @@ def _chart_page(story, s, T, img_bytes, title, narrative, num, CW):
                         width=CW, height=CW * 0.48)
             story.append(KeepTogether([img, Spacer(1, 3*mm)]))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
     if narrative:
         story.append(Paragraph("Analysis", s["h3"]))
         _narrative_box(story, s, T, narrative)
@@ -1429,7 +1431,7 @@ def _finance_page(story, s, T, df, config, CW, profile=None):
             try:
                 period_rev = period_rev.sort_index()
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
 
             if len(period_rev) >= 2:
                 period_rows = [[str(idx)[:20], f"{val:,.0f}",

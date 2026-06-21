@@ -18,6 +18,8 @@ import streamlit as st
 
 from core.session_manager import require_data, get_df, get_filename
 from core.story_engine   import detect_domain as _detect_domain_engine
+import logging
+logger = logging.getLogger(__name__)
 
 
 @st.cache_data(show_spinner=False)
@@ -259,7 +261,7 @@ def build_insights(df: pd.DataFrame, niche: str) -> list:
                     sev
                 ))
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
 
         # ── HR: Tenure cohort analysis ─────────────────
         tenure_col = _find(["tenure","years","seniority","experience","time_spend"])
@@ -300,7 +302,7 @@ def build_insights(df: pd.DataFrame, niche: str) -> list:
                         "warning"
                     ))
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
 
         # ── HR: Overwork risk ─────────────────────────────
         hours_col = _find(["hours","montly_hours","monthly_hours","avg_hours","work_hour"])
@@ -322,7 +324,7 @@ def build_insights(df: pd.DataFrame, niche: str) -> list:
                         sev
                     ))
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
 
         # ── HR: Salary band vs attrition ─────────────────
         salary_col = _find(["salary","pay","compensation","wage","band"])
@@ -353,7 +355,7 @@ def build_insights(df: pd.DataFrame, niche: str) -> list:
                             "critical" if worst_rate > 25 else "warning"
                         ))
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
 
         # ── HR: Promotion gap → flight risk ───────────────
         promo_col = _find(["promotion","promoted","promotion_last"])
@@ -385,7 +387,7 @@ def build_insights(df: pd.DataFrame, niche: str) -> list:
                         "critical" if promo_rate < 3 else "warning"
                     ))
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
 
         # ── HR: Flight risk segment ───────────────────────
         if attrition_col and sat_col and tenure_col:
@@ -419,7 +421,7 @@ def build_insights(df: pd.DataFrame, niche: str) -> list:
                             "critical" if risk_pct > 20 else "warning"
                         ))
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
 
     # ── SALES-specific ────────────────────────────────────
     elif niche == "sales":
@@ -487,7 +489,7 @@ def build_insights(df: pd.DataFrame, niche: str) -> list:
                     sev
                 ))
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
 
     # ── FINANCE-specific ─────────────────────────────────
     elif niche == "finance":
@@ -596,7 +598,7 @@ def build_health_pdf(df: pd.DataFrame, niche: str, health: dict,
             if alias == "HDF-Bold": _BB = "HDF-Bold"
             if alias == "HDF-Italic": _BI = "HDF-Italic"
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     def ps(name, **kw): return ParagraphStyle(name, **kw)
     ST = {
@@ -900,7 +902,7 @@ def build_health_pdf(df: pd.DataFrame, niche: str, health: dict,
             plt.close(fig)
             story.append(Image(buf2, width=CW, height=CW*0.3))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # ══════════════════════════════════════════════════════
     # PAGE 4: COLUMN QUALITY TABLE
@@ -1075,7 +1077,7 @@ def build_health_pdf(df: pd.DataFrame, niche: str, health: dict,
                     ]))
                     story.append(corr_tbl)
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # ── Disclaimer ────────────────────────────────────────
     story.append(Spacer(1, 8*mm))

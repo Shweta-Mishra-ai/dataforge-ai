@@ -20,6 +20,8 @@ require_data()
 
 from core.stats_engine import analyze
 from core.story_engine import detect_domain
+import logging
+logger = logging.getLogger(__name__)
 
 # Import domain dashboards (new file)
 try:
@@ -328,7 +330,7 @@ with tabs[tab_idx]:
             desc.index = desc.index.str.upper()
             st.dataframe(desc.astype(str), use_container_width=True)
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
 # ── Trends tab ────────────────────────────────────────────────────────────────
 if dt_cols:

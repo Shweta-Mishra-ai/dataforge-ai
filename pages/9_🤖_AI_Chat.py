@@ -8,6 +8,8 @@ from ai.response_parser import parse_tool_call
 from ai.tool_dispatcher import dispatch
 from core.data_profiler import profile_dataset
 from components.kpi_cards import inject_global_css
+import logging
+logger = logging.getLogger(__name__)
 
 st.set_page_config(
     page_title="AI Chat — DataForge AI",
@@ -62,7 +64,7 @@ for msg in st.session_state["messages"]:
                     use_container_width=True
                 )
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
         if msg.get("df_json"):
             try:
                 st.dataframe(
@@ -70,7 +72,7 @@ for msg in st.session_state["messages"]:
                     use_container_width=True
                 )
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
 
 # ── Input ──────────────────────────────────────────────────
 prompt = st.chat_input(
@@ -123,7 +125,7 @@ if prompt:
                     try:
                         rec["fig_json"] = pio.to_json(result.figure)
                     except Exception:
-                        pass
+                        logger.debug("%s silent skip", exc_info=True)
 
                 if result.dataframe is not None:
                     st.dataframe(
@@ -133,7 +135,7 @@ if prompt:
                     try:
                         rec["df_json"] = result.dataframe.head(50).to_json()
                     except Exception:
-                        pass
+                        logger.debug("%s silent skip", exc_info=True)
 
             st.session_state["messages"].append(rec)
 

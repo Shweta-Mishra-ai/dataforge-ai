@@ -23,6 +23,8 @@ from core.pdf_builder    import build_pdf, THEMES
 from core.chart_exporter import generate_all_charts
 from core.story_engine   import generate_story, detect_domain
 from core.data_profiler  import profile_dataset
+import logging
+logger = logging.getLogger(__name__)
 
 
 @st.cache_data(show_spinner=False)
@@ -202,7 +204,7 @@ if gen_btn:
                     if abs(sk) > 1.5:
                         findings_list.append(f"'{col}' is right-skewed (skew={sk:.2f}) — use median for reporting, not mean")
                 except Exception:
-                    pass
+                    logger.debug("%s silent skip", exc_info=True)
 
             exec_summary = (
                 f"This report analyses {len(df):,} records across {len(df.columns)} variables "
@@ -245,7 +247,7 @@ if gen_btn:
             try:
                 stats_report = stats_cached or __import__("core.stats_engine", fromlist=["analyze"]).analyze(df)
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
 
         # 6. BI
         progress.progress(52, text="Running business intelligence...")
@@ -255,7 +257,7 @@ if gen_btn:
                 from core.bi_engine import run_bi
                 bi_report = run_bi(df)
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
 
         # 7. ML
         ml_report = ml_cached if include_ml else None

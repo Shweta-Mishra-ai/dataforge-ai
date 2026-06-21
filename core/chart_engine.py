@@ -22,6 +22,8 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from typing import List, Tuple, Optional, Dict
+import logging
+logger = logging.getLogger(__name__)
 
 PALETTE  = ["#1565C0", "#0D47A1", "#B71C1C", "#1B5E20",
             "#f77070", "#ffd43b", "#38bdf8", "#fb7185"]
@@ -101,7 +103,7 @@ def _is_identifier(col_name: str, series: pd.Series, n_rows: int) -> bool:
             if (diffs == 1).mean() > 0.95:
                 return True
     except Exception:
-        pass
+        logger.debug("%s silent skip", exc_info=True)
 
     return False
 
@@ -310,7 +312,7 @@ def recommend_charts(
                 )
                 charts.append(("Trend Over Time", _apply_contrast(fig, theme_name)))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # Chart 3: Distribution histogram
     if primary_metric:

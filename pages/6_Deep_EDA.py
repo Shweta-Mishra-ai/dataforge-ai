@@ -17,6 +17,8 @@ df    = get_df()
 fname = get_filename()
 
 from core.eda_engine import run_eda
+import logging
+logger = logging.getLogger(__name__)
 
 COLORS = ["#1565C0", "#0D47A1", "#B71C1C", "#1B5E20", "#4527A0", "#E65100"]
 
@@ -290,7 +292,7 @@ with tab2:
                     line=dict(color="#f7934f", width=2, dash="dash")
                 ))
             except Exception:
-                pass
+                logger.debug("%s silent skip", exc_info=True)
             fig_sc.update_layout(
                 paper_bgcolor="white", plot_bgcolor="#F8FAFF",
                 margin=dict(l=10, r=10, t=40, b=10),
@@ -360,7 +362,7 @@ with tab3:
                     )
                     st.plotly_chart(fig, use_container_width=True)
                 except Exception:
-                    pass
+                    logger.debug("%s silent skip", exc_info=True)
 
 # ── Tab 4: Multicollinearity ──────────────────────────────
 with tab4:
@@ -475,10 +477,9 @@ with tab5:
                     )
                     st.plotly_chart(fig, use_container_width=True)
                 except Exception:
-                    pass
+                    logger.debug("%s silent skip", exc_info=True)
 
         st.markdown("#### ADF Test Guide")
         c1, c2 = st.columns(2)
         c1.success("p < 0.05 — Stationary: mean/variance stable. Ready for modeling.")
         c2.error("p > 0.05 — Non-stationary: apply differencing or log-transform before ARIMA.")
-

@@ -9,6 +9,8 @@ import numpy as np
 import pandas as pd
 from dataclasses import dataclass
 from typing import Optional
+import logging
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -166,7 +168,7 @@ def build_top_insights(
                         impact   = f"If low-band attrition moves to {hi_rate:.1f}%, approximately {int((lo_rate-hi_rate)/100 * sal_rates.get('low',0)):.0f} fewer exits per cycle.",
                     ))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # ── Tenure cohort insight ─────────────────────────────────────────────
     tenure_col = next((c for c in num_cols if "tenure" in c.lower() or
@@ -201,7 +203,7 @@ def build_top_insights(
                     ))
             df.drop(columns=["_ten_band"], inplace=True, errors="ignore")
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # ── Universal insights for any domain ─────────────────────────────────
     # Missing data
@@ -236,7 +238,7 @@ def build_top_insights(
                 ))
                 break
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     # Correlation
     if len(num_cols) >= 2:
@@ -258,6 +260,6 @@ def build_top_insights(
                     impact   = "Association only — controlled experiment or longitudinal data needed to establish causation.",
                 ))
         except Exception:
-            pass
+            logger.debug("%s silent skip", exc_info=True)
 
     return insights[:6]
