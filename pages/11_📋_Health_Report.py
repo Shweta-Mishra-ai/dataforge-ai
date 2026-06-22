@@ -92,7 +92,7 @@ st.markdown("""
 
   .section-head {
     font-size: 1.1rem; font-weight: 700;
-    border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; margin: 18px 0 14px;
+    border-bottom: 2px solid rgba(128,128,128,0.25); padding-bottom: 6px; margin: 18px 0 14px;
   }
   .niche-badge {
     display:inline-block; padding:5px 16px; border-radius: 20px;
@@ -1255,8 +1255,8 @@ with c_a:
         }))
     fig.update_layout(
         height=260,
-        paper_bgcolor="white",
-        font=dict(color="#0F172A", size=12))
+        paper_bgcolor="rgba(0,0,0,0)",
+        font=dict( size=12))
     st.plotly_chart(fig, use_container_width=True)
 
 with c_b:
@@ -1272,7 +1272,7 @@ with c_b:
     ))
     fig2.update_layout(
         title="Health Dimension Breakdown", height=260,
-        paper_bgcolor="white", plot_bgcolor="#f8faff",
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         font=dict(family="Inter, sans-serif", size=11),
         xaxis=dict(range=[0, 100]),
         margin=dict(l=10, r=10, t=40, b=10), showlegend=False,

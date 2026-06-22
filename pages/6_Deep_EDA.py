@@ -11,6 +11,25 @@ from plotly.subplots import make_subplots
 
 from core.session_manager import require_data, get_df, get_filename
 
+
+# ── Global adaptive CSS (dark + light theme safe) ─────────────────────────────
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+html,body,[class*="css"]{font-family:'Inter',sans-serif!important}
+.block-container{padding-top:1.2rem!important}
+section[data-testid="stSidebar"]{background:linear-gradient(180deg,#0D1B2E,#0F2240)!important}
+section[data-testid="stSidebar"] *{color:rgba(255,255,255,.85)!important}
+section[data-testid="stSidebar"] hr{border-color:rgba(255,255,255,.12)!important}
+/* adaptive card base */
+.df-card{background:rgba(128,128,128,.06);border:1px solid rgba(128,128,128,.18);border-radius:12px;padding:16px 20px;margin-bottom:12px}
+/* finding/risk/opp rows */
+.risk-row{border-left:4px solid #ef4444;background:rgba(239,68,68,.07);padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:8px}
+.opp-row{border-left:4px solid #10b981;background:rgba(16,185,129,.07);padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:8px}
+.info-row{border-left:4px solid #3b82f6;background:rgba(59,130,246,.07);padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:8px}
+</style>
+""", unsafe_allow_html=True)
+
 st.set_page_config(page_title="Deep EDA", layout="wide")
 require_data()
 df    = get_df()
@@ -120,8 +139,8 @@ with tab1:
         st.markdown(
             "<div style='background:rgba(21,101,192,0.15);border-left:4px solid #90CAF9;"
             "padding:14px 18px;border-radius:6px;margin-bottom:16px;"
-            "color:#E3F2FD;font-size:14px;line-height:1.6'>"
-            "<b style='color:#90CAF9'>Interpretation:</b> {}</div>".format(r.interpretation),
+            "font-size:14px;line-height:1.6;color:inherit'>"
+            "<b>Interpretation:</b> {}</div>".format(r.interpretation),
             unsafe_allow_html=True
         )
 
@@ -201,18 +220,18 @@ with tab1:
             row=1, col=2
         )
         fig.update_layout(
-            paper_bgcolor="white", plot_bgcolor="#F8FAFF",
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
             font=dict(family="Helvetica", size=11, color="#0F172A"),
-            title_font=dict(color="#0A1628"),
+            title_font=dict(),
             margin=dict(l=10, r=10, t=40, b=10),
             showlegend=False, height=380,
         )
-        fig.update_xaxes(tickfont=dict(color="#0F172A", size=10),
-                         title_font=dict(color="#0F172A"),
-                         gridcolor="#CBD5E1")
-        fig.update_yaxes(tickfont=dict(color="#0F172A", size=10),
-                         title_font=dict(color="#0F172A"),
-                         gridcolor="#CBD5E1")
+        fig.update_xaxes(tickfont=dict( size=10),
+                         title_font=dict(),
+                         gridcolor="rgba(128,128,128,.2)")
+        fig.update_yaxes(tickfont=dict( size=10),
+                         title_font=dict(),
+                         gridcolor="rgba(128,128,128,.2)")
         st.plotly_chart(fig, use_container_width=True)
 
 # ── Tab 2: Correlations ───────────────────────────────────
@@ -259,7 +278,7 @@ with tab2:
                 title="Correlation Heatmap",
             )
             fig.update_layout(
-                paper_bgcolor="white",
+                paper_bgcolor="rgba(0,0,0,0)",
                 margin=dict(l=10, r=10, t=40, b=10),
             )
             st.plotly_chart(fig, use_container_width=True)
@@ -294,7 +313,7 @@ with tab2:
             except Exception:
                 logger.debug("%s silent skip", exc_info=True)
             fig_sc.update_layout(
-                paper_bgcolor="white", plot_bgcolor="#F8FAFF",
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                 margin=dict(l=10, r=10, t=40, b=10),
             )
             st.plotly_chart(fig_sc, use_container_width=True)
@@ -356,7 +375,7 @@ with tab3:
                         points="outliers",
                     )
                     fig.update_layout(
-                        paper_bgcolor="white", plot_bgcolor="#F8FAFF",
+                        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                         margin=dict(l=10, r=10, t=40, b=10),
                         showlegend=False,
                     )
@@ -406,14 +425,14 @@ with tab4:
                       annotation_text="VIF=5 (warning)")
         fig.update_layout(
             title="VIF by Feature",
-            paper_bgcolor="white", plot_bgcolor="#F8FAFF",
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
             font=dict(family="Helvetica", size=11, color="#0F172A"),
-            title_font=dict(color="#0A1628", size=13),
+            title_font=dict( size=13),
             margin=dict(l=10, r=10, t=40, b=10),
             xaxis_tickangle=-30,
         )
-        fig.update_xaxes(tickfont=dict(color="#0F172A"), title_font=dict(color="#0F172A"))
-        fig.update_yaxes(tickfont=dict(color="#0F172A"), title_font=dict(color="#0F172A"))
+        fig.update_xaxes(tickfont=dict(color="#0F172A"), title_font=dict())
+        fig.update_yaxes(tickfont=dict(color="#0F172A"), title_font=dict())
         st.plotly_chart(fig, use_container_width=True)
 
         # Guide
@@ -472,7 +491,7 @@ with tab5:
                             ts_data[val_col].mean())
                     )
                     fig.update_layout(
-                        paper_bgcolor="white", plot_bgcolor="#F8FAFF",
+                        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                         margin=dict(l=10, r=10, t=40, b=10),
                     )
                     st.plotly_chart(fig, use_container_width=True)
