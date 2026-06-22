@@ -87,12 +87,12 @@ st.markdown("""
   }
   .ins-tag  { font-size: 0.65rem; font-weight: 700; letter-spacing: .08em;
               text-transform: uppercase; margin-bottom: 5px; }
-  .ins-body { font-size: 0.88rem; line-height: 1.6; color: #1e1e2e; }
+  .ins-body { font-size: 0.88rem; line-height: 1.6; color: inherit; }
   .ins-action { font-size: 0.78rem; font-weight: 600; margin-top: 6px; }
 
   .section-head {
-    font-size: 1.1rem; font-weight: 700; color: #0f1b2d;
-    border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; margin: 18px 0 14px;
+    font-size: 1.1rem; font-weight: 700;
+    border-bottom: 2px solid rgba(128,128,128,0.25); padding-bottom: 6px; margin: 18px 0 14px;
   }
   .niche-badge {
     display:inline-block; padding:5px 16px; border-radius: 20px;
@@ -175,13 +175,15 @@ def build_insights(df: pd.DataFrame, niche: str) -> list:
         return None
 
     def _ins(tag, title, body, action, severity):
+        # FIX: use rgba with low alpha so cards are visible on both light and dark Streamlit themes.
+        # Hardcoded light hex (#fef2f2, #eff6ff etc.) vanish on dark backgrounds.
         COLOR = {
-            "critical": ("#ef4444", "#fef2f2"),
-            "warning":  ("#f97316", "#fff7ed"),
-            "positive": ("#22d3a5", "#f0fdf4"),
-            "info":     ("#3b82f6", "#eff6ff"),
+            "critical": ("#ef4444", "rgba(239,68,68,0.08)"),
+            "warning":  ("#f97316", "rgba(249,115,22,0.08)"),
+            "positive": ("#22d3a5", "rgba(34,211,165,0.08)"),
+            "info":     ("#3b82f6", "rgba(59,130,246,0.08)"),
         }
-        border, bg = COLOR.get(severity, ("#3b82f6", "#eff6ff"))
+        border, bg = COLOR.get(severity, ("#3b82f6", "rgba(59,130,246,0.08)"))
         return {"tag": tag, "title": title, "body": body, "action": action,
                 "severity": severity, "border": border, "bg": bg, "tag_color": border}
 
@@ -694,15 +696,16 @@ def build_health_pdf(df: pd.DataFrame, niche: str, health: dict,
     story.append(Spacer(1, 6*mm))
 
     # Health score KPI box
+    # FIX: fontSize 36 → 28 + explicit row height to prevent score bleeding into footer
     story.append(Paragraph("Overall Data Health Score", ST["h2"]))
     score_para = Paragraph(
         "<b>{}/100</b>".format(health["score"]),
-        ParagraphStyle("sc", fontName=_BB, fontSize=36, textColor=score_color,
-                       alignment=TA_CENTER))
+        ParagraphStyle("sc", fontName=_BB, fontSize=28, textColor=score_color,
+                       alignment=TA_CENTER, leading=34))
     grade_para = Paragraph(
         "<b>Grade: {}  —  {}</b>".format(health["grade"], health["label"]),
-        ParagraphStyle("gr", fontName=_BB, fontSize=11,
-                       textColor=score_color, alignment=TA_CENTER))
+        ParagraphStyle("gr", fontName=_BB, fontSize=10,
+                       textColor=score_color, alignment=TA_CENTER, leading=13))
 
     kpi_row = [
         [score_para, grade_para,
@@ -714,15 +717,18 @@ def build_health_pdf(df: pd.DataFrame, niche: str, health: dict,
                    ParagraphStyle("kv", fontName=_BF, fontSize=9, textColor=dark, alignment=TA_CENTER)),
         ]
     ]
-    kpi_tbl = Table(kpi_row, colWidths=[CW*x for x in [0.18,0.25,0.19,0.19,0.19]])
+    # FIX: explicit rowHeights prevents text from escaping table bounds and
+    # overlapping with the page-number circle drawn at 5.5 mm in the footer
+    kpi_tbl = Table(kpi_row, colWidths=[CW*x for x in [0.18,0.25,0.19,0.19,0.19]],
+                    rowHeights=[58])
     kpi_tbl.setStyle(TableStyle([
         ("BACKGROUND",    (0,0),(0,0), light),
         ("BACKGROUND",    (1,0),(1,0), HexColor("#EFF6FF")),
         ("BACKGROUND",    (2,0),(-1,0), light2),
         ("VALIGN",        (0,0),(-1,-1), "MIDDLE"),
         ("ALIGN",         (0,0),(-1,-1), "CENTER"),
-        ("TOPPADDING",    (0,0),(-1,-1), 16),
-        ("BOTTOMPADDING", (0,0),(-1,-1), 16),
+        ("TOPPADDING",    (0,0),(-1,-1), 10),
+        ("BOTTOMPADDING", (0,0),(-1,-1), 10),
         ("BOX",           (0,0),(-1,-1), 1.5, accent),
         ("INNERGRID",     (0,0),(-1,-1), 0.3, HexColor("#E5E7EB")),
         ("LINEBELOW",     (0,0),(-1,0),  2, accent),
@@ -1249,8 +1255,8 @@ with c_a:
         }))
     fig.update_layout(
         height=260,
-        paper_bgcolor="white",
-        font=dict(color="#0F172A", size=12))
+        paper_bgcolor="rgba(0,0,0,0)",
+        font=dict( size=12))
     st.plotly_chart(fig, use_container_width=True)
 
 with c_b:
@@ -1266,7 +1272,7 @@ with c_b:
     ))
     fig2.update_layout(
         title="Health Dimension Breakdown", height=260,
-        paper_bgcolor="white", plot_bgcolor="#f8faff",
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         font=dict(family="Inter, sans-serif", size=11),
         xaxis=dict(range=[0, 100]),
         margin=dict(l=10, r=10, t=40, b=10), showlegend=False,

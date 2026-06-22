@@ -524,13 +524,27 @@ def predict_what_if(
     """
     Make a single prediction from user-supplied input values.
     Returns prediction + confidence info.
+    FIX: encode categorical columns via stored label_encoders before predict.
     """
     if ml_report.best_model is None or ml_report.best_model.model is None:
         return {"error": "No trained model available."}
 
     try:
-        # Build input row
-        X_input = pd.DataFrame([input_values])[ml_report.feature_cols]
+        # Build input row aligned to feature_cols
+        row = {}
+        for feat in ml_report.feature_cols:
+            val = input_values.get(feat)
+            # Apply the same LabelEncoder used during training for categoricals
+            if ml_report.label_encoders and feat in ml_report.label_encoders:
+                le = ml_report.label_encoders[feat]
+                try:
+                    val = int(le.transform([str(val)])[0])
+                except Exception:
+                    # Unseen label — use 0 (safe fallback, same as training fallback)
+                    val = 0
+            row[feat] = val
+
+        X_input = pd.DataFrame([row])[ml_report.feature_cols]
         pipe    = ml_report.best_model.model
         pred    = pipe.predict(X_input)[0]
 

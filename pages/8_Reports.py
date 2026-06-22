@@ -193,37 +193,68 @@ if gen_btn:
 
             # Compute real stats for fallback narrative
             findings_list, risks_list = [], []
-            for col in num_cols[:4]:
+            stat_highlights = []
+            for col in num_cols[:5]:
                 try:
                     mean_v = df[col].mean()
                     std_v  = df[col].std()
                     cv     = (std_v / mean_v * 100) if mean_v != 0 else 0
+                    sk     = float(df[col].skew())
                     if cv > 60:
-                        findings_list.append(f"'{col}' shows high variability (CV={cv:.0f}%) — wide spread in values")
-                    sk = float(df[col].skew())
+                        findings_list.append(f"'{col}' shows high variability (CV={cv:.0f}%) — median is {df[col].median():.2f} vs mean {mean_v:.2f}")
                     if abs(sk) > 1.5:
-                        findings_list.append(f"'{col}' is right-skewed (skew={sk:.2f}) — use median for reporting, not mean")
+                        findings_list.append(f"'{col}' is heavily skewed (skew={sk:.2f}) — use median {df[col].median():.2f}, not mean {mean_v:.2f}")
+                    stat_highlights.append(f"'{col}': mean={mean_v:.2f}, σ={std_v:.2f}")
                 except Exception:
                     logger.debug("%s silent skip", exc_info=True)
 
+            # Correlation highlights
+            corr_note = ""
+            if len(num_cols) >= 2:
+                try:
+                    corr = df[num_cols[:6]].corr()
+                    pairs = []
+                    cols = num_cols[:6]
+                    for i in range(len(cols)):
+                        for j in range(i+1, len(cols)):
+                            r = corr.iloc[i,j]
+                            if abs(r) > 0.4:
+                                pairs.append((cols[i], cols[j], r))
+                    pairs.sort(key=lambda x: abs(x[2]), reverse=True)
+                    if pairs:
+                        a, b, r = pairs[0]
+                        corr_note = (f" Strongest relationship: '{a}' and '{b}' are "
+                                     f"{'positively' if r > 0 else 'negatively'} correlated "
+                                     f"(r={r:.2f}, sharing {r**2*100:.0f}% of variance).")
+                except Exception:
+                    pass
+
+            # Missing data specifics
+            if miss_pct > 0:
+                worst_col = df.isna().mean().idxmax()
+                worst_pct = df[worst_col].isna().mean() * 100
+                risks_list.append(f"'{worst_col}' has the highest missing rate ({worst_pct:.1f}%) — impute or exclude before modelling")
+
+            # Build summary with actual numbers
             exec_summary = (
-                f"This report analyses {len(df):,} records across {len(df.columns)} variables "
+                f"Dataset: {len(df):,} records × {len(df.columns)} columns "
                 f"({len(num_cols)} numeric, {len(cat_cols)} categorical). "
-                f"{'Data is fully complete with no missing values. ' if miss_pct == 0 else f'Missing data rate: {miss_pct:.1f}%. '}"
-                f"{'No duplicate rows detected. ' if dup_count == 0 else f'{dup_count:,} duplicate rows were identified and removed before analysis. '}"
-                f"Statistical analysis covers distributions, normality testing, correlation patterns, and outlier detection. "
-                f"All findings are computed directly from the submitted dataset."
+                f"{'No missing values — data is complete. ' if miss_pct == 0 else f'Missing data rate: {miss_pct:.1f}% overall. '}"
+                f"{'No duplicates detected. ' if dup_count == 0 else f'{dup_count:,} duplicate rows removed before analysis. '}"
+                + (f"Key numeric profiles: {'; '.join(stat_highlights[:3])}. " if stat_highlights else "")
+                + corr_note
+                + " All findings computed directly from the submitted dataset."
             )
-            findings     = findings_list or [
+            findings = findings_list or [
                 f"{len(df):,} records × {len(df.columns)} columns analysed",
-                f"Missing data: {miss_pct:.1f}%",
+                f"Missing data: {miss_pct:.1f}% | Duplicates: {dup_count:,}",
                 f"Numeric columns: {len(num_cols)} | Categorical: {len(cat_cols)}",
             ]
-            risks         = []
+            risks         = risks_list
             opportunities = []
-            actions       = ["Run statistical analysis to identify key variable relationships",
-                             "Review data quality flags before drawing business conclusions",
-                             "Configure GROQ_API_KEY in secrets.toml for AI-generated narratives"]
+            actions       = ["Address data quality flags before drawing business conclusions",
+                             "Review skewed columns — use median for all client-facing metrics",
+                             "Configure GROQ_API_KEY in .streamlit/secrets.toml for AI-generated narratives"]
             story_obj     = None
 
         # 4. Structured insights
@@ -279,23 +310,44 @@ if gen_btn:
                         from ai.report_narrator import generate_chart_narrative
                         narrative = generate_chart_narrative(df, title, groq_key, domain_name)
                     except Exception:
-                        # Real-stats fallback — not boilerplate
+                        # Real-stats fallback — data-specific, not boilerplate
                         try:
                             num_cols_n = df.select_dtypes(include="number").columns.tolist()
-                            if num_cols_n:
-                                col = num_cols_n[0]
-                                mean_v = df[col].mean()
-                                std_v = df[col].std()
+                            # Pick the most relevant column based on title keywords
+                            title_lower = title.lower()
+                            matched_col = next(
+                                (c for c in num_cols_n if c.lower() in title_lower),
+                                num_cols_n[0] if num_cols_n else None
+                            )
+                            if matched_col:
+                                s_col = df[matched_col].dropna()
+                                mean_v  = s_col.mean()
+                                median_v = s_col.median()
+                                std_v   = s_col.std()
+                                sk      = float(s_col.skew())
+                                top10   = float(s_col.quantile(0.9))
+                                bot10   = float(s_col.quantile(0.1))
+                                skew_note = (
+                                    f" Distribution is right-skewed (skew={sk:.2f}) — "
+                                    f"median ({median_v:.2f}) is a better central measure than mean."
+                                    if sk > 1.0 else
+                                    f" Distribution is left-skewed (skew={sk:.2f}) — "
+                                    f"check for floor effects or data capping."
+                                    if sk < -1.0 else ""
+                                )
                                 narrative = (
-                                    f"Chart shows '{title}'. "
-                                    f"Primary metric '{col}': mean={mean_v:.2f}, "
-                                    f"std={std_v:.2f} (CV={std_v/mean_v*100:.0f}% variability). "
-                                    f"Dataset: {len(df):,} rows."
+                                    f"'{matched_col}': mean={mean_v:.2f}, "
+                                    f"median={median_v:.2f}, σ={std_v:.2f} "
+                                    f"(CV={std_v/mean_v*100:.0f}% variability). "
+                                    f"P10={bot10:.2f}, P90={top10:.2f} — "
+                                    f"top decile is {top10/bot10:.1f}× the bottom decile."
+                                    + skew_note
+                                    + f" Based on {len(df):,} records."
                                 )
                             else:
-                                narrative = f"Visual summary of '{title}' — {len(df):,} records analysed."
+                                narrative = f"Visual summary of '{title}' — {len(df):,} records across {len(df.columns)} columns."
                         except Exception:
-                            narrative = f"Chart: {title}."
+                            narrative = f"Chart: {title} — {len(df):,} records."
                     chart_data.append((title, img_bytes, narrative))
         except Exception as e:
             st.warning(f"Charts skipped: {e}")

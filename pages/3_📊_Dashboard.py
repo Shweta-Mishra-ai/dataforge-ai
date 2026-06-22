@@ -46,24 +46,24 @@ html,body,[class*="css"]{font-family:'Inter',sans-serif!important}
     margin-bottom:16px;
 }
 .kpi-card{
-    background:white;border:1px solid #E2E8F0;border-radius:14px;
+    background:rgba(128,128,128,.06);border:1px solid rgba(128,128,128,.18);border-radius:14px;
     padding:18px 16px;position:relative;overflow:hidden;
     transition:box-shadow .2s;
 }
 .kpi-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.07)}
 .kpi-val{font-size:26px;font-weight:800;line-height:1.1;margin-bottom:4px}
 .kpi-lbl{font-size:11px;font-weight:700;text-transform:uppercase;
-         letter-spacing:.07em;color:#64748B;margin-bottom:6px}
-.kpi-sub{font-size:11px;color:#94A3B8;line-height:1.4}
+         letter-spacing:.07em;color:inherit;opacity:.6;margin-bottom:6px}
+.kpi-sub{font-size:11px;color:inherit;opacity:.5;line-height:1.4}
 .kpi-accent{position:absolute;top:0;left:0;right:0;height:3px;border-radius:14px 14px 0 0}
 
 .section-hdr{
-    font-size:16px;font-weight:800;color:#0F172A;
+    font-size:16px;font-weight:800;color:inherit;
     margin:24px 0 12px;display:flex;align-items:center;gap:8px;
 }
 .domain-section{
-    background:linear-gradient(135deg,#F0F7FF,#EFF6FF);
-    border:1px solid #BFDBFE;border-radius:16px;
+    background:rgba(59,130,246,.07);
+    border:1px solid rgba(59,130,246,.2);border-radius:16px;
     padding:20px 22px;margin-bottom:20px;
 }
 
@@ -155,9 +155,9 @@ with col_title:
 with col_info:
     st.markdown(f"""
     <div style="text-align:right;padding-top:8px">
-        <div style="font-size:22px;font-weight:800;color:#0F172A">{len(df_filtered):,}</div>
-        <div style="font-size:11px;color:#64748B">rows after filters</div>
-        <div style="font-size:11px;color:#94A3B8">{len(df_master.columns)} columns</div>
+        <div style="font-size:22px;font-weight:800;color:inherit">{len(df_filtered):,}</div>
+        <div style="font-size:11px;opacity:.6">rows after filters</div>
+        <div style="font-size:11px;opacity:.5">{len(df_master.columns)} columns</div>
     </div>
     """, unsafe_allow_html=True)
 

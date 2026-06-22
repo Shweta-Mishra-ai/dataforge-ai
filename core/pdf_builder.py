@@ -627,31 +627,115 @@ def _toc(story, s, T, entries, CW):
 
 def _exec_summary(story, s, T, summary, findings, risks, opps, CW):
     _sec(story, s, T, "Executive Summary",
-         "Key findings and strategic priorities")
+         "Key findings, strategic priorities, and analytical scope")
+
+    # ── Narrative summary box ──────────────────────────────
     if summary:
         _narrative_box(story, s, T, summary)
+    story.append(Spacer(1, 3*mm))
+
+    # ── 3-column highlight strip: Findings / Risks / Opps ─
+    n_f = len(findings)
+    n_r = len(risks)
+    n_o = len(opps)
+    strip = Table([[
+        Paragraph(f"<b><font size='20' color='{T['accent']}'>{n_f}</font></b><br/>"
+                  "<font size='8' color='#888888'>KEY FINDINGS</font>", s["body"]),
+        Paragraph(f"<b><font size='20' color='{T['negative']}'>{n_r}</font></b><br/>"
+                  "<font size='8' color='#888888'>BUSINESS RISKS</font>", s["body"]),
+        Paragraph(f"<b><font size='20' color='{T['positive']}'>{n_o}</font></b><br/>"
+                  "<font size='8' color='#888888'>OPPORTUNITIES</font>", s["body"]),
+    ]], colWidths=[CW/3]*3)
+    strip.setStyle(TableStyle([
+        ("ALIGN",         (0,0), (-1,-1), "CENTER"),
+        ("VALIGN",        (0,0), (-1,-1), "MIDDLE"),
+        ("TOPPADDING",    (0,0), (-1,-1), 10),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 10),
+        ("BOX",           (0,0), (-1,-1), 0.5, _c(T["border"])),
+        ("INNERGRID",     (0,0), (-1,-1), 0.3, _c(T["border"])),
+        ("BACKGROUND",    (0,0), (-1,-1), _c(T["bg_light"])),
+    ]))
+    story.append(strip)
+    story.append(Spacer(1, 4*mm))
+
+    # ── Key findings as numbered list ──────────────────────
     if findings:
         story.append(Paragraph("Key Findings", s["h3"]))
-        for f in findings[:5]:
-            story.append(Paragraph("+ " + str(f), s["bl"]))
+        for i, f in enumerate(findings[:6], 1):
+            row = Table([[
+                Paragraph(f"<b>{i:02d}</b>",
+                          ParagraphStyle("fnum", fontName="Helvetica-Bold",
+                                         fontSize=9, textColor=_c(T["accent"]),
+                                         alignment=TA_CENTER)),
+                Paragraph(str(f),
+                          ParagraphStyle("ftext", fontName="Helvetica",
+                                         fontSize=9, leading=13, spaceAfter=0)),
+            ]], colWidths=[CW*0.06, CW*0.94])
+            row.setStyle(TableStyle([
+                ("VALIGN",        (0,0), (-1,-1), "TOP"),
+                ("LEFTPADDING",   (0,0), (-1,-1), 4),
+                ("RIGHTPADDING",  (0,0), (-1,-1), 4),
+                ("TOPPADDING",    (0,0), (-1,-1), 4),
+                ("BOTTOMPADDING", (0,0), (-1,-1), 4),
+                ("BACKGROUND",    (0,0), (-1,-1), _c(T["bg_light"])),
+                ("BOX",           (0,0), (-1,-1), 0.3, _c(T["border"])),
+                ("LINEAFTER",     (0,0), (0,-1),  1.5, _c(T["accent"])),
+            ]))
+            story.append(row)
+            story.append(Spacer(1, 1.5*mm))
         story.append(Spacer(1, 2*mm))
+
+    # ── Risks as red-accented rows ─────────────────────────
     if risks:
         story.append(Paragraph("Business Risks", s["h3"]))
-        for r in risks[:4]:
-            story.append(Paragraph("! " + str(r),
-                ParagraphStyle("risk_p", fontName="Helvetica", fontSize=9,
-                               textColor=_c(T["negative"]), leading=13,
-                               leftIndent=10, firstLineIndent=-10,
-                               spaceAfter=3)))
+        labels = ["CRITICAL", "HIGH", "HIGH", "MEDIUM", "MEDIUM", "LOW"]
+        for i, r in enumerate(risks[:5], 1):
+            lbl = labels[min(i-1, len(labels)-1)]
+            color = T["negative"] if i <= 2 else T["warning"]
+            row = Table([[
+                Paragraph(f"<b><font color='{color}'>{lbl}</font></b>",
+                          ParagraphStyle("rlbl", fontName="Helvetica-Bold",
+                                         fontSize=8, alignment=TA_CENTER)),
+                Paragraph(str(r),
+                          ParagraphStyle("rtext", fontName="Helvetica",
+                                         fontSize=9, leading=13, spaceAfter=0)),
+            ]], colWidths=[CW*0.11, CW*0.89])
+            row.setStyle(TableStyle([
+                ("VALIGN",        (0,0), (-1,-1), "MIDDLE"),
+                ("LEFTPADDING",   (0,0), (-1,-1), 6),
+                ("RIGHTPADDING",  (0,0), (-1,-1), 6),
+                ("TOPPADDING",    (0,0), (-1,-1), 5),
+                ("BOTTOMPADDING", (0,0), (-1,-1), 5),
+                ("LINEBEFORE",    (0,0), (0,-1),  3, _c(color)),
+                ("BACKGROUND",    (0,0), (0,-1),  _c(T["bg_light"])),
+            ]))
+            story.append(row)
+            story.append(Spacer(1, 1.5*mm))
         story.append(Spacer(1, 2*mm))
+
+    # ── Opportunities as green-accented rows ───────────────
     if opps:
-        story.append(Paragraph("Opportunities", s["h3"]))
-        for o in opps[:3]:
-            story.append(Paragraph("* " + str(o),
-                ParagraphStyle("opp_p", fontName="Helvetica", fontSize=9,
-                               textColor=_c(T["positive"]), leading=13,
-                               leftIndent=10, firstLineIndent=-10,
-                               spaceAfter=3)))
+        story.append(Paragraph("Growth Opportunities", s["h3"]))
+        for i, o in enumerate(opps[:4], 1):
+            row = Table([[
+                Paragraph(f"<b><font color='{T['positive']}'>OPP {i:02d}</font></b>",
+                          ParagraphStyle("olbl", fontName="Helvetica-Bold",
+                                         fontSize=8, alignment=TA_CENTER)),
+                Paragraph(str(o),
+                          ParagraphStyle("otext", fontName="Helvetica",
+                                         fontSize=9, leading=13, spaceAfter=0)),
+            ]], colWidths=[CW*0.11, CW*0.89])
+            row.setStyle(TableStyle([
+                ("VALIGN",        (0,0), (-1,-1), "MIDDLE"),
+                ("LEFTPADDING",   (0,0), (-1,-1), 6),
+                ("RIGHTPADDING",  (0,0), (-1,-1), 6),
+                ("TOPPADDING",    (0,0), (-1,-1), 5),
+                ("BOTTOMPADDING", (0,0), (-1,-1), 5),
+                ("LINEBEFORE",    (0,0), (0,-1),  3, _c(T["positive"])),
+                ("BACKGROUND",    (0,0), (0,-1),  _c(T["bg_light"])),
+            ]))
+            story.append(row)
+            story.append(Spacer(1, 1.5*mm))
 
 
 # ══════════════════════════════════════════════════════════
@@ -923,22 +1007,23 @@ def _attrition_page(story, s, T, attrition, CW, config=None):
 
 def _dataset_overview(story, s, T, df, profile, CW):
     _sec(story, s, T, "Dataset Overview & Descriptive Statistics",
-         "Column breakdown and statistical summary")
+         "Column breakdown, statistical summary, correlations, and distribution flags")
 
     num_cols = df.select_dtypes(include="number").columns.tolist()
     cat_cols = df.select_dtypes(include=["object", "string"]).columns.tolist()
     dt_cols  = df.select_dtypes(include="datetime").columns.tolist()
 
+    # ── Dataset composition strip ──────────────────────────
     _gtable(story, T,
-            ["Type", "Count", "Columns (sample)"],
-            [["Numeric",     len(num_cols), ", ".join(num_cols[:6])],
-             ["Categorical", len(cat_cols), ", ".join(cat_cols[:6])],
+            ["Type", "Count", "Sample Columns"],
+            [["Numeric",     len(num_cols), ", ".join(num_cols[:6]) or "None"],
+             ["Categorical", len(cat_cols), ", ".join(cat_cols[:6]) or "None"],
              ["DateTime",    len(dt_cols),  ", ".join(dt_cols[:4]) or "None"]],
             [CW*0.20, CW*0.12, CW*0.68])
 
+    # ── Descriptive statistics table ───────────────────────
     if num_cols:
         story.append(Paragraph("Descriptive Statistics", s["h3"]))
-        # Exclude pure sequential index columns from descriptive stats
         import re as _re
         _ID_KW = {"index","idx","id","rowid","row_id","empid","emp_id",
                   "order_id","orderid","product_id","customer_id","user_id"}
@@ -952,46 +1037,140 @@ def _dataset_overview(story, s, T, df, profile, CW):
                     if (diffs == 1).mean() > 0.90:
                         return True
                 except Exception:
-                    logger.debug("%s silent skip", exc_info=True)
+                    logger.debug("%s id-col check skip", exc_info=True)
             return False
+
         filtered_num = [c for c in num_cols if not _is_id_col(c, df[c])]
-        show = filtered_num[:5] if filtered_num else num_cols[:5]
-        desc  = df[show].describe().round(3)
-        hrow  = ["Stat"] + [c[:10] for c in show]
-        rows  = [hrow] + [
+        show = filtered_num[:6] if filtered_num else num_cols[:6]
+        desc = df[show].describe().round(3)
+
+        hrow = ["Stat"] + [c[:9] for c in show]
+        rows = [hrow] + [
             [stat] + [str(desc.loc[stat, c]) for c in show]
-            for stat in ["mean","std","min","25%","50%","75%","max"]
+            for stat in ["mean", "std", "min", "25%", "50%", "75%", "max"]
             if stat in desc.index
         ]
         cw_s = CW / (len(show) + 1)
-        tbl  = Table(rows, colWidths=[cw_s] * (len(show)+1), repeatRows=1)
+        tbl = Table(rows, colWidths=[cw_s] * (len(show)+1), repeatRows=1)
         tbl.setStyle(TableStyle([
-            ("FONTNAME",     (0,0), (-1,0),  "Helvetica-Bold"),
-            ("FONTNAME",     (0,1), (-1,-1), "Helvetica"),
-            ("FONTSIZE",     (0,0), (-1,-1), 8),
-            ("TEXTCOLOR",    (0,0), (-1,0),  HexColor("#FFFFFF")),
-            ("BACKGROUND",   (0,0), (-1,0),  _c(T["header_bg"])),
-            ("ROWBACKGROUNDS",(0,1),(-1,-1), [HexColor("#FFFFFF"), _c(T["bg_light"])]),
-            ("GRID",         (0,0), (-1,-1), 0.3, _c(T["border"])),
-            ("ALIGN",        (0,0), (-1,-1), "CENTER"),
-            ("VALIGN",       (0,0), (-1,-1), "MIDDLE"),
-            ("TOPPADDING",   (0,0), (-1,-1), 4),
-            ("BOTTOMPADDING",(0,0), (-1,-1), 4),
+            ("FONTNAME",      (0,0), (-1,0),  "Helvetica-Bold"),
+            ("FONTNAME",      (0,1), (-1,-1), "Helvetica"),
+            ("FONTSIZE",      (0,0), (-1,-1), 8),
+            ("TEXTCOLOR",     (0,0), (-1,0),  HexColor("#FFFFFF")),
+            ("BACKGROUND",    (0,0), (-1,0),  _c(T["header_bg"])),
+            ("ROWBACKGROUNDS",(0,1),(-1,-1),  [HexColor("#FFFFFF"), _c(T["bg_light"])]),
+            ("GRID",          (0,0), (-1,-1), 0.3, _c(T["border"])),
+            ("ALIGN",         (0,0), (-1,-1), "CENTER"),
+            ("VALIGN",        (0,0), (-1,-1), "MIDDLE"),
+            ("TOPPADDING",    (0,0), (-1,-1), 4),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 4),
         ]))
         story.append(KeepTogether([tbl]))
-        story.append(Spacer(1, 2*mm))
+        story.append(Spacer(1, 3*mm))
 
-        # Skew warning
-        for col in num_cols[:6]:
+        # ── Per-column insight flags ───────────────────────
+        story.append(Paragraph("Column-Level Analytical Flags", s["h3"]))
+        flag_rows = [["Column", "Mean", "Median", "CV %", "Skew", "Outliers %", "Flag"]]
+        for col in filtered_num[:10]:
             try:
-                sk = float(df[col].skew())
-                if abs(sk) > 1.0:
-                    story.append(Paragraph(
-                        "★ {} is heavily skewed (skew={:.2f}) — "
-                        "use median not mean for reporting.".format(col, sk),
-                        s["note"]))
+                s_col = df[col].dropna()
+                if len(s_col) < 3:
+                    continue
+                mean_v   = float(s_col.mean())
+                med_v    = float(s_col.median())
+                std_v    = float(s_col.std())
+                cv       = std_v / abs(mean_v) * 100 if mean_v != 0 else 0
+                skew_v   = float(s_col.skew())
+                q1, q3   = float(s_col.quantile(0.25)), float(s_col.quantile(0.75))
+                iqr      = q3 - q1
+                out_pct  = float(((s_col < q1-1.5*iqr) | (s_col > q3+1.5*iqr)).mean() * 100)
+                if out_pct > 15 or abs(skew_v) > 3:
+                    flag = "⚠ Heavy outliers"
+                elif cv > 80:
+                    flag = "⚠ High variability"
+                elif abs(skew_v) > 1.5:
+                    flag = "Use median"
+                elif out_pct > 5:
+                    flag = "Review tail"
+                else:
+                    flag = "✓ Normal"
+                flag_rows.append([
+                    col[:12],
+                    f"{mean_v:.3g}", f"{med_v:.3g}",
+                    f"{cv:.0f}%", f"{skew_v:+.2f}",
+                    f"{out_pct:.1f}%", flag,
+                ])
             except Exception:
-                logger.debug("%s silent skip", exc_info=True)
+                logger.debug("%s flag row skip", exc_info=True)
+        if len(flag_rows) > 1:
+            cws = [CW*x for x in [0.18, 0.1, 0.1, 0.09, 0.09, 0.12, 0.32]]
+            ft = Table(flag_rows, colWidths=cws, repeatRows=1)
+            ft.setStyle(TableStyle([
+                ("FONTNAME",      (0,0), (-1,0),  "Helvetica-Bold"),
+                ("FONTNAME",      (0,1), (-1,-1), "Helvetica"),
+                ("FONTSIZE",      (0,0), (-1,-1), 8),
+                ("TEXTCOLOR",     (0,0), (-1,0),  HexColor("#FFFFFF")),
+                ("BACKGROUND",    (0,0), (-1,0),  _c(T["header_bg"])),
+                ("ROWBACKGROUNDS",(0,1),(-1,-1),  [HexColor("#FFFFFF"), _c(T["bg_light"])]),
+                ("GRID",          (0,0), (-1,-1), 0.3, _c(T["border"])),
+                ("ALIGN",         (0,0), (-1,-1), "CENTER"),
+                ("ALIGN",         (0,0), (0,-1),  "LEFT"),
+                ("ALIGN",         (-1,0),(-1,-1), "LEFT"),
+                ("VALIGN",        (0,0), (-1,-1), "MIDDLE"),
+                ("TOPPADDING",    (0,0), (-1,-1), 3),
+                ("BOTTOMPADDING", (0,0), (-1,-1), 3),
+            ]))
+            story.append(KeepTogether([ft]))
+            story.append(Spacer(1, 3*mm))
+
+        # ── Top correlations ──────────────────────────────
+        if len(filtered_num) >= 2:
+            story.append(Paragraph("Top Correlations (Pearson r)", s["h3"]))
+            try:
+                from scipy import stats as _scipy_stats
+                corr_rows = [["Column A", "Column B", "r", "r²", "Strength", "Sig?"]]
+                cols_for_corr = filtered_num[:8]
+                for i in range(len(cols_for_corr)):
+                    for j in range(i+1, len(cols_for_corr)):
+                        a, b = cols_for_corr[i], cols_for_corr[j]
+                        try:
+                            common = df[[a,b]].dropna()
+                            if len(common) < 10:
+                                continue
+                            r, p = _scipy_stats.pearsonr(common[a], common[b])
+                            if abs(r) >= 0.25:
+                                strength = "Strong" if abs(r)>=0.7 else "Moderate" if abs(r)>=0.4 else "Weak"
+                                sig = "Yes" if p < 0.05 else "No"
+                                corr_rows.append([a[:12], b[:12], f"{r:+.3f}",
+                                                  f"{r**2:.3f}", strength, sig])
+                        except Exception:
+                            logger.debug("%s corr pair skip", exc_info=True)
+                corr_rows.sort(key=lambda x: abs(float(x[2])) if x[2] != "r" else 0, reverse=True)
+                top_corr = [corr_rows[0]] + corr_rows[1:7]
+                if len(top_corr) > 1:
+                    cws2 = [CW*x for x in [0.20, 0.20, 0.10, 0.10, 0.18, 0.10]]
+                    ctbl = Table(top_corr, colWidths=cws2, repeatRows=1)
+                    ctbl.setStyle(TableStyle([
+                        ("FONTNAME",      (0,0), (-1,0),  "Helvetica-Bold"),
+                        ("FONTNAME",      (0,1), (-1,-1), "Helvetica"),
+                        ("FONTSIZE",      (0,0), (-1,-1), 8),
+                        ("TEXTCOLOR",     (0,0), (-1,0),  HexColor("#FFFFFF")),
+                        ("BACKGROUND",    (0,0), (-1,0),  _c(T["header_bg"])),
+                        ("ROWBACKGROUNDS",(0,1),(-1,-1),  [HexColor("#FFFFFF"), _c(T["bg_light"])]),
+                        ("GRID",          (0,0), (-1,-1), 0.3, _c(T["border"])),
+                        ("ALIGN",         (0,0), (-1,-1), "CENTER"),
+                        ("VALIGN",        (0,0), (-1,-1), "MIDDLE"),
+                        ("TOPPADDING",    (0,0), (-1,-1), 3),
+                        ("BOTTOMPADDING", (0,0), (-1,-1), 3),
+                    ]))
+                    story.append(KeepTogether([ctbl]))
+                    story.append(Paragraph(
+                        "Correlation ≠ causation. r² = shared variance. "
+                        "Significant at p<0.05 only. Strong correlations (|r|≥0.7) warrant "
+                        "causal investigation via controlled comparison or regression.",
+                        s["note"]))
+            except Exception as _e:
+                logger.debug("Correlation table failed: %s", _e)
 
 
 # ══════════════════════════════════════════════════════════

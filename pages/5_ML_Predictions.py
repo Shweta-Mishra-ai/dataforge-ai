@@ -10,11 +10,11 @@ import plotly.graph_objects as go
 
 def _style_fig(fig):
     """Apply high-contrast fonts — readable on both light and dark Streamlit themes."""
-    fig.update_layout(font=dict(color="#0F172A", size=11))
-    fig.update_xaxes(tickfont=dict(color="#0F172A", size=10),
-                     title_font=dict(color="#0F172A"))
-    fig.update_yaxes(tickfont=dict(color="#0F172A", size=10),
-                     title_font=dict(color="#0F172A"))
+    fig.update_layout(font=dict( size=11))
+    fig.update_xaxes(tickfont=dict( size=10),
+                     title_font=dict())
+    fig.update_yaxes(tickfont=dict( size=10),
+                     title_font=dict())
     return fig
 
 
@@ -29,6 +29,25 @@ fname   = get_filename()
 from core.ml_engine import run_ml_pipeline, suggest_targets, detect_task, predict_what_if
 
 COLORS = ["#1565C0", "#0D47A1", "#B71C1C", "#1B5E20", "#4527A0", "#E65100"]
+
+
+# ── Global adaptive CSS (dark + light theme safe) ─────────────────────────────
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+html,body,[class*="css"]{font-family:'Inter',sans-serif!important}
+.block-container{padding-top:1.2rem!important}
+section[data-testid="stSidebar"]{background:linear-gradient(180deg,#0D1B2E,#0F2240)!important}
+section[data-testid="stSidebar"] *{color:rgba(255,255,255,.85)!important}
+section[data-testid="stSidebar"] hr{border-color:rgba(255,255,255,.12)!important}
+/* adaptive card base */
+.df-card{background:rgba(128,128,128,.06);border:1px solid rgba(128,128,128,.18);border-radius:12px;padding:16px 20px;margin-bottom:12px}
+/* finding/risk/opp rows */
+.risk-row{border-left:4px solid #ef4444;background:rgba(239,68,68,.07);padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:8px}
+.opp-row{border-left:4px solid #10b981;background:rgba(16,185,129,.07);padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:8px}
+.info-row{border-left:4px solid #3b82f6;background:rgba(59,130,246,.07);padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:8px}
+</style>
+""", unsafe_allow_html=True)
 
 st.markdown("## ML Predictions")
 st.caption("{} — {:,} rows, {} columns".format(fname, len(df), len(df.columns)))
@@ -72,14 +91,8 @@ if suggestions[:3]:
     cols_s = st.columns(min(3, len(suggestions)))
     for i, sug in enumerate(suggestions[:3]):
         with cols_s[i]:
-            st.markdown(
-                "<div style='background:#f0f4ff;border-radius:8px;"
-                "padding:10px 14px;border:1px solid #d0d8f0'>"
-                "<b>{}</b><br>"
-                "<span style='font-size:12px;color:#1E293B'>{} | {}</span>"
-                "</div>".format(sug["column"], sug["task"].title(), sug["reason"]),
-                unsafe_allow_html=True
-            )
+            # FIX: use st.info instead of hardcoded #f0f4ff bg — invisible on dark theme
+            st.info("**{}**  \n{} | {}".format(sug["column"], sug["task"].title(), sug["reason"]))
 
 st.divider()
 
@@ -221,9 +234,9 @@ with tab1:
         fig.update_layout(
             title="Model Performance Comparison",
             barmode="group",
-            paper_bgcolor="white",
-            plot_bgcolor="#F8FAFF",
-            font=dict(color="#0F172A", family="Helvetica", size=11),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font=dict( family="Helvetica", size=11),
             margin=dict(l=10, r=10, t=40, b=10),
             legend=dict(orientation="h", y=1.1),
             yaxis=dict(range=[0, 1.1]),
@@ -258,7 +271,7 @@ with tab1:
             color_discrete_sequence=COLORS,
             hole=0.4,
         )
-        fig_pie.update_layout(paper_bgcolor="white",
+        fig_pie.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                                margin=dict(l=10,r=10,t=40,b=10))
         st.plotly_chart(_style_fig(fig_pie), use_container_width=True)
         if max(values) > 0.80:
@@ -300,9 +313,9 @@ with tab2:
         ))
         fig.update_layout(
             title="Feature Importance (% contribution)",
-            paper_bgcolor="white",
-            plot_bgcolor="#F8FAFF",
-            font=dict(color="#0F172A", family="Helvetica", size=11),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font=dict( family="Helvetica", size=11),
             margin=dict(l=10, r=10, t=40, b=10),
             yaxis=dict(autorange="reversed"),
             height=max(300, len(fi) * 35),

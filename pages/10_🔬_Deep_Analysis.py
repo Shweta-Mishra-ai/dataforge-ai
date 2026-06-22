@@ -5,6 +5,25 @@ from core.chart_engine import make_bar, make_line, make_scatter, make_histogram,
 from core.data_profiler import profile_dataset
 from components.kpi_cards import inject_global_css
 
+
+# ── Global adaptive CSS (dark + light theme safe) ─────────────────────────────
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+html,body,[class*="css"]{font-family:'Inter',sans-serif!important}
+.block-container{padding-top:1.2rem!important}
+section[data-testid="stSidebar"]{background:linear-gradient(180deg,#0D1B2E,#0F2240)!important}
+section[data-testid="stSidebar"] *{color:rgba(255,255,255,.85)!important}
+section[data-testid="stSidebar"] hr{border-color:rgba(255,255,255,.12)!important}
+/* adaptive card base */
+.df-card{background:rgba(128,128,128,.06);border:1px solid rgba(128,128,128,.18);border-radius:12px;padding:16px 20px;margin-bottom:12px}
+/* finding/risk/opp rows */
+.risk-row{border-left:4px solid #ef4444;background:rgba(239,68,68,.07);padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:8px}
+.opp-row{border-left:4px solid #10b981;background:rgba(16,185,129,.07);padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:8px}
+.info-row{border-left:4px solid #3b82f6;background:rgba(59,130,246,.07);padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:8px}
+</style>
+""", unsafe_allow_html=True)
+
 st.set_page_config(
     page_title="Deep Analysis — DataForge AI",
     page_icon="🔬",
@@ -53,7 +72,21 @@ with tab1:
             elif chart_type == "Histogram":
                 fig = make_histogram(df, x_col)
             elif chart_type == "Pie":
-                fig = make_pie(df, x_col, y_col)
+                # FIX: user explicitly chose Pie — build it directly without
+                # the auto-mode guard that redirects score-like columns to bar.
+                import plotly.express as px
+                agg = df.groupby(x_col)[y_col].sum().reset_index().head(12)
+                fig = px.pie(
+                    agg, names=x_col, values=y_col,
+                    title=f"{y_col} Share by {x_col}",
+                    template="plotly_white",
+                    hole=0.0,
+                )
+                fig.update_layout(
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    font=dict( size=11),
+                    margin=dict(l=10, r=10, t=50, b=10),
+                )
             st.plotly_chart(fig, use_container_width=True)
         except Exception as e:
             st.error(f"Chart error: {e}")
@@ -116,12 +149,12 @@ with tab3:
             points="outliers"
         )
         fig.update_layout(
-            paper_bgcolor="white", plot_bgcolor="#F8FAFF",
-            font=dict(color="#0F172A", size=11),
-            title_font=dict(color="#0A1628", size=14),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            font=dict( size=11),
+            title_font=dict( size=14),
         )
-        fig.update_xaxes(tickfont=dict(color="#0F172A"), title_font=dict(color="#0F172A"))
-        fig.update_yaxes(tickfont=dict(color="#0F172A"), title_font=dict(color="#0F172A"))
+        fig.update_xaxes(tickfont=dict(color="#0F172A"), title_font=dict())
+        fig.update_yaxes(tickfont=dict(color="#0F172A"), title_font=dict())
         st.plotly_chart(fig, use_container_width=True)
 
         if not outliers.empty:

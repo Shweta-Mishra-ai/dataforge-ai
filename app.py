@@ -68,15 +68,15 @@ html, body, [class*="css"] {
 
 /* Feature cards */
 .feat-card {
-    background: white; border: 1px solid #E2E8F0;
+    background: rgba(128,128,128,.06); border: 1px solid rgba(128,128,128,.18);
     border-radius: 16px; padding: 24px 22px;
     transition: box-shadow 0.2s, transform 0.2s;
     height: 100%;
 }
 .feat-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.08); transform: translateY(-2px); }
 .feat-icon { font-size: 28px; margin-bottom: 12px; }
-.feat-title { font-size: 15px; font-weight: 700; color: #0F172A; margin-bottom: 8px; }
-.feat-desc { font-size: 13px; color: #64748B; line-height: 1.6; }
+.feat-title { font-size: 15px; font-weight: 700; color: inherit; margin-bottom: 8px; }
+.feat-desc { font-size: 13px; color: inherit; opacity: .65; line-height: 1.6; }
 
 /* Domain badges */
 .domain-badge {
@@ -88,20 +88,20 @@ html, body, [class*="css"] {
 
 /* Upload zone */
 .upload-card {
-    background: linear-gradient(135deg, #F0F7FF 0%, #EFF6FF 100%);
-    border: 2px dashed #93C5FD; border-radius: 16px;
+    background: rgba(59,130,246,.06);
+    border: 2px dashed rgba(59,130,246,.4); border-radius: 16px;
     padding: 32px 28px; text-align: center;
 }
-.upload-title { font-size: 18px; font-weight: 700; color: #1E3A5F; margin-bottom: 8px; }
-.upload-sub   { font-size: 13px; color: #64748B; margin-bottom: 20px; }
+.upload-title { font-size: 18px; font-weight: 700; color: inherit; margin-bottom: 8px; }
+.upload-sub   { font-size: 13px; color: inherit; opacity: .65; margin-bottom: 20px; }
 
 /* Config card */
 .config-card {
-    background: white; border: 1px solid #E2E8F0;
+    background: rgba(128,128,128,.06); border: 1px solid rgba(128,128,128,.18);
     border-radius: 16px; padding: 24px; margin-bottom: 16px;
 }
 .config-title {
-    font-size: 13px; font-weight: 700; color: #0F172A;
+    font-size: 13px; font-weight: 700; color: inherit;
     text-transform: uppercase; letter-spacing: 0.07em;
     margin-bottom: 16px; padding-bottom: 10px;
     border-bottom: 2px solid #E2E8F0;
@@ -347,13 +347,13 @@ with col_left:
     # Config summary
     if client_name or report_title:
         st.markdown("""
-        <div style="background:#F0FDF4; border:1px solid #BBF7D0; border-radius:10px;
+        <div style="background:rgba(16,185,129,.08); border:1px solid rgba(16,185,129,.25); border-radius:10px;
                     padding:14px 16px; margin-top:8px;">
-            <div style="font-size:11px; font-weight:700; color:#166534;
+            <div style="font-size:11px; font-weight:700; color:#10b981;
                         letter-spacing:.07em; text-transform:uppercase; margin-bottom:6px;">
                 ✅ Report Config Saved
             </div>
-            <div style="font-size:12px; color:#374151;">
+            <div style="font-size:12px; color:inherit; opacity:.75;">
                 This will appear on the PDF cover page automatically.
                 No need to re-enter in the Reports section.
             </div>
@@ -381,13 +381,13 @@ with col_right:
                 All analysis runs in your session — data is never stored on any server.
             </div>
             <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:16px;">
-                <span style="background:#DBEAFE; color:#1D4ED8; font-size:11px; font-weight:700;
+                <span style="background:rgba(59,130,246,.15); color:#60a5fa; font-size:11px; font-weight:700;
                              padding:4px 12px; border-radius:12px;">HR Analytics</span>
-                <span style="background:#FEF3C7; color:#B45309; font-size:11px; font-weight:700;
+                <span style="background:rgba(245,158,11,.15); color:#fbbf24; font-size:11px; font-weight:700;
                              padding:4px 12px; border-radius:12px;">E-Commerce</span>
-                <span style="background:#D1FAE5; color:#065F46; font-size:11px; font-weight:700;
+                <span style="background:rgba(16,185,129,.15); color:#34d399; font-size:11px; font-weight:700;
                              padding:4px 12px; border-radius:12px;">Sales</span>
-                <span style="background:#EDE9FE; color:#5B21B6; font-size:11px; font-weight:700;
+                <span style="background:rgba(139,92,246,.15); color:#a78bfa; font-size:11px; font-weight:700;
                              padding:4px 12px; border-radius:12px;">Finance</span>
             </div>
         </div>
@@ -503,19 +503,19 @@ st.markdown("""
                 letter-spacing:0.1em; margin-bottom:16px;">
         Supported Business Domains
     </div>
-    <span class="domain-badge" style="background:#DBEAFE; color:#1D4ED8;">
+    <span class="domain-badge" style="background:rgba(59,130,246,.15); color:#60a5fa;">
         👥 HR & People Analytics
     </span>
-    <span class="domain-badge" style="background:#FEF3C7; color:#B45309;">
+    <span class="domain-badge" style="background:rgba(245,158,11,.15); color:#fbbf24;">
         🛒 E-Commerce Analytics
     </span>
-    <span class="domain-badge" style="background:#D1FAE5; color:#065F46;">
+    <span class="domain-badge" style="background:rgba(16,185,129,.15); color:#34d399;">
         📈 Sales Performance
     </span>
     <span class="domain-badge" style="background:#F3E8FF; color:#6B21A8;">
         💰 Finance & Accounting
     </span>
-    <span class="domain-badge" style="background:#F1F5F9; color:#475569;">
+    <span class="domain-badge" style="background:rgba(128,128,128,.15); color:inherit;">
         📋 General Business
     </span>
 </div>
@@ -523,8 +523,8 @@ st.markdown("""
 
 # Footer
 st.markdown("""
-<div style="text-align:center; padding:20px 0 8px; border-top:1px solid #E2E8F0; margin-top:16px;">
-    <span style="font-size:12px; color:#9CA3AF;">
+<div style="text-align:center; padding:20px 0 8px; border-top:1px solid rgba(128,128,128,.2); margin-top:16px;">
+    <span style="font-size:12px; opacity:.5;">
         DataForge AI · Advanced Analytics Platform · All data processed locally in your session
     </span>
 </div>
