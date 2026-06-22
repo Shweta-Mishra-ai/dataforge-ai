@@ -53,7 +53,21 @@ with tab1:
             elif chart_type == "Histogram":
                 fig = make_histogram(df, x_col)
             elif chart_type == "Pie":
-                fig = make_pie(df, x_col, y_col)
+                # FIX: user explicitly chose Pie — build it directly without
+                # the auto-mode guard that redirects score-like columns to bar.
+                import plotly.express as px
+                agg = df.groupby(x_col)[y_col].sum().reset_index().head(12)
+                fig = px.pie(
+                    agg, names=x_col, values=y_col,
+                    title=f"{y_col} Share by {x_col}",
+                    template="plotly_white",
+                    hole=0.0,
+                )
+                fig.update_layout(
+                    paper_bgcolor="white",
+                    font=dict(color="#0F172A", size=11),
+                    margin=dict(l=10, r=10, t=50, b=10),
+                )
             st.plotly_chart(fig, use_container_width=True)
         except Exception as e:
             st.error(f"Chart error: {e}")

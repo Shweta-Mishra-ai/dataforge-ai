@@ -118,12 +118,8 @@ with tab1:
                            key="bm_col")
         bm  = next(b for b in report.benchmarks if b.column == sel)
 
-        st.markdown(
-            "<div style='background:#f0f4ff;border-left:4px solid #1a4a8a;"
-            "padding:12px 16px;border-radius:4px'>{}</div>".format(
-                bm.interpretation),
-            unsafe_allow_html=True
-        )
+        # FIX: use st.info() instead of hardcoded #f0f4ff which is invisible on dark theme
+        st.info(bm.interpretation)
 
         # Distribution with percentile lines
         col_data = df[sel].dropna()
@@ -177,12 +173,8 @@ with tab2:
         c2.metric("Threshold", "{:.2f}".format(rc.low_performer_threshold))
         c3.metric("Drivers Found", str(len(rc.drivers)))
 
-        st.markdown(
-            "<div style='background:#fff0f0;border-left:4px solid #f77070;"
-            "padding:12px 16px;border-radius:4px;margin:12px 0'>"
-            "<b>Root Cause:</b> {}</div>".format(rc.interpretation),
-            unsafe_allow_html=True
-        )
+        # FIX: use st.warning() instead of hardcoded #fff0f0 — invisible on dark theme
+        st.warning("**Root Cause:** {}".format(rc.interpretation))
 
         if rc.drivers:
             st.markdown("#### Top Drivers")

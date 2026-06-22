@@ -72,14 +72,8 @@ if suggestions[:3]:
     cols_s = st.columns(min(3, len(suggestions)))
     for i, sug in enumerate(suggestions[:3]):
         with cols_s[i]:
-            st.markdown(
-                "<div style='background:#f0f4ff;border-radius:8px;"
-                "padding:10px 14px;border:1px solid #d0d8f0'>"
-                "<b>{}</b><br>"
-                "<span style='font-size:12px;color:#1E293B'>{} | {}</span>"
-                "</div>".format(sug["column"], sug["task"].title(), sug["reason"]),
-                unsafe_allow_html=True
-            )
+            # FIX: use st.info instead of hardcoded #f0f4ff bg — invisible on dark theme
+            st.info("**{}**  \n{} | {}".format(sug["column"], sug["task"].title(), sug["reason"]))
 
 st.divider()
 

@@ -51,7 +51,7 @@ html,body,[class*="css"]{font-family:'Inter',sans-serif!important}
 .ic-row{display:flex;gap:8px;margin-bottom:8px;align-items:flex-start}
 .ic-lbl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;
         min-width:72px;padding-top:2px;flex-shrink:0}
-.ic-val{font-size:13px;color:#1E293B;line-height:1.55}
+.ic-val{font-size:13px;color:inherit;line-height:1.55}
 
 .domain-header{
     background:linear-gradient(135deg,#0D1B2E,#1B3A6B);
@@ -234,7 +234,7 @@ with tabs[0]:
         st.markdown(f"""
         <div style='background:#F8FAFC;border-left:4px solid {dcolor};
                     padding:18px 22px;border-radius:6px;font-size:14.5px;
-                    line-height:1.8;color:#1E293B'>{exec_text}</div>
+                    line-height:1.8;color:inherit'>{exec_text}</div>
         """, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -261,7 +261,7 @@ with tabs[0]:
             st.markdown(f"""
             <div style='background:#F8FAFC;border:1px solid #E2E8F0;
                         border-radius:8px;padding:12px 16px;margin-bottom:8px;
-                        font-size:13.5px;color:#1E293B;line-height:1.6'>
+                        font-size:13.5px;color:inherit;line-height:1.6'>
                 <span style='color:{dcolor};font-weight:700;font-size:11px;
                              text-transform:uppercase;letter-spacing:.07em'>
                     Finding {i}
@@ -312,7 +312,7 @@ with tabs[2]:
                                  text-transform:uppercase;letter-spacing:.07em'>
                         {sev}
                     </span><br>
-                    <span style='font-size:13px;color:#1E293B;line-height:1.6'>{risk}</span>
+                    <span style='font-size:13px;color:inherit;line-height:1.6'>{risk}</span>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -331,7 +331,7 @@ with tabs[2]:
                                  text-transform:uppercase;letter-spacing:.07em'>
                         OPPORTUNITY {i}
                     </span><br>
-                    <span style='font-size:13px;color:#1E293B;line-height:1.6'>{opp}</span>
+                    <span style='font-size:13px;color:inherit;line-height:1.6'>{opp}</span>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -604,7 +604,7 @@ with tabs[4]:
                             letter-spacing:.07em;color:#64748B;margin-bottom:6px'>
                     {priority}
                 </div>
-                <div style='font-size:13.5px;color:#1E293B;line-height:1.6'>{action}</div>
+                <div style='font-size:13.5px;color:inherit;line-height:1.6'>{action}</div>
             </div>
             """, unsafe_allow_html=True)
 
