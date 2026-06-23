@@ -56,6 +56,36 @@ if result.sheet_names and len(result.sheet_names) > 1:
 
 df = result.df
 
+# ── Hard limits enforcement ─────────────────────────────────
+from core.config import (validate_upload, MAX_FILE_SIZE_MB,
+                          MAX_ROWS, MAX_COLS, WARN_FILE_SIZE_MB)
+
+errors = validate_upload(result.file_size_mb, len(df), len(df.columns))
+for err in errors:
+    if "too large" in err.lower():
+        st.error(f"🚫 {err}")
+        st.stop()
+
+# Sample oversized datasets rather than crashing
+_sampled = False
+if len(df) > MAX_ROWS:
+    df = df.sample(n=MAX_ROWS, random_state=42).reset_index(drop=True)
+    st.warning(
+        f"⚠️ Dataset has {result.df.shape[0]:,} rows — sampled to {MAX_ROWS:,} "
+        "for analysis. Results represent a stratified random sample."
+    )
+    _sampled = True
+
+if len(df.columns) > MAX_COLS:
+    df = df.iloc[:, :MAX_COLS]
+    st.warning(f"⚠️ Dataset has {len(result.df.columns)} columns — first {MAX_COLS} used.")
+
+if result.file_size_mb > WARN_FILE_SIZE_MB:
+    st.warning(
+        f"⚠️ Large file ({result.file_size_mb:.0f} MB). Analysis will be slower. "
+        "Consider filtering to relevant columns before upload."
+    )
+
 # ── Warnings ───────────────────────────────────────────────
 if result.warnings:
     with st.expander("Data Warnings ({})".format(len(result.warnings))):

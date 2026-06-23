@@ -160,11 +160,34 @@ elif cached is not None:
 if report is None:
     st.stop()
 
-# Warnings
+# ── Warnings — imbalance first, prominently ────────────────────────────────
 if report.warnings:
-    with st.expander("Warnings ({})".format(len(report.warnings))):
-        for w in report.warnings:
+    for w in report.warnings:
+        if "⚠️" in w and "imbalance" in w.lower():
+            # Imbalance warnings must be top-level, not buried in expander
+            st.error(w)
+        elif "⚠️" in w:
             st.warning(w)
+
+    other_warnings = [w for w in report.warnings
+                      if "imbalance" not in w.lower() and "⚠️" not in w]
+    if other_warnings:
+        with st.expander(f"ℹ️ Analysis notes ({len(other_warnings)})"):
+            for w in other_warnings:
+                st.info(w)
+
+# ── SHAP availability notice ───────────────────────────────────────────────
+try:
+    import shap as _shap  # noqa: F401
+    _shap_available = True
+except ImportError:
+    _shap_available = False
+
+if not _shap_available:
+    st.info(
+        "ℹ️ SHAP not installed — showing coefficient/Gini importance instead. "
+        "Add `shap>=0.44.0` to requirements.txt and redeploy for SHAP values."
+    )
 
 if not report.models:
     st.error("No models trained. Check warnings above.")

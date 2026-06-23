@@ -7,21 +7,13 @@ Cost estimates clearly labelled as scenario calculations.
 from __future__ import annotations
 import numpy as np
 import pandas as pd
-from dataclasses import dataclass
 from typing import Optional
 import logging
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class Insight:
-    severity: str    # critical | high | warning | info
-    title: str
-    problem: str
-    cause: str
-    evidence: str
-    action: str
-    impact: str
+# Single source of truth — Insight lives in story_engine
+from core.story_engine import Insight  # noqa: F401  re-exported for callers
 
 
 def build_top_insights(

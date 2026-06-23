@@ -93,7 +93,7 @@ class Insight:
     action:    str
     impact:    str
     severity:  str   # critical / warning / positive / info
-    category:  str
+    category:  str = "general"   # optional — defaults to "general"
 
 @dataclass
 class AttritionAnalysis:
@@ -1367,13 +1367,16 @@ def _insights_general(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
     findings, risks, opps, actions = [], [], [], []
     insights = []
 
-    for col in list(stats.keys())[:5]:
-        st = stats.get(col,{})
-        if not st: continue
-        skew    = st.get("skew",0)
-        out_pct = st.get("outlier_pct",0)
-        mean    = st.get("mean",0)
-        median  = st.get("median",0)
+    num_cols = df.select_dtypes(include="number").columns.tolist()
+
+    for col in list(stats.keys())[:8]:
+        st = stats.get(col, {})
+        if not st:
+            continue
+        skew    = st.get("skew", 0)
+        out_pct = st.get("outlier_pct", 0)
+        mean    = st.get("mean", 0)
+        median  = st.get("median", 0)
 
         if out_pct > 10:
             insights.append(_build_insight(
@@ -1381,7 +1384,7 @@ def _insights_general(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
                 problem="{:.0f}% of '{}' values are statistical outliers".format(out_pct, col),
                 cause="Data entry errors, measurement anomalies, or genuine extreme values",
                 evidence="IQR method: {:.0f}% outliers. Range: {:.2f} to {:.2f}".format(
-                    out_pct, st.get("min",0), st.get("max",0)),
+                    out_pct, st.get("min", 0), st.get("max", 0)),
                 action="1. Inspect outlier records  2. Determine error or genuine  "
                        "3. Cap or remove confirmed errors  4. Document decisions",
                 impact="Outliers distort all statistical analyses and reduce ML accuracy",
@@ -1391,23 +1394,56 @@ def _insights_general(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
             findings.append(
                 "'{}' is {}-skewed (mean {:.2f} vs median {:.2f}). "
                 "Report median for this column.".format(
-                    col, "right" if skew>0 else "left", mean, median))
+                    col, "right" if skew > 0 else "left", mean, median))
 
     for corr in corrs[:3]:
-        if corr.get("strength") in ("strong","moderate"):
+        if corr.get("strength") in ("strong", "moderate"):
             findings.append(
                 "{} {} relationship: '{}' and '{}' (r={:.2f}) — "
                 "statistically significant".format(
                     corr["strength"].title(), corr["direction"],
                     corr["col_a"], corr["col_b"], corr["r"]))
 
+    # ── Generic opportunity detection — works on ANY column names ────────────
+    # Looks for P90/median uplift potential, high-variability improvement room
+    for col in num_cols[:8]:
+        try:
+            s = df[col].dropna()
+            if len(s) < 20:
+                continue
+            p10  = float(s.quantile(0.10))
+            p50  = float(s.quantile(0.50))
+            p90  = float(s.quantile(0.90))
+            mean_v = float(s.mean())
+            cv   = s.std() / abs(mean_v) * 100 if mean_v != 0 else 0
+
+            # Uplift opportunity: large spread between P10 and P90
+            if p50 > 0 and p90 / p50 >= 2.0 and cv > 40:
+                uplift_pct = (p90 - p50) / p50 * 100
+                opps.append(
+                    f"'{col}': Top decile ({p90:.2g}) is {p90/p50:.1f}× the median "
+                    f"({p50:.2g}). Bringing the bottom quartile (currently {p10:.2g}) "
+                    f"to median would represent a {uplift_pct:.0f}% improvement. "
+                    f"Identify what high performers have in common."
+                )
+            # High concentration risk: >50% in one value for numeric col
+            top_val_pct = float(s.value_counts(normalize=True).iloc[0]) * 100
+            if top_val_pct > 60 and s.nunique() > 3:
+                risks.append(
+                    f"'{col}': {top_val_pct:.0f}% of records share the same value "
+                    f"({s.value_counts().index[0]:.3g}). "
+                    "Potential data collection bias or limited diversity."
+                )
+        except Exception:
+            logger.debug("Generic opportunity check failed for %s", col, exc_info=True)
+
     actions.extend([
         "Validate all outliers before analysis or modeling",
         "Use median for skewed distributions in executive reports",
         "Segment analysis — subgroups may tell different stories",
     ])
-    return {"findings":findings, "risks":risks, "opportunities":opps,
-            "actions":actions, "insights":insights}
+    return {"findings": findings, "risks": risks, "opportunities": opps,
+            "actions": actions, "insights": insights}
 
 
 # ══════════════════════════════════════════════════════════
@@ -1459,11 +1495,25 @@ def generate_story(df: pd.DataFrame) -> StoryReport:
     else:
         raw = _insights_general(df, all_stats, corrs)
 
-    # Always add general for extra insights
+    # Only fall back to general insights when domain engine produced < 3 findings
+    # — prevents generic "use median" noise diluting HR/Sales/Finance insights
     gen = _insights_general(df, all_stats, corrs)
-    raw["findings"]    += gen["findings"]
-    raw["risks"]       += gen["risks"]
-    raw["opportunities"]+= gen["opportunities"]
+    if domain != "general":
+        # Merge general ONLY where domain engine came up empty for a list
+        if len(raw["findings"]) < 3:
+            raw["findings"] += gen["findings"]
+        if len(raw["risks"]) < 2:
+            raw["risks"] += gen["risks"]
+        if len(raw["opportunities"]) < 2:
+            raw["opportunities"] += gen["opportunities"]
+        # General insights: only add if domain had fewer than 4 structured insights
+        if len(raw.get("insights", [])) < 4:
+            raw.setdefault("insights", [])
+            raw["insights"] += gen.get("insights", [])
+    else:
+        raw["findings"]     += gen["findings"]
+        raw["risks"]        += gen["risks"]
+        raw["opportunities"]+= gen["opportunities"]
 
     insights = raw.get("insights",[])
     sev_order = {"critical":0,"warning":1,"info":2,"positive":3}

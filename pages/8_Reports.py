@@ -38,7 +38,7 @@ def _cached_domain(df):
 
 
 @st.cache_data(show_spinner=False)
-def _cached_charts(df, theme_name, max_charts=5):
+def _cached_charts(df, theme_name, max_charts=8):
     return generate_all_charts(df, theme_name, max_charts=max_charts)
 
 
@@ -298,12 +298,13 @@ if gen_btn:
         chart_data = []
         groq_key = ""
         try:
-            groq_key = st.secrets.get("GROQ_API_KEY", "")
+            from core.config import get_groq_key as _get_groq_key
+            groq_key = _get_groq_key()
         except Exception:
-            groq_key = os.environ.get("GROQ_API_KEY", "")
+            groq_key = _get_groq_key()
 
         try:
-            charts = _cached_charts(df, theme_name, max_charts=5)
+            charts = _cached_charts(df, theme_name, max_charts=8)  # raised cap per config
             for title, img_bytes in charts:
                 if img_bytes:
                     try:
