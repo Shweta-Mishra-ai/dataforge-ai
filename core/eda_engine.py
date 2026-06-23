@@ -415,7 +415,7 @@ def analyze_bivariate_numeric(
             interpretation="Insufficient data.")
 
     if is_normal_a and is_normal_b:
-        r, p       = pearsonr(a, b)
+        r, p       = spearmanr(a, b)  # Spearman: robust to non-normal, outlier-resistant
         test_name  = "Pearson Correlation"
         effect_s   = abs(r)
         effect_lbl = ("Negligible" if effect_s < 0.1 else

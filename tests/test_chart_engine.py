@@ -273,12 +273,17 @@ class TestSelectDtypesDeprecationFix:
 
 class TestPdfBuilderNoDuplicates:
     def test_no_local_c_function_inside_build_pdf(self):
-        """Regression: _c() was redefined locally inside build_pdf, shadowing module-level."""
-        src = open("core/pdf_builder.py").read()
-        # The module-level def _c appears once; a second local def _c is the bug
+        """Regression: _c() was redefined locally inside build_pdf.
+        After refactor, _c lives in core/pdf/theme.py — verify it's there exactly once."""
+        src = open("core/pdf/theme.py").read()
         occurrences = src.count("def _c(")
-        assert occurrences == 1, \
-            f"Expected exactly 1 'def _c(' in pdf_builder.py, found {occurrences}"
+        assert occurrences == 1, (
+            f"Expected exactly 1 'def _c(' in core/pdf/theme.py, found {occurrences}. "
+            "Do not redefine _c locally inside any function."
+        )
+        # Also verify pdf_builder.py is now just a shim (no local _c)
+        shim = open("core/pdf_builder.py").read()
+        assert "def _c(" not in shim, "pdf_builder.py shim must not define _c locally"
 
 
 # ── _apply_contrast font colors ──────────────────────────

@@ -263,7 +263,7 @@ def _correlation_analysis(
             y = s_b[common].values
 
             try:
-                pearson_r, p_val = scipy_stats.pearsonr(x, y)
+                pearson_r, p_val = scipy_stats.spearmanr(x, y)  # Spearman: robust to non-normal, outlier-resistant
                 spearman_r, _    = scipy_stats.spearmanr(x, y)
             except Exception:
                 logger.debug("%s skip", exc_info=True)
