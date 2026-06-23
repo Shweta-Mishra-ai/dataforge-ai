@@ -208,13 +208,15 @@ class _ReportCanvas(CV.Canvas):
 
     def save(self):
         tot = len(self._sp)
-        for st in self._sp:
+        # Cover page = page 1 → content pages start at page 2 in the merged PDF
+        page_offset = getattr(self, "_page_offset", 1)
+        for i, st in enumerate(self._sp):
             self.__dict__.update(st)
-            self._draw(tot)
+            self._draw(tot, page_number=i + 1 + page_offset, total_pages=tot + page_offset)
             super().showPage()
         super().save()
 
-    def _draw(self, tot):
+    def _draw(self, tot, page_number=None, total_pages=None):
         T = self.T
         # ── Header ────────────────────────────────────────
         self.setFillColor(_c(T["header_bg"]))
@@ -241,8 +243,11 @@ class _ReportCanvas(CV.Canvas):
         self.setFont("Helvetica", 6.5)
         self.drawString(18*mm, 4.5*mm,
             _domain_footer_text(getattr(self, "_domain", "general")))
+        # Use explicit page_number / total_pages if provided (correct for merged cover+content)
+        pn  = page_number   if page_number   is not None else self._pageNumber
+        tot_display = total_pages if total_pages is not None else tot
         self.drawRightString(W - 18*mm, 4.5*mm,
-            "Page {} of {}".format(self._pageNumber, tot))
+            "Page {} of {}".format(pn, tot_display))
 
 def _domain_footer_text(domain: str) -> str:
     """FIX-054: Domain-specific footer — no HR benchmarks in sales reports."""
@@ -1145,8 +1150,10 @@ def _dataset_overview(story, s, T, df, profile, CW):
                                                   f"{r**2:.3f}", strength, sig])
                         except Exception:
                             logger.debug("%s corr pair skip", exc_info=True)
-                corr_rows.sort(key=lambda x: abs(float(x[2])) if x[2] != "r" else 0, reverse=True)
-                top_corr = [corr_rows[0]] + corr_rows[1:7]
+                corr_header = corr_rows[0]
+                corr_data   = corr_rows[1:]
+                corr_data.sort(key=lambda x: abs(float(x[2])), reverse=True)
+                top_corr = [corr_header] + corr_data[:6]
                 if len(top_corr) > 1:
                     cws2 = [CW*x for x in [0.20, 0.20, 0.10, 0.10, 0.18, 0.10]]
                     ctbl = Table(top_corr, colWidths=cws2, repeatRows=1)

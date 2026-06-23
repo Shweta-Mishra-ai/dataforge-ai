@@ -44,13 +44,8 @@ if "df_active" not in st.session_state:
 
 df = st.session_state["df_active"]
 
-# FIX: st.secrets raises StreamlitSecretNotFoundError when secrets.toml is absent.
-# Safe pattern: try secrets first, fall back to env variable.
-try:
-    groq_key = st.secrets.get("GROQ_API_KEY", "")
-except Exception:
-    import os
-    groq_key = os.environ.get("GROQ_API_KEY", "")
+from core.config import get_groq_key as _get_groq_key
+groq_key = _get_groq_key()
 
 if not groq_key:
     st.error("⚠️ GROQ_API_KEY not found in .streamlit/secrets.toml")

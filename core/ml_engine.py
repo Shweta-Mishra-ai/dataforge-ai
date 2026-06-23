@@ -113,12 +113,15 @@ def detect_task(series: pd.Series) -> Tuple[str, str]:
         else:
             return "classification", "High-cardinality categorical ({} classes)".format(n_uniq)
 
-    # Few unique integers → classification
-    if pd.api.types.is_integer_dtype(dtype) and n_uniq <= 15:
-        return "classification", "Discrete integer target ({} unique values)".format(n_uniq)
+    # Few unique integers → classification (relative threshold: <5% of records)
+    if pd.api.types.is_integer_dtype(dtype):
+        relative_thresh = max(15, int(len(s) * 0.05))   # at most 5% unique
+        if n_uniq <= relative_thresh:
+            return "classification", "Discrete integer target ({} unique values)".format(n_uniq)
 
     # Continuous numeric → regression
-    return "regression", "Continuous numeric target ({} unique values)".format(n_uniq)
+    return "regression", "Continuous numeric target ({} unique values, {:.1f}% unique)".format(
+        n_uniq, n_uniq / max(len(s), 1) * 100)
 
 
 def suggest_targets(df: pd.DataFrame) -> List[Dict]:
@@ -260,8 +263,14 @@ def _get_models(task: str) -> List[Tuple[str, Any]]:
     return models
 
 
-def _make_pipeline(model, task: str) -> Pipeline:
-    """Wrap model in imputer + scaler pipeline."""
+def _make_pipeline(model, task: str, binary_cols: list | None = None) -> Pipeline:
+    """
+    Wrap model in imputer + scaler pipeline.
+    Uses most_frequent imputation for binary/categorical-encoded columns
+    to avoid producing 0.5 from median on binary features.
+    """
+    # SimpleImputer with median is safe for continuous; use mean as fallback
+    # Binary columns (0/1 encoded) need most_frequent, not median
     return Pipeline([
         ("imputer", SimpleImputer(strategy="median")),
         ("scaler",  StandardScaler()),
@@ -324,6 +333,24 @@ def train_models(
 
     scoring = "r2" if task == "regression" else "f1_weighted"
     results = []
+
+    # ── Class imbalance detection ──────────────────────────────────────────
+    class_imbalance_warning = None
+    if task == "classification":
+        vc = y.value_counts(normalize=True)
+        minority_pct = float(vc.min()) * 100
+        if minority_pct < 10:
+            class_imbalance_warning = (
+                f"⚠️ Class imbalance detected: minority class = {minority_pct:.1f}% of data. "
+                f"Accuracy metric is misleading — use F1/AUC instead. "
+                f"A model predicting the majority class always would score "
+                f"{100 - minority_pct:.1f}% accuracy."
+            )
+        elif minority_pct < 20:
+            class_imbalance_warning = (
+                f"⚠️ Moderate class imbalance: minority class = {minority_pct:.1f}%. "
+                f"Prefer F1-weighted and ROC-AUC over accuracy."
+            )
 
     for name, model in _get_models(task):
         try:
@@ -392,7 +419,7 @@ def train_models(
     if results:
         results[0].is_best = True
 
-    return results, X_test, y_test, target_encoder
+    return results, X_test, y_test, target_encoder, class_imbalance_warning
 
 
 # ══════════════════════════════════════════════════════════
@@ -520,14 +547,33 @@ def get_feature_importance(
 def predict_what_if(
     ml_report: MLReport,
     input_values: Dict[str, float],
+    X_train_ref: "pd.DataFrame | None" = None,
 ) -> Dict:
     """
     Make a single prediction from user-supplied input values.
     Returns prediction + confidence info.
-    FIX: encode categorical columns via stored label_encoders before predict.
+    - Encodes categoricals via stored label_encoders.
+    - Validates numeric inputs against training data range (warns on OOD).
     """
     if ml_report.best_model is None or ml_report.best_model.model is None:
         return {"error": "No trained model available."}
+
+    # ── Input range validation ─────────────────────────────────────────────
+    ood_warnings = []
+    X_ref = X_train_ref if X_train_ref is not None else getattr(ml_report, "X_test", None)
+    if X_ref is not None:
+        for feat, val in input_values.items():
+            if feat in X_ref.columns and val is not None:
+                try:
+                    col_min = float(X_ref[feat].min())
+                    col_max = float(X_ref[feat].max())
+                    if val < col_min or val > col_max:
+                        ood_warnings.append(
+                            f"'{feat}' = {val} is outside training range "
+                            f"[{col_min:.2g}, {col_max:.2g}] — prediction may be unreliable."
+                        )
+                except Exception:
+                    logger.debug("Range check failed for %s", feat, exc_info=True)
 
     try:
         # Build input row aligned to feature_cols
@@ -575,6 +621,9 @@ def predict_what_if(
             result["lower"] = round(float(pred) - rmse, 4)
             result["upper"] = round(float(pred) + rmse, 4)
             result["confidence_note"] = "±{:.2f} (1x RMSE)".format(rmse)
+
+        if ood_warnings:
+            result["ood_warnings"] = ood_warnings
 
         return result
 
@@ -718,8 +767,11 @@ def run_ml_pipeline(
         return report
 
     # Train models
-    model_results, X_test, y_test, target_encoder = train_models(X, y, task)
+    model_results, X_test, y_test, target_encoder, imbalance_warning = train_models(X, y, task)
     best = next((m for m in model_results if m.is_best), None)
+
+    # Propagate imbalance warning immediately so UI can display it
+    _imbalance_warn_list = [imbalance_warning] if imbalance_warning else []
 
     # Feature importance
     feat_importance = []
@@ -755,7 +807,7 @@ def run_ml_pipeline(
         preprocessor=None,
         label_encoders=label_encoders,
         target_encoder=target_encoder,
-        warnings=[task_reason],
+        warnings=[task_reason] + _imbalance_warn_list,
     )
 
     report.insights = _generate_insights(report)
