@@ -48,10 +48,20 @@ CORE_FILES_NEEDING_LOGGING = [
     "core/insights_builder.py",
     "core/data_profiler.py",
     "core/story_engine.py",
+    "core/engines/base.py",
+    "core/engines/hr.py",
+    "core/engines/ecommerce.py",
+    "core/engines/sales.py",
+    "core/engines/finance.py",
+    "core/engines/general.py",
     "core/bi_engine.py",
     "core/chart_exporter.py",
     "core/chart_engine.py",
-    "core/pdf_builder.py",
+    "core/pdf/theme.py",
+    "core/pdf/primitives.py",
+    "core/pdf/sections.py",
+    "core/pdf/domain_sections.py",
+    "core/pdf/builder.py",
     "core/eda_engine.py",
     "core/ml_engine.py",
     "core/domain_dashboards.py",
@@ -114,9 +124,11 @@ class TestStoryEngineExecSummary:
     def test_exec_summary_not_boilerplate(self, hr_df):
         from core.story_engine import generate_story
         story = generate_story(hr_df)
-        # Old boilerplate: "This X-row Y dataset analysis identified N critical issue(s)"
-        assert "identified" not in story.executive_summary.lower() or "analysed" in story.executive_summary.lower(), \
-            "exec summary still looks like old boilerplate"
+        summary = story.executive_summary.lower()
+        # The old boilerplate was: "This X-row Y dataset analysis identified N critical issue(s)"
+        # Pattern: starts with "this" and has "dataset analysis"
+        assert not (summary.startswith("this") and "dataset analysis" in summary), \
+            "exec summary still matches old boilerplate pattern (starts with 'this...dataset analysis')"
 
     def test_exec_summary_has_row_count(self, hr_df):
         from core.story_engine import generate_story
