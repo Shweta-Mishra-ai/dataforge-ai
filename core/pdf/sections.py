@@ -439,7 +439,7 @@ def _benchmark_section(story, s, T, domain, CW, df=None):
                              f"Dataset median: {med_v:.2f}",
                              "Dataset computed"])
             except Exception:
-                logger.debug("%s silent skip", exc_info=True)
+                logger.warning("%s unexpected failure", exc_info=True)
 
     if not rows:
         story.append(Paragraph(
@@ -576,7 +576,7 @@ def _dataset_overview(story, s, T, df, profile, CW):
                     if (diffs == 1).mean() > 0.90:
                         return True
                 except Exception:
-                    logger.debug("%s id-col check skip", exc_info=True)
+                    logger.warning("id-col check failed", exc_info=True)
             return False
 
         filtered_num = [c for c in num_cols if not _is_id_col(c, df[c])]
@@ -640,7 +640,7 @@ def _dataset_overview(story, s, T, df, profile, CW):
                     f"{out_pct:.1f}%", flag,
                 ])
             except Exception:
-                logger.debug("%s flag row skip", exc_info=True)
+                logger.warning("flag row failed", exc_info=True)
         if len(flag_rows) > 1:
             cws = [CW*x for x in [0.18, 0.1, 0.1, 0.09, 0.09, 0.12, 0.32]]
             ft = Table(flag_rows, colWidths=cws, repeatRows=1)
@@ -683,7 +683,7 @@ def _dataset_overview(story, s, T, df, profile, CW):
                                 corr_rows.append([a[:12], b[:12], f"{r:+.3f}",
                                                   f"{r**2:.3f}", strength, sig])
                         except Exception:
-                            logger.debug("%s corr pair skip", exc_info=True)
+                            logger.debug("corr pair skip", exc_info=True)
                 corr_header = corr_rows[0]
                 corr_data   = corr_rows[1:]
                 corr_data.sort(key=lambda x: abs(float(x[2])), reverse=True)
@@ -860,7 +860,7 @@ def _chart_page(story, s, T, img_bytes, title, narrative, num, CW):
                         width=CW, height=CW * 0.48)
             story.append(KeepTogether([img, Spacer(1, 3*mm)]))
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
     if narrative:
         story.append(Paragraph("Analysis", s["h3"]))
         _narrative_box(story, s, T, narrative)

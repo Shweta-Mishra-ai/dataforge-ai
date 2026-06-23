@@ -54,6 +54,11 @@ CORE_FILES_NEEDING_LOGGING = [
     "core/engines/sales.py",
     "core/engines/finance.py",
     "core/engines/general.py",
+    "core/dashboards/hr.py",
+    "core/dashboards/finance.py",
+    "core/dashboards/ecommerce.py",
+    "core/dashboards/sales.py",
+    "core/dashboards/general.py",
     "core/bi_engine.py",
     "core/chart_exporter.py",
     "core/chart_engine.py",
@@ -277,3 +282,91 @@ class TestReportNarrativeFallback:
     def test_report_page_imports_logging(self):
         src = open("pages/8_Reports.py").read()
         assert "import logging" in src
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  NEW: No bare except / logger.debug suppression in dashboards
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestDashboardSplit:
+    def test_domain_dashboards_shim_re_exports(self):
+        """Shim must re-export get_domain_kpis and get_domain_charts."""
+        from core.domain_dashboards import get_domain_kpis, get_domain_charts
+        assert callable(get_domain_kpis)
+        assert callable(get_domain_charts)
+
+    def test_dashboards_package_importable(self):
+        """All dashboard submodules must import without error."""
+        import core.dashboards.base
+        import core.dashboards.hr
+        import core.dashboards.finance
+        import core.dashboards.ecommerce
+        import core.dashboards.sales
+        import core.dashboards.general
+        assert True  # reaching here = no ImportError
+
+    def test_no_bare_except_in_dashboards(self):
+        """Dashboard files must not use bare except:."""
+        import ast
+        import pathlib
+        for path in pathlib.Path("core/dashboards").glob("*.py"):
+            if path.name == "__init__.py":
+                continue
+            try:
+                tree = ast.parse(path.read_text())
+            except SyntaxError as e:
+                pytest.fail(f"{path.name}: SyntaxError — {e}")
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ExceptHandler) and node.type is None:
+                    pytest.fail(f"{path.name} line {node.lineno}: bare `except:` not allowed")
+
+    def test_no_silent_debug_in_dashboards(self):
+        """Dashboard files must not use logger.debug for unexpected failures."""
+        import pathlib
+        for path in pathlib.Path("core/dashboards").glob("*.py"):
+            if path.name == "__init__.py":
+                continue
+            src = path.read_text()
+            if 'logger.debug("%s silent skip"' in src or 'logger.debug("%s skip"' in src:
+                pytest.fail(
+                    f"{path.name}: still has silent logger.debug. "
+                    "Use logger.warning for unexpected failures."
+                )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  NEW: Silent failure surfacing — logger.warning sweep
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestSilentFailureSweep:
+    CRITICAL_MODULES = [
+        "core/engines/hr.py",
+        "core/engines/finance.py",
+        "core/engines/ecommerce.py",
+        "core/engines/sales.py",
+        "core/engines/general.py",
+        "core/bi_engine.py",
+        "core/insight_engine.py",
+        "core/insights_builder.py",
+        "core/eda_engine.py",
+        "core/pdf/sections.py",
+        "core/pdf/domain_sections.py",
+    ]
+
+    @pytest.mark.parametrize("filepath", CRITICAL_MODULES)
+    def test_no_silent_debug_exceptions(self, filepath):
+        """
+        Critical modules must not swallow unexpected failures with logger.debug.
+        All unexpected except blocks should use logger.warning or logger.error.
+        """
+        import pathlib
+        src = pathlib.Path(filepath).read_text()
+        bad_patterns = [
+            'logger.debug("%s silent skip", exc_info=True)',
+            'logger.debug("%s skip", exc_info=True)',
+        ]
+        for pattern in bad_patterns:
+            assert pattern not in src, (
+                f"{filepath}: still contains '{pattern}'. "
+                "Use logger.warning for unexpected failures so operators see them."
+            )

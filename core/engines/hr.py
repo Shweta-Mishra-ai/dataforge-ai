@@ -57,7 +57,7 @@ def _run_attrition(df: pd.DataFrame) -> Optional[AttritionAnalysis]:
                         lv.mean(), sv.mean(), diff_pct),
                 })
         except Exception:
-            logger.debug("%s skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
             continue
 
     # Categorical drivers
@@ -83,7 +83,7 @@ def _run_attrition(df: pd.DataFrame) -> Optional[AttritionAnalysis]:
                         worst, rates[worst], best, rates[best]),
                 })
         except Exception:
-            logger.debug("%s skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
             continue
 
     top_drivers.sort(key=lambda x: x["impact"], reverse=True)

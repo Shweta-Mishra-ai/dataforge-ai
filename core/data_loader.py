@@ -246,7 +246,7 @@ def _sanitize(df: pd.DataFrame, warnings: list) -> pd.DataFrame:
                 warnings.append(
                     "{:,} infinite values replaced with blank.".format(int(inf_count)))
     except Exception:
-        logger.debug("%s silent skip", exc_info=True)
+        logger.warning("data_loader unexpected failure", exc_info=True)
 
     # Try to improve dtypes for object columns (safe — won't break values)
     df = _smart_dtype_inference(df)
@@ -278,7 +278,7 @@ def _smart_dtype_inference(df: pd.DataFrame) -> pd.DataFrame:
                 df[col] = converted
                 continue
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("data_loader unexpected failure", exc_info=True)
 
         # Try datetime (only for date-named columns)
         date_keywords = ["date", "time", "created", "updated", "timestamp"]
@@ -290,6 +290,6 @@ def _smart_dtype_inference(df: pd.DataFrame) -> pd.DataFrame:
                 if success_rate > 0.70:
                     df[col] = converted
             except Exception:
-                logger.debug("%s silent skip", exc_info=True)
+                logger.warning("data_loader unexpected failure", exc_info=True)
 
     return df

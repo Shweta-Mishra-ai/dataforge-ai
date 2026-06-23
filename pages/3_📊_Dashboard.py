@@ -330,7 +330,7 @@ with tabs[tab_idx]:
             desc.index = desc.index.str.upper()
             st.dataframe(desc.astype(str), use_container_width=True)
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
 
 # ── Trends tab ────────────────────────────────────────────────────────────────
 if dt_cols:

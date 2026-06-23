@@ -483,7 +483,7 @@ def generate_all_charts(
                 df, best_cat, best_metric, title, theme_name
             )))
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
 
     # 2. Second view — datetime trend OR second categorical breakdown
     #    (avoids numeric-binned x-axis with unreadable labels like "(0.089, 0.)")
@@ -494,7 +494,7 @@ def generate_all_charts(
                 df, date_cols[0], best_metric, title, theme_name
             )))
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
     else:
         second_cat = next(
             (c for c in cat_cols if c != best_cat and 2 <= df[c].nunique() <= 12),
@@ -507,7 +507,7 @@ def generate_all_charts(
                     df, second_cat, best_metric, title, theme_name
                 )))
             except Exception:
-                logger.debug("%s silent skip", exc_info=True)
+                logger.warning("%s unexpected failure", exc_info=True)
         elif len(num_cols) >= 2:
             second_metric = next((c for c in num_cols if c != best_metric), num_cols[0])
             title = "Distribution: {}".format(second_metric.replace("_", " ").title())
@@ -516,7 +516,7 @@ def generate_all_charts(
                     df, second_metric, title, theme_name
                 )))
             except Exception:
-                logger.debug("%s silent skip", exc_info=True)
+                logger.warning("%s unexpected failure", exc_info=True)
 
     # 3. Histogram — distribution of primary metric
     if best_metric:
@@ -526,7 +526,7 @@ def generate_all_charts(
                 df, best_metric, title, theme_name
             )))
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
 
     # 4. Correlation heatmap
     if len(num_cols) >= 3:
@@ -535,7 +535,7 @@ def generate_all_charts(
                 df, "Correlation Matrix", theme_name
             )))
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
 
     # 5. Ranked horizontal bar — clearer comparison than a pie for many categories
     if best_cat and best_metric:
@@ -551,6 +551,6 @@ def generate_all_charts(
                     df, best_cat, best_metric, title, theme_name
                 )))
             except Exception:
-                logger.debug("%s silent skip", exc_info=True)
+                logger.warning("%s unexpected failure", exc_info=True)
 
     return charts[:max_charts]

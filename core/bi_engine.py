@@ -223,7 +223,7 @@ def analyze_root_cause(
                     "dtype":     "numeric",
                 })
         except Exception:
-            logger.debug("%s skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
             continue
 
     # Categorical features — compare distributions
@@ -268,7 +268,7 @@ def analyze_root_cause(
                 "dtype":       "categorical",
             })
         except Exception:
-            logger.debug("%s skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
             continue
 
     # Sort by impact
@@ -690,7 +690,7 @@ def run_bi(df: pd.DataFrame, max_rows: int = 50_000) -> BIReport:
         try:
             report.benchmarks.append(analyze_benchmark(df, col))
         except Exception:
-            logger.debug("%s skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
             continue
 
     # 2. Root cause — top numeric as target
@@ -699,7 +699,7 @@ def run_bi(df: pd.DataFrame, max_rows: int = 50_000) -> BIReport:
             report.root_causes.append(
                 analyze_root_cause(df, col, threshold_pct=25))
         except Exception:
-            logger.debug("%s skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
             continue
 
     # 3. Cohort analysis — top cat × top numeric
@@ -708,7 +708,7 @@ def run_bi(df: pd.DataFrame, max_rows: int = 50_000) -> BIReport:
             try:
                 report.cohorts.append(analyze_cohort(df, cat, num))
             except Exception:
-                logger.debug("%s skip", exc_info=True)
+                logger.warning("%s unexpected failure", exc_info=True)
                 continue
 
     # 4. Pareto — top cat × top numeric
@@ -719,7 +719,7 @@ def run_bi(df: pd.DataFrame, max_rows: int = 50_000) -> BIReport:
                       or "rating" in num.lower() else "sum"
                 report.pareto.append(analyze_pareto(df, cat, num, agg))
             except Exception:
-                logger.debug("%s skip", exc_info=True)
+                logger.warning("%s unexpected failure", exc_info=True)
                 continue
 
     # 5. Segment health
@@ -728,7 +728,7 @@ def run_bi(df: pd.DataFrame, max_rows: int = 50_000) -> BIReport:
             report.segments = analyze_segment_health(
                 df, cat_cols[0], num_cols[:4])
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
 
     # 6. Key insights + brief
     report.key_insights, report.executive_brief = _generate_key_insights(report, df)

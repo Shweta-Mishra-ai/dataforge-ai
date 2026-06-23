@@ -142,7 +142,7 @@ def _hr_insights(df: pd.DataFrame) -> List[Dict]:
                 "columns_used": [atr_col],
             })
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
 
     # ── 2. Satisfaction Analysis ──────────────────────────────────────────────
     sat_col = _find_col(df, ["satisfaction", "satisfaction_level", "engagement"], numeric_only=True)
@@ -190,7 +190,7 @@ def _hr_insights(df: pd.DataFrame) -> List[Dict]:
                 "columns_used": [sat_col],
             })
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
 
     # ── 3. Workload / Overwork Detection ─────────────────────────────────────
     hours_col = _find_col(df, ["average_montly_hours", "monthly_hours", "hours", "avg_hours"], numeric_only=True)
@@ -226,7 +226,7 @@ def _hr_insights(df: pd.DataFrame) -> List[Dict]:
                     "columns_used": [hours_col],
                 })
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
 
     # ── 4. Compensation Analysis ──────────────────────────────────────────────
     sal_col = _find_col_exact(df, ["salary", "salary_band", "compensation", "pay_grade"])
@@ -261,7 +261,7 @@ def _hr_insights(df: pd.DataFrame) -> List[Dict]:
                         "columns_used": [sal_col, atr_col2],
                     })
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
 
     # ── 5. Promotion Gap ─────────────────────────────────────────────────────
     promo_col = _find_col(df, ["promotion", "promoted", "promotion_last_5years"], numeric_only=True)
@@ -284,7 +284,7 @@ def _hr_insights(df: pd.DataFrame) -> List[Dict]:
                     "columns_used": [promo_col],
                 })
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
 
     return insights
 
@@ -333,7 +333,7 @@ def _ecommerce_insights(df: pd.DataFrame) -> List[Dict]:
                 "columns_used": [amount_col],
             })
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
 
     # ── 2. Order Status / Cancellation ───────────────────────────────────────
     status_col = _find_col_exact(df, ["status", "order_status", "order status"])
@@ -406,7 +406,7 @@ def _ecommerce_insights(df: pd.DataFrame) -> List[Dict]:
                         "columns_used": [status_col],
                     })
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
 
     # ── 3. Fulfillment Performance ────────────────────────────────────────────
     fulfil_col = _find_col_exact(df, ["fulfilment", "fulfillment", "fulfilled_by", "fulfillment_method"])
@@ -443,7 +443,7 @@ def _ecommerce_insights(df: pd.DataFrame) -> List[Dict]:
                         "columns_used": [fulfil_col, amount_col],
                     })
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
 
     # ── 4. Quantity Analysis ──────────────────────────────────────────────────
     qty_col = _find_col(df, ["qty", "quantity", "units", "items"], numeric_only=True)
@@ -467,7 +467,7 @@ def _ecommerce_insights(df: pd.DataFrame) -> List[Dict]:
                     "columns_used": [qty_col],
                 })
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
 
     return insights
 
@@ -504,7 +504,7 @@ def _sales_insights(df: pd.DataFrame) -> List[Dict]:
                 "columns_used": [rev_col],
             })
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
 
     return insights
 
@@ -536,7 +536,7 @@ def _general_insights(df: pd.DataFrame) -> List[Dict]:
                     "columns_used": [col],
                 })
         except Exception:
-            logger.debug("%s skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
             continue
 
     return insights[:3]
