@@ -206,7 +206,7 @@ if gen_btn:
                         findings_list.append(f"'{col}' is heavily skewed (skew={sk:.2f}) — use median {df[col].median():.2f}, not mean {mean_v:.2f}")
                     stat_highlights.append(f"'{col}': mean={mean_v:.2f}, σ={std_v:.2f}")
                 except Exception:
-                    logger.debug("%s silent skip", exc_info=True)
+                    logger.warning("%s unexpected failure", exc_info=True)
 
             # Correlation highlights
             corr_note = ""
@@ -278,7 +278,7 @@ if gen_btn:
             try:
                 stats_report = stats_cached or __import__("core.stats_engine", fromlist=["analyze"]).analyze(df)
             except Exception:
-                logger.debug("%s silent skip", exc_info=True)
+                logger.warning("%s unexpected failure", exc_info=True)
 
         # 6. BI
         progress.progress(52, text="Running business intelligence...")
@@ -288,7 +288,7 @@ if gen_btn:
                 from core.bi_engine import run_bi
                 bi_report = run_bi(df)
             except Exception:
-                logger.debug("%s silent skip", exc_info=True)
+                logger.warning("%s unexpected failure", exc_info=True)
 
         # 7. ML
         ml_report = ml_cached if include_ml else None

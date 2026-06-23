@@ -87,7 +87,7 @@ def _insights_general(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
                     "Potential data collection bias or limited diversity."
                 )
         except Exception:
-            logger.debug("Generic opportunity check failed for %s", col, exc_info=True)
+            logger.warning("Opportunity check failed for %s", col, exc_info=True)
 
     actions.extend([
         "Validate all outliers before analysis or modeling",

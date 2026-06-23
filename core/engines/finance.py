@@ -116,7 +116,7 @@ def _insights_finance(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
                 findings.append(f"Gross margin ranges from {min_margin:.1f}% to {float(margin_series.max()):.1f}% — high variability")
 
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
 
     # ── 2. REVENUE TREND (period analysis) ───────────────────────────────
     if period_col and rev_col:
@@ -127,7 +127,7 @@ def _insights_finance(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
                 try:
                     period_rev = period_rev.sort_index()
                 except Exception:
-                    logger.debug("%s silent skip", exc_info=True)
+                    logger.warning("%s unexpected failure", exc_info=True)
 
                 first_half_mean  = float(period_rev.iloc[:len(period_rev)//2].mean())
                 second_half_mean = float(period_rev.iloc[len(period_rev)//2:].mean())
@@ -171,7 +171,7 @@ def _insights_finance(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
                 findings.append(f"Revenue across {len(period_rev)} periods: peak {peak_val:,.0f} in {best_period}, "
                                  f"trough {trough_val:,.0f} in {worst_period}")
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
 
     # ── 3. BUDGET VS ACTUAL ───────────────────────────────────────────────
     if budget_col and actual_col and budget_col != actual_col:
@@ -217,7 +217,7 @@ def _insights_finance(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
                     severity = bv_sev, category = "budget_variance"
                 ))
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
 
     # ── 4. COST CATEGORY CONCENTRATION ───────────────────────────────────
     if cat_col and (cost_col or expense_col or amt_col):
@@ -261,7 +261,7 @@ def _insights_finance(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
                         f"review whether these activities generate sufficient return"
                     )
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
 
     # ── 5. OPERATING EXPENSE RATIO ────────────────────────────────────────
     if opex_col and rev_col:
@@ -295,7 +295,7 @@ def _insights_finance(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
                     severity = opex_sev, category = "opex_ratio"
                 ))
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
 
     # ── 6. REVENUE CONCENTRATION (category) ──────────────────────────────
     if cat_col and rev_col:
@@ -321,7 +321,7 @@ def _insights_finance(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
                         f"Top 3 categories = {top3_rev_pct:.1f}% of revenue — moderate concentration risk"
                     )
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
 
     # ── 7. PERIOD-OVER-PERIOD COST GROWTH ─────────────────────────────────
     if period_col and cost_col and rev_col:
@@ -330,7 +330,7 @@ def _insights_finance(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
             try:
                 period_data = period_data.sort_index()
             except Exception:
-                logger.debug("%s silent skip", exc_info=True)
+                logger.warning("%s unexpected failure", exc_info=True)
             if len(period_data) >= 3:
                 rev_growth  = period_data[rev_col].pct_change().mean() * 100
                 cost_growth = period_data[cost_col].pct_change().mean() * 100
@@ -354,7 +354,7 @@ def _insights_finance(df: pd.DataFrame, stats: Dict, corrs: List) -> Dict:
                         f"Avg period cost growth: {cost_growth:.1f}%"
                     )
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
 
     # ── Actions ───────────────────────────────────────────────────────────
     if not actions:

@@ -239,12 +239,12 @@ def _finance_page(story, s, T, df, config, CW, profile=None):
         header = ["Line Item", "Amount", "% Revenue", "Source"]
         all_rows = [header] + pl_rows
         col_w = [CW*0.38, CW*0.22, CW*0.18, CW*0.22]
-        t = Table([[Paragraph(str(c), s["th"] if ri == 0 else s["td"])
+        t = Table([[Paragraph(str(c), s["h3"] if ri == 0 else s["body"])
                     for c in row]
                    for ri, row in enumerate(all_rows)],
                   colWidths=col_w)
         t.setStyle(TableStyle([
-            ("BACKGROUND",    (0,0), (-1,0), _c(T["primary"])),
+            ("BACKGROUND",    (0,0), (-1,0), _c(T["header_bg"])),
             ("TEXTCOLOR",     (0,0), (-1,0), _c("#FFFFFF")),
             ("TOPPADDING",    (0,0), (-1,-1), 4),
             ("BOTTOMPADDING", (0,0), (-1,-1), 4),
@@ -300,12 +300,12 @@ def _finance_page(story, s, T, df, config, CW, profile=None):
                 all_rows_bva = [bva_header] + bva_data
                 col_w_bva    = [CW*0.30, CW*0.17, CW*0.17, CW*0.18, CW*0.18]
 
-                t_bva = Table([[Paragraph(str(c), s["th"] if ri == 0 else s["td"])
+                t_bva = Table([[Paragraph(str(c), s["h3"] if ri == 0 else s["body"])
                                 for c in row]
                                for ri, row in enumerate(all_rows_bva)],
                               colWidths=col_w_bva)
                 t_bva.setStyle(TableStyle([
-                    ("BACKGROUND",    (0,0), (-1,0), _c(T["primary"])),
+                    ("BACKGROUND",    (0,0), (-1,0), _c(T["header_bg"])),
                     ("TEXTCOLOR",     (0,0), (-1,0), _c("#FFFFFF")),
                     ("TOPPADDING",    (0,0), (-1,-1), 4),
                     ("BOTTOMPADDING", (0,0), (-1,-1), 4),
@@ -340,12 +340,12 @@ def _finance_page(story, s, T, df, config, CW, profile=None):
             cat_header = ["Category / Segment", "Total Amount", "% of Total"]
             all_cat    = [cat_header] + cat_rows
             col_w_cat  = [CW*0.50, CW*0.28, CW*0.22]
-            t_cat = Table([[Paragraph(str(c), s["th"] if ri == 0 else s["td"])
+            t_cat = Table([[Paragraph(str(c), s["h3"] if ri == 0 else s["body"])
                             for c in row]
                            for ri, row in enumerate(all_cat)],
                           colWidths=col_w_cat)
             t_cat.setStyle(TableStyle([
-                ("BACKGROUND",    (0,0), (-1,0), _c(T["primary"])),
+                ("BACKGROUND",    (0,0), (-1,0), _c(T["header_bg"])),
                 ("TEXTCOLOR",     (0,0), (-1,0), _c("#FFFFFF")),
                 ("TOPPADDING",    (0,0), (-1,-1), 4),
                 ("BOTTOMPADDING", (0,0), (-1,-1), 4),
@@ -377,7 +377,7 @@ def _finance_page(story, s, T, df, config, CW, profile=None):
             try:
                 period_rev = period_rev.sort_index()
             except Exception:
-                logger.debug("%s silent skip", exc_info=True)
+                logger.warning("%s unexpected failure", exc_info=True)
 
             if len(period_rev) >= 2:
                 period_rows = [[str(idx)[:20], f"{val:,.0f}",
@@ -387,12 +387,12 @@ def _finance_page(story, s, T, df, config, CW, profile=None):
                 period_header = ["Period", "Revenue", "Change vs Prior"]
                 all_period    = [period_header] + period_rows
                 col_w_p       = [CW*0.38, CW*0.35, CW*0.27]
-                t_p = Table([[Paragraph(str(c), s["th"] if ri == 0 else s["td"])
+                t_p = Table([[Paragraph(str(c), s["h3"] if ri == 0 else s["body"])
                               for c in row]
                              for ri, row in enumerate(all_period)],
                             colWidths=col_w_p)
                 t_p.setStyle(TableStyle([
-                    ("BACKGROUND",    (0,0), (-1,0), _c(T["primary"])),
+                    ("BACKGROUND",    (0,0), (-1,0), _c(T["header_bg"])),
                     ("TEXTCOLOR",     (0,0), (-1,0), _c("#FFFFFF")),
                     ("TOPPADDING",    (0,0), (-1,-1), 4),
                     ("BOTTOMPADDING", (0,0), (-1,-1), 4),

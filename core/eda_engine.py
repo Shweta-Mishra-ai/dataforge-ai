@@ -180,7 +180,7 @@ def _fit_distribution(s: pd.Series) -> Tuple[str, Dict]:
                 best_dist   = dist_name
                 best_params = {"params": params, "ks_p": round(p, 4)}
         except Exception:
-            logger.debug("%s skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
             continue
     return best_dist, best_params
 
@@ -249,7 +249,7 @@ def analyze_univariate(series: pd.Series) -> UnivariateResult:
         mode_val   = float(s.mode().iloc[0])
         result.mode = round(mode_val, 6)
     except Exception:
-        logger.debug("%s silent skip", exc_info=True)
+        logger.warning("%s unexpected failure", exc_info=True)
 
     # Distribution shape
     skew = float(s.skew())
@@ -280,21 +280,21 @@ def analyze_univariate(series: pd.Series) -> UnivariateResult:
         result.shapiro_stat = round(float(sw_stat), 6)
         result.shapiro_p    = round(float(sw_p), 6)
     except Exception:
-        logger.debug("%s silent skip", exc_info=True)
+        logger.warning("%s unexpected failure", exc_info=True)
 
     try:
         da_stat, da_p = normaltest(s)
         result.dagostino_stat = round(float(da_stat), 6)
         result.dagostino_p    = round(float(da_p), 6)
     except Exception:
-        logger.debug("%s silent skip", exc_info=True)
+        logger.warning("%s unexpected failure", exc_info=True)
 
     try:
         ad_result = anderson(sample, dist="norm")
         result.anderson_stat     = round(float(ad_result.statistic), 6)
         result.anderson_critical = round(float(ad_result.critical_values[2]), 6)
     except Exception:
-        logger.debug("%s silent skip", exc_info=True)
+        logger.warning("%s unexpected failure", exc_info=True)
 
     # Consensus normality — majority of tests
     normal_votes = 0
@@ -344,7 +344,7 @@ def analyze_univariate(series: pd.Series) -> UnivariateResult:
         try:
             result.best_fit_dist, result.best_fit_params = _fit_distribution(s)
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
 
     # Plain English interpretation
     mean_vs_median = abs(result.mean - result.median)
@@ -619,7 +619,7 @@ def analyze_vif(df: pd.DataFrame) -> List[MulticollinearityResult]:
                 verdict=verdict, interpretation=interp,
             ))
         except Exception:
-            logger.debug("%s skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
             continue
 
     return sorted(results, key=lambda x: x.vif, reverse=True)
@@ -786,7 +786,7 @@ def run_eda(df: pd.DataFrame, max_rows: int = 50_000) -> EDAReport:
         try:
             report.univariate[col] = analyze_univariate(df[col])
         except Exception:
-            logger.debug("%s skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
             continue
 
     # 2. Correlations — numeric pairs
@@ -805,7 +805,7 @@ def run_eda(df: pd.DataFrame, max_rows: int = 50_000) -> EDAReport:
                 )
                 report.correlations.append(res)
             except Exception:
-                logger.debug("%s skip", exc_info=True)
+                logger.warning("%s unexpected failure", exc_info=True)
                 continue
 
     report.correlations.sort(
@@ -822,7 +822,7 @@ def run_eda(df: pd.DataFrame, max_rows: int = 50_000) -> EDAReport:
                 )
                 report.group_comparisons.append(res)
             except Exception:
-                logger.debug("%s skip", exc_info=True)
+                logger.warning("%s unexpected failure", exc_info=True)
                 continue
 
     # 4. Multicollinearity
@@ -830,7 +830,7 @@ def run_eda(df: pd.DataFrame, max_rows: int = 50_000) -> EDAReport:
         try:
             report.multicollinearity = analyze_vif(df)
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
 
     # 5. Time series
     if dt_cols and num_cols:
@@ -840,7 +840,7 @@ def run_eda(df: pd.DataFrame, max_rows: int = 50_000) -> EDAReport:
                     res = analyze_time_series(df, dt_col, num_col)
                     report.time_series.append(res)
                 except Exception:
-                    logger.debug("%s skip", exc_info=True)
+                    logger.warning("%s unexpected failure", exc_info=True)
                     continue
 
     # 6. Key findings

@@ -103,7 +103,7 @@ def _is_identifier(col_name: str, series: pd.Series, n_rows: int) -> bool:
             if (diffs == 1).mean() > 0.95:
                 return True
     except Exception:
-        logger.debug("%s silent skip", exc_info=True)
+        logger.warning("%s unexpected failure", exc_info=True)
 
     return False
 
@@ -312,7 +312,7 @@ def recommend_charts(
                 )
                 charts.append(("Trend Over Time", _apply_contrast(fig, theme_name)))
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected failure", exc_info=True)
 
     # Chart 3: Distribution histogram
     if primary_metric:
