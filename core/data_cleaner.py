@@ -157,13 +157,25 @@ def _clean_column(df: pd.DataFrame, col: str, report: CleaningReport):
     # ── 5c. Numeric outlier flagging (NOT auto-removed) ────
     if pd.api.types.is_numeric_dtype(df[col]) and col in df.columns:
         s2 = df[col].dropna()
+        # Force pure numeric array — quantile on object-backed Series returns
+        # a Series/DataFrame in newer pandas/Python 3.14, breaking b - a in numpy
+        try:
+            s2 = pd.to_numeric(s2, errors="coerce").dropna()
+        except Exception:
+            logger.warning("to_numeric failed for '%s' — skipping outlier flag", col)
+            return
         if len(s2) > 10:
-            q1, q3 = s2.quantile(0.25), s2.quantile(0.75)
+            try:
+                q1 = float(s2.quantile(0.25))
+                q3 = float(s2.quantile(0.75))
+            except (TypeError, ValueError):
+                logger.warning("quantile failed for '%s' — skipping outlier flag", col)
+                return
             iqr = q3 - q1
             if iqr > 0:
                 lo = q1 - 3.0 * iqr   # 3x IQR = extreme outliers only
                 hi = q3 + 3.0 * iqr
-                extreme = ((df[col] < lo) | (df[col] > hi)).sum()
+                extreme = int(((df[col] < lo) | (df[col] > hi)).sum())
                 if extreme > 0:
                     report.add(col,
                                "{} extreme outliers (3x IQR: {:.2g} – {:.2g})".format(
