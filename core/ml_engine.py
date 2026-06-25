@@ -299,7 +299,7 @@ def _evaluate_classification(y_true, y_pred, y_prob=None) -> Dict:
                                     average="weighted")
             auc = round(auc, 4)
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected ML failure", exc_info=True)
     return {"accuracy": round(acc, 4), "f1": round(f1, 4), "roc_auc": auc}
 
 
@@ -787,7 +787,7 @@ def run_ml_pipeline(
         try:
             y_pred = best.model.predict(X_test)
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("%s unexpected ML failure", exc_info=True)
 
     report = MLReport(
         task=task,

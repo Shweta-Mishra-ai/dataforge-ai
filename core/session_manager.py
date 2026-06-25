@@ -168,7 +168,7 @@ def _hash_df(df: pd.DataFrame) -> str:
             parts.append(str(df.iloc[0].astype(str).tolist())  if len(df) > 0 else "")
             parts.append(str(df.iloc[-1].astype(str).tolist()) if len(df) > 0 else "")
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("session_manager unexpected failure", exc_info=True)
         content = "|".join(parts)
         return hashlib.md5(content.encode("utf-8", errors="replace")).hexdigest()
     except Exception:

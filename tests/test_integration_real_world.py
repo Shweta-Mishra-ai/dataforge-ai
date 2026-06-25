@@ -494,8 +494,11 @@ class TestSilentFailureSurfacing:
         """PDF submodules must not use bare except:."""
         import ast
         import pathlib
-        pdf_files = list(pathlib.Path("core/pdf").glob("*.py"))
-        assert len(pdf_files) >= 4
+        pdf_files = (
+            list(pathlib.Path("core/pdf").glob("*.py")) +
+            [pathlib.Path("core/health_pdf_builder.py")]
+        )
+        assert len(pdf_files) >= 6
         for path in pdf_files:
             if path.name == "__init__.py":
                 continue
@@ -505,7 +508,7 @@ class TestSilentFailureSurfacing:
                 if isinstance(node, ast.ExceptHandler):
                     if node.type is None:
                         pytest.fail(
-                            f"core/pdf/{path.name} line {node.lineno}: "
+                            f"{path.name} line {node.lineno}: "
                             "bare `except:` not allowed."
                         )
 
