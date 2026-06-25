@@ -131,7 +131,7 @@ def _load_csv(f, warnings: list) -> Optional[pd.DataFrame]:
                         warnings.append("Separator detected: '{}'".format(sep))
                     return df
             except Exception:
-                logger.debug("%s skip", exc_info=True)
+                logger.warning("data_loader column parse failure", exc_info=True)
                 continue
 
     # Last resort — no separator detection

@@ -327,9 +327,9 @@ def _build_cover(T: dict, config: dict, kpis_preview: list) -> bytes:
             try:
                 os.unlink(_tmp.name)
             except Exception:
-                logger.debug("%s silent skip", exc_info=True)
+                logger.warning("PDF theme unexpected failure", exc_info=True)
         except Exception:
-            logger.debug("%s silent skip", exc_info=True)
+            logger.warning("PDF theme unexpected failure", exc_info=True)
 
     if not _logo_drawn and logo_path and os.path.exists(logo_path):
         try:

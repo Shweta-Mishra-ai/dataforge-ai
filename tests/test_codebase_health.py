@@ -64,9 +64,11 @@ CORE_FILES_NEEDING_LOGGING = [
     "core/chart_engine.py",
     "core/pdf/theme.py",
     "core/pdf/primitives.py",
-    "core/pdf/sections.py",
+    "core/pdf/narrative_sections.py",
+    "core/pdf/data_sections.py",
     "core/pdf/domain_sections.py",
     "core/pdf/builder.py",
+    "core/health_pdf_builder.py",
     "core/eda_engine.py",
     "core/ml_engine.py",
     "core/domain_dashboards.py",
@@ -349,8 +351,10 @@ class TestSilentFailureSweep:
         "core/insight_engine.py",
         "core/insights_builder.py",
         "core/eda_engine.py",
-        "core/pdf/sections.py",
+        "core/pdf/narrative_sections.py",
+        "core/pdf/data_sections.py",
         "core/pdf/domain_sections.py",
+        "core/health_pdf_builder.py",
     ]
 
     @pytest.mark.parametrize("filepath", CRITICAL_MODULES)

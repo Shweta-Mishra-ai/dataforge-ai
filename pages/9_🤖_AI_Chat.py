@@ -78,7 +78,7 @@ for msg in st.session_state["messages"]:
                     use_container_width=True
                 )
             except Exception:
-                logger.debug("%s silent skip", exc_info=True)
+                logger.warning("AI Chat unexpected failure", exc_info=True)
         if msg.get("df_json"):
             try:
                 st.dataframe(
@@ -86,7 +86,7 @@ for msg in st.session_state["messages"]:
                     use_container_width=True
                 )
             except Exception:
-                logger.debug("%s silent skip", exc_info=True)
+                logger.warning("AI Chat unexpected failure", exc_info=True)
 
 # ── Input ──────────────────────────────────────────────────
 prompt = st.chat_input(
@@ -139,7 +139,7 @@ if prompt:
                     try:
                         rec["fig_json"] = pio.to_json(result.figure)
                     except Exception:
-                        logger.debug("%s silent skip", exc_info=True)
+                        logger.warning("AI Chat unexpected failure", exc_info=True)
 
                 if result.dataframe is not None:
                     st.dataframe(
@@ -149,7 +149,7 @@ if prompt:
                     try:
                         rec["df_json"] = result.dataframe.head(50).to_json()
                     except Exception:
-                        logger.debug("%s silent skip", exc_info=True)
+                        logger.warning("AI Chat unexpected failure", exc_info=True)
 
             st.session_state["messages"].append(rec)
 
