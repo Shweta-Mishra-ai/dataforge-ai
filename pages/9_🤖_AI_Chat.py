@@ -135,7 +135,7 @@ if prompt:
                     rec["text"] += "\n" + result.text_output
 
                 if result.figure is not None:
-                    st.plotly_chart(result.figure, use_container_width=True)
+                    st.plotly_chart(result.figure, width="stretch")
                     try:
                         rec["fig_json"] = pio.to_json(result.figure)
                     except Exception:

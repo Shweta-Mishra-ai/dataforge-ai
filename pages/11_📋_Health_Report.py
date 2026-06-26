@@ -695,7 +695,7 @@ with c_a:
         height=260,
         paper_bgcolor="rgba(0,0,0,0)",
         font=dict( size=12))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 with c_b:
     vals   = [max(0, 100 - mp * 2.5), max(0, 100 - dp * 3),
@@ -715,7 +715,7 @@ with c_b:
         xaxis=dict(range=[0, 100]),
         margin=dict(l=10, r=10, t=40, b=10), showlegend=False,
     )
-    st.plotly_chart(fig2, use_container_width=True)
+    st.plotly_chart(fig2, width="stretch")
 
 st.divider()
 
