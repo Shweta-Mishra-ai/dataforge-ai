@@ -232,7 +232,7 @@ with tab1:
         fig.update_yaxes(tickfont=dict( size=10),
                          title_font=dict(),
                          gridcolor="rgba(128,128,128,.2)")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
 # ── Tab 2: Correlations ───────────────────────────────────
 with tab2:
@@ -281,7 +281,7 @@ with tab2:
                 paper_bgcolor="rgba(0,0,0,0)",
                 margin=dict(l=10, r=10, t=40, b=10),
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
         # Scatter for top correlation
         if corrs:
@@ -316,7 +316,7 @@ with tab2:
                 paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                 margin=dict(l=10, r=10, t=40, b=10),
             )
-            st.plotly_chart(fig_sc, use_container_width=True)
+            st.plotly_chart(fig_sc, width="stretch")
 
         # Effect size guide
         st.markdown("#### Effect Size Guide")
@@ -379,7 +379,7 @@ with tab3:
                         margin=dict(l=10, r=10, t=40, b=10),
                         showlegend=False,
                     )
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
                 except Exception:
                     logger.warning("%s unexpected failure", exc_info=True)
 
@@ -433,7 +433,7 @@ with tab4:
         )
         fig.update_xaxes(tickfont=dict(color="#0F172A"), title_font=dict())
         fig.update_yaxes(tickfont=dict(color="#0F172A"), title_font=dict())
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
         # Guide
         c1, c2, c3, c4 = st.columns(4)
@@ -494,7 +494,7 @@ with tab5:
                         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                         margin=dict(l=10, r=10, t=40, b=10),
                     )
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
                 except Exception:
                     logger.warning("%s unexpected failure", exc_info=True)
 

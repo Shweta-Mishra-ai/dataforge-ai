@@ -292,14 +292,29 @@ def _evaluate_classification(y_true, y_pred, y_prob=None) -> Dict:
     auc = None
     if y_prob is not None:
         try:
-            if len(np.unique(y_true)) == 2:
-                auc = roc_auc_score(y_true, y_prob[:, 1])
-            else:
+            n_classes_true  = len(np.unique(y_true))
+            n_classes_proba = y_prob.shape[1] if y_prob.ndim == 2 else 2
+
+            if n_classes_true == 2:
+                # Binary: use column 1 probability; handle 1-D proba arrays
+                proba_col = y_prob[:, 1] if y_prob.ndim == 2 else y_prob
+                auc = roc_auc_score(y_true, proba_col)
+            elif n_classes_true == n_classes_proba:
+                # Multiclass: only valid when y_true classes == proba columns
                 auc = roc_auc_score(y_true, y_prob, multi_class="ovr",
                                     average="weighted")
-            auc = round(auc, 4)
+            else:
+                # Mismatch — test split missing some classes (small / imbalanced data)
+                logger.warning(
+                    "roc_auc_score skipped: %d classes in y_true vs %d proba "
+                    "columns — test split does not contain all classes. "
+                    "Use stratified split or larger dataset.",
+                    n_classes_true, n_classes_proba,
+                )
+            if auc is not None:
+                auc = round(float(auc), 4)
         except Exception:
-            logger.warning("%s unexpected ML failure", exc_info=True)
+            logger.warning("roc_auc_score failed unexpectedly", exc_info=True)
     return {"accuracy": round(acc, 4), "f1": round(f1, 4), "roc_auc": auc}
 
 

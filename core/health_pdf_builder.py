@@ -63,25 +63,33 @@ def build_health_pdf(df: pd.DataFrame, niche: str, health: dict,
     light2      = HexColor("#F8FAFF")
     score_color = HexColor(health["color"])
 
-    # ── Premium fonts ─────────────────────────────────────
+    # ── Premium fonts — fall back to Helvetica if not found ──────────────
     import os as _os
     from reportlab.pdfbase import pdfmetrics as _pm
     from reportlab.pdfbase.ttfonts import TTFont as _TTF
-    _FONT_DIR = _os.path.join(
-        _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
-        "..", "assets", "fonts"
-    )
+
+    # Resolve repo root: health_pdf_builder is at core/, assets/ is at root
+    _REPO_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+    _FONT_DIR  = _os.path.join(_REPO_ROOT, "assets", "fonts")
+
     _BF, _BB, _BI = "Helvetica", "Helvetica-Bold", "Helvetica-Oblique"
-    for alias, fname_f in [("HDF-Reg","Carlito-Regular.ttf"),
-                            ("HDF-Bold","Carlito-Bold.ttf"),
-                            ("HDF-Italic","Carlito-Italic.ttf")]:
+    _FONTS = [
+        ("HDF-Reg",    "Carlito-Regular.ttf",    "_BF"),
+        ("HDF-Bold",   "Carlito-Bold.ttf",        "_BB"),
+        ("HDF-Italic", "Carlito-Italic.ttf",      "_BI"),
+    ]
+    for alias, fname_f, var in _FONTS:
+        font_path = _os.path.join(_FONT_DIR, fname_f)
+        if not _os.path.exists(font_path):
+            logger.warning("Font not found at %s — using Helvetica fallback", font_path)
+            continue
         try:
-            _pm.registerFont(_TTF(alias, _os.path.join(_FONT_DIR, fname_f)))
-            if alias == "HDF-Reg":  _BF = "HDF-Reg"
-            if alias == "HDF-Bold": _BB = "HDF-Bold"
-            if alias == "HDF-Italic": _BI = "HDF-Italic"
+            _pm.registerFont(_TTF(alias, font_path))
+            if alias == "HDF-Reg":    _BF = alias
+            if alias == "HDF-Bold":   _BB = alias
+            if alias == "HDF-Italic": _BI = alias
         except Exception:
-            logger.warning("Health Report section failure", exc_info=True)
+            logger.warning("Font registration failed for %s", alias, exc_info=True)
 
     def ps(name, **kw): return ParagraphStyle(name, **kw)
     ST = {

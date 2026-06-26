@@ -745,7 +745,7 @@ with tabs[3]:
                 ))
                 fig.update_layout(height=420, margin=dict(l=10,r=10,t=40,b=10),
                                   paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
                 st.caption("Spearman correlation. r² = shared variance. Correlation ≠ causation.")
             except Exception as e:
                 st.error(f"Heatmap error: {e}")

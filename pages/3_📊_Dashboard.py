@@ -230,7 +230,7 @@ if DOMAIN_DASH_AVAILABLE and domain != "general":
                 c1, c2 = st.columns(2)  # always 2 cols; single chart uses first only
                 for col_ui, (chart_title, fig) in zip([c1, c2], pair):
                     with col_ui:
-                        st.plotly_chart(fig, use_container_width=True,
+                        st.plotly_chart(fig, width="stretch",
                                         config={"displayModeBar": False})
                 if len(pair) == 1:
                     st.empty()  # Fill second column
@@ -284,17 +284,17 @@ with tabs[tab_idx]:
                     title=dict(text=f"{agg} of {col} by {cat}",
                                font=dict(size=14, color="#0F172A", family="Arial Black")),
                     height=max(300, len(gdata) * 36 + 80),
-                    paper_bgcolor="white", plot_bgcolor="#F8FAFF",
+                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                     margin=dict(l=10, r=90, t=55, b=20),
                     font=dict(color="#0F172A", family="Arial"),
-                    xaxis=dict(showgrid=True, gridcolor="#CBD5E1",
+                    xaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,.2)",
                                tickfont=dict(size=11, color="#0F172A"),
                                title_font=dict(color="#0F172A")),
                     yaxis=dict(showgrid=False,
                                tickfont=dict(size=11, color="#0F172A"),
                                title_font=dict(color="#0F172A")),
                 )
-                st.plotly_chart(fig, use_container_width=True,
+                st.plotly_chart(fig, width="stretch",
                                 config={"displayModeBar": False})
             except Exception as e:
                 st.error(f"Chart failed: {e}")
@@ -314,10 +314,10 @@ with tabs[tab_idx]:
                                line_width=1.5, annotation_text=f"Median {med_v:.2f}")
                 fig2.update_layout(
                     title=f"Distribution: {col2}",
-                    height=400, paper_bgcolor="white", plot_bgcolor="white",
+                    height=400, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                     margin=dict(l=10, r=10, t=50, b=20),
                 )
-                st.plotly_chart(fig2, use_container_width=True,
+                st.plotly_chart(fig2, width="stretch",
                                 config={"displayModeBar": False})
             except Exception as e:
                 st.error(f"Chart failed: {e}")
@@ -369,16 +369,16 @@ if dt_cols:
                     ))
                     fig.update_layout(
                         title=f"{agg2} of {val_col} over Time",
-                        height=380, paper_bgcolor="white", plot_bgcolor="white",
+                        height=380, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                         margin=dict(l=10, r=10, t=50, b=20),
                         xaxis=dict(showgrid=False,
                                tickfont=dict(color="#0F172A", size=10),
                                title_font=dict(color="#0F172A")),
-                        yaxis=dict(showgrid=True, gridcolor="#CBD5E1",
+                        yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,.2)",
                                tickfont=dict(color="#0F172A", size=10),
                                title_font=dict(color="#0F172A")),
                     )
-                    st.plotly_chart(fig, use_container_width=True,
+                    st.plotly_chart(fig, width="stretch",
                                     config={"displayModeBar": False})
                 except Exception as e:
                     st.error(f"Trend chart failed: {e}")
@@ -408,11 +408,11 @@ with tabs[tab_idx]:
                             fig.update_layout(
                                 title=f"{col}<br><sup>skew={skew:.2f} · "
                                       f"{'use median' if abs(skew)>1 else 'mean OK'}</sup>",
-                                height=280, paper_bgcolor="white",
-                                plot_bgcolor="white",
+                                height=280, paper_bgcolor="rgba(0,0,0,0)",
+                                plot_bgcolor="rgba(0,0,0,0)",
                                 margin=dict(l=10, r=10, t=55, b=20),
                             )
-                            st.plotly_chart(fig, use_container_width=True,
+                            st.plotly_chart(fig, width="stretch",
                                             config={"displayModeBar": False})
                         except Exception as e:
                             st.error(f"{col}: {e}")
@@ -435,10 +435,10 @@ with tabs[tab_idx]:
                              trendline="ols", **kwargs)
             fig.update_layout(
                 title=f"{col_a} vs {col_b}",
-                height=420, paper_bgcolor="white", plot_bgcolor="white",
+                height=420, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                 margin=dict(l=10, r=10, t=50, b=20),
             )
-            st.plotly_chart(fig, use_container_width=True,
+            st.plotly_chart(fig, width="stretch",
                             config={"displayModeBar": False})
         except Exception as e:
             st.error(f"Scatter failed: {e}")
@@ -461,10 +461,10 @@ with tabs[tab_idx]:
             fig_corr.update_layout(
                 title="Spearman Correlation Matrix (r²: shared variance, not causation)",
                 height=max(350, len(num_cols[:12]) * 40 + 80),
-                paper_bgcolor="white",
+                paper_bgcolor="rgba(0,0,0,0)",
                 margin=dict(l=10, r=10, t=60, b=20),
             )
-            st.plotly_chart(fig_corr, use_container_width=True,
+            st.plotly_chart(fig_corr, width="stretch",
                             config={"displayModeBar": False})
             st.caption("r² = shared variance between two variables. "
                        "Correlation is association — not causation.")
@@ -508,10 +508,10 @@ with tabs[tab_idx]:
             fig = px.histogram(df_filtered, x=x_col, **c_kwargs)
 
         fig.update_layout(
-            height=420, paper_bgcolor="white", plot_bgcolor="white",
+            height=420, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
             margin=dict(l=10, r=10, t=40, b=20),
         )
-        st.plotly_chart(fig, use_container_width=True,
+        st.plotly_chart(fig, width="stretch",
                         config={"displayModeBar": False})
     except Exception as e:
         st.error(f"Custom chart failed: {e}")

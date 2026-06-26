@@ -87,7 +87,7 @@ with tab1:
                     font=dict( size=11),
                     margin=dict(l=10, r=10, t=50, b=10),
                 )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
         except Exception as e:
             st.error(f"Chart error: {e}")
 
@@ -155,7 +155,7 @@ with tab3:
         )
         fig.update_xaxes(tickfont=dict(color="#0F172A"), title_font=dict())
         fig.update_yaxes(tickfont=dict(color="#0F172A"), title_font=dict())
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
         if not outliers.empty:
             st.markdown(f"**Outlier rows ({len(outliers):,}):**")
