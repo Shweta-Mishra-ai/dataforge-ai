@@ -19,6 +19,23 @@ from core.session_manager import init_session, set_dataframe
 
 init_session()
 
+# ── Adaptive dark/light CSS injected globally ─────────────────────────────────
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+html,body,[class*="css"]{font-family:'Inter',sans-serif!important}
+.block-container{padding-top:1.2rem!important}
+section[data-testid="stSidebar"]{background:linear-gradient(180deg,#0D1B2E,#0F2240)!important}
+section[data-testid="stSidebar"] *{color:rgba(255,255,255,.85)!important}
+section[data-testid="stSidebar"] hr{border-color:rgba(255,255,255,.12)!important}
+.df-card{background:rgba(128,128,128,.06);border:1px solid rgba(128,128,128,.18);border-radius:12px;padding:16px 20px;margin-bottom:12px}
+.risk-row{border-left:4px solid #ef4444;background:rgba(239,68,68,.07);padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:8px}
+.opp-row{border-left:4px solid #10b981;background:rgba(16,185,129,.07);padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:8px}
+.info-row{border-left:4px solid #3b82f6;background:rgba(59,130,246,.07);padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:8px}
+</style>
+""", unsafe_allow_html=True)
+
+
 # ── Header ─────────────────────────────────────────────────
 st.markdown("## Upload Your Data")
 st.caption("Supports CSV, Excel (.xlsx/.xls, multi-sheet), JSON — up to 200 MB")

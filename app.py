@@ -104,7 +104,7 @@ html, body, [class*="css"] {
     font-size: 13px; font-weight: 700; color: inherit;
     text-transform: uppercase; letter-spacing: 0.07em;
     margin-bottom: 16px; padding-bottom: 10px;
-    border-bottom: 2px solid #E2E8F0;
+    border-bottom: 2px solid rgba(128,128,128,.2);
 }
 
 /* Step strip */
@@ -499,7 +499,7 @@ for col, (icon, title, desc) in zip([f1, f2, f3, f4], features):
 st.markdown("<br>", unsafe_allow_html=True)
 st.markdown("""
 <div style="text-align:center; padding: 24px 0;">
-    <div style="font-size:13px; font-weight:700; color:#6B7280; text-transform:uppercase;
+    <div style="font-size:13px; font-weight:700; color:inherit; opacity:.55; text-transform:uppercase;
                 letter-spacing:0.1em; margin-bottom:16px;">
         Supported Business Domains
     </div>
@@ -512,10 +512,10 @@ st.markdown("""
     <span class="domain-badge" style="background:rgba(16,185,129,.15); color:#34d399;">
         📈 Sales Performance
     </span>
-    <span class="domain-badge" style="background:#F3E8FF; color:#6B21A8;">
+    <span class="domain-badge" style="background:rgba(139,92,246,.15); color:#a78bfa;">
         💰 Finance & Accounting
     </span>
-    <span class="domain-badge" style="background:rgba(128,128,128,.15); color:inherit;">
+    <span class="domain-badge" style="background:rgba(128,128,128,.12); color:inherit;">
         📋 General Business
     </span>
 </div>

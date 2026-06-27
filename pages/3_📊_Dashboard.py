@@ -91,8 +91,8 @@ dt_cols  = stats.datetime_cols
 domain, confidence = detect_domain(df_master)
 
 DOMAIN_META = {
-    "hr":        {"icon": "👥", "label": "HR Analytics",     "color": "#1D4ED8", "bg": "#DBEAFE"},
-    "finance":   {"icon": "💰", "label": "Finance",          "color": "#065F46", "bg": "#D1FAE5"},
+    "hr":        {"icon": "👥", "label": "HR Analytics",     "color": "#60a5fa", "bg": "rgba(59,130,246,.15)"},
+    "finance":   {"icon": "💰", "label": "Finance",          "color": "#34d399", "bg": "rgba(16,185,129,.15)"},
     "ecommerce": {"icon": "🛒", "label": "E-Commerce",       "color": "#B45309", "bg": "#FEF3C7"},
     "sales":     {"icon": "📈", "label": "Sales",            "color": "#6D28D9", "bg": "#EDE9FE"},
     "general":   {"icon": "📊", "label": "General Business", "color": "#475569", "bg": "#F1F5F9"},
@@ -278,21 +278,21 @@ with tabs[tab_idx]:
                     marker_color="#1565C0", opacity=1.0,
                     text=[f"{v:,.2f}" for v in gdata[col]],
                     textposition="outside",
-                    textfont=dict(size=11, color="#0F172A"),
+                    textfont=dict(size=11),
                 ))
                 fig.update_layout(
                     title=dict(text=f"{agg} of {col} by {cat}",
-                               font=dict(size=14, color="#0F172A", family="Arial Black")),
+                               font=dict(size=14, family="Arial Black")),
                     height=max(300, len(gdata) * 36 + 80),
                     paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                     margin=dict(l=10, r=90, t=55, b=20),
-                    font=dict(color="#0F172A", family="Arial"),
+                    font=dict(family="Arial"),
                     xaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,.2)",
-                               tickfont=dict(size=11, color="#0F172A"),
-                               title_font=dict(color="#0F172A")),
+                               tickfont=dict(size=11),
+                               title_font=dict()),
                     yaxis=dict(showgrid=False,
-                               tickfont=dict(size=11, color="#0F172A"),
-                               title_font=dict(color="#0F172A")),
+                               tickfont=dict(size=11),
+                               title_font=dict()),
                 )
                 st.plotly_chart(fig, width="stretch",
                                 config={"displayModeBar": False})
@@ -372,11 +372,11 @@ if dt_cols:
                         height=380, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                         margin=dict(l=10, r=10, t=50, b=20),
                         xaxis=dict(showgrid=False,
-                               tickfont=dict(color="#0F172A", size=10),
-                               title_font=dict(color="#0F172A")),
+                               tickfont=dict(size=10),
+                               title_font=dict()),
                         yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,.2)",
-                               tickfont=dict(color="#0F172A", size=10),
-                               title_font=dict(color="#0F172A")),
+                               tickfont=dict(size=10),
+                               title_font=dict()),
                     )
                     st.plotly_chart(fig, width="stretch",
                                     config={"displayModeBar": False})

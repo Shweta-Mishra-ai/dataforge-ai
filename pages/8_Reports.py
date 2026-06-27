@@ -58,10 +58,10 @@ st.markdown("""
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 html,body,[class*="css"]{font-family:'Inter',sans-serif!important}
 .block-container{padding-top:1.2rem!important}
-.cfg-block{background:white;border:1px solid #E2E8F0;border-radius:14px;padding:22px 24px;margin-bottom:16px}
+.cfg-block{background:rgba(128,128,128,.06);border:1px solid rgba(128,128,128,.18);border-radius:14px;padding:22px 24px;margin-bottom:16px}
 .cfg-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
-           color:#6B7280;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #F1F5F9}
-.pre-chip{background:#DBEAFE;border:1px solid #93C5FD;color:#1D4ED8;
+           color:inherit;opacity:.6;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid rgba(128,128,128,.2)}
+.pre-chip{background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.3);color:#60a5fa;
           font-size:12px;font-weight:600;padding:6px 14px;border-radius:8px;display:inline-block}
 section[data-testid="stSidebar"]{background:linear-gradient(180deg,#0D1B2E,#0F2240)!important}
 section[data-testid="stSidebar"] *{color:rgba(255,255,255,.85)!important}
@@ -98,7 +98,7 @@ if pre_client or pre_title:
     st.markdown(f"**Report Title:** {pre_title}")
     st.markdown("""
     <div style="font-size:12px;color:#6B7280;margin-top:8px;">
-    ℹ️ To change client name or logo, go back to the <a href="/" style="color:#2563A8">Home page</a>.
+    ℹ️ To change client name or logo, go back to the <a href="/" style="color:#60a5fa">Home page</a>.
     </div>
     """, unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)

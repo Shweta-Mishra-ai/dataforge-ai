@@ -221,7 +221,7 @@ with tab1:
         )
         fig.update_layout(
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(family="Helvetica", size=11, color="#0F172A"),
+            font=dict(family="Helvetica", size=11),
             title_font=dict(),
             margin=dict(l=10, r=10, t=40, b=10),
             showlegend=False, height=380,
@@ -426,13 +426,13 @@ with tab4:
         fig.update_layout(
             title="VIF by Feature",
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(family="Helvetica", size=11, color="#0F172A"),
+            font=dict(family="Helvetica", size=11),
             title_font=dict( size=13),
             margin=dict(l=10, r=10, t=40, b=10),
             xaxis_tickangle=-30,
         )
-        fig.update_xaxes(tickfont=dict(color="#0F172A"), title_font=dict())
-        fig.update_yaxes(tickfont=dict(color="#0F172A"), title_font=dict())
+        fig.update_xaxes(tickfont=dict(), title_font=dict())
+        fig.update_yaxes(tickfont=dict(), title_font=dict())
         st.plotly_chart(fig, width="stretch")
 
         # Guide

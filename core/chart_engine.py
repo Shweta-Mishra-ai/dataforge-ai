@@ -222,19 +222,19 @@ def _apply_contrast(fig: go.Figure, theme_name: str = "Corporate Light") -> go.F
         return _style(fig)
     fig.update_layout(
         font=dict(color="#0F172A", size=11, family="Arial, sans-serif"),
-        paper_bgcolor="white",
-        plot_bgcolor="#F8FAFF",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
         title_font=dict(color="#0A1628", size=14),
     )
     fig.update_xaxes(
-        tickfont=dict(color="#0F172A", size=10),
+        tickfont=dict(size=10),
         title_font=dict(color="#0F172A", size=11),
-        gridcolor="#CBD5E1",
+        gridcolor="rgba(128,128,128,.2)",
     )
     fig.update_yaxes(
-        tickfont=dict(color="#0F172A", size=10),
+        tickfont=dict(size=10),
         title_font=dict(color="#0F172A", size=11),
-        gridcolor="#CBD5E1",
+        gridcolor="rgba(128,128,128,.2)",
     )
     return fig
 

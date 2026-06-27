@@ -41,7 +41,7 @@ def _apply_theme(fig: go.Figure, title: str, subtitle: str = "") -> go.Figure:
     fig.update_layout(
         title=dict(text=title_text, font=dict(size=15, color="#0A1628", family="Arial Black, Arial"),
                    x=0, xanchor="left", pad=dict(l=4)),
-        paper_bgcolor="white", plot_bgcolor="white",
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         font=dict(family="Inter, Arial", size=11, color="#0F172A"),
         margin=dict(l=55, r=20, t=72, b=50),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
