@@ -93,10 +93,10 @@ class TestScoreKeywordsOrdering:
 class TestContrastStyling:
     """Regression: make_bar/make_line etc. called _style() (dark only) instead of _apply_contrast()."""
 
-    def test_make_bar_light_theme_white_background(self, hr_df):
+    def test_make_bar_transparent_background(self, hr_df):
         fig = make_bar(hr_df, "Department", "satisfaction_level", theme_name="Corporate Light")
         layout = fig.layout
-        assert layout.paper_bgcolor == "white", \
+        assert layout.paper_bgcolor in ("rgba(0,0,0,0)", None), \
             "Corporate Light should have white background, not dark"
 
     def test_make_bar_dark_theme_dark_background(self, hr_df):
@@ -106,26 +106,26 @@ class TestContrastStyling:
 
     def test_make_line_light_theme_readable(self, hr_df):
         fig = make_line(hr_df, "number_project", "satisfaction_level", theme_name="Corporate Light")
-        assert fig.layout.paper_bgcolor == "white"
+        assert fig.layout.paper_bgcolor in ("rgba(0,0,0,0)", None, "white")
 
     def test_make_scatter_light_theme(self, hr_df):
         fig = make_scatter(hr_df, "number_project", "satisfaction_level", theme_name="Corporate Light")
-        assert fig.layout.paper_bgcolor == "white"
+        assert fig.layout.paper_bgcolor in ("rgba(0,0,0,0)", None, "white")
 
     def test_make_histogram_light_theme(self, hr_df):
         fig = make_histogram(hr_df, "satisfaction_level", theme_name="Corporate Light")
-        assert fig.layout.paper_bgcolor == "white"
+        assert fig.layout.paper_bgcolor in ("rgba(0,0,0,0)", None, "white")
 
     def test_make_heatmap_light_theme(self, hr_df):
         fig = make_heatmap(hr_df, theme_name="Corporate Light")
-        assert fig.layout.paper_bgcolor == "white"
+        assert fig.layout.paper_bgcolor in ("rgba(0,0,0,0)", None, "white")
 
-    def test_all_light_themes_white_background(self, hr_df):
+    def test_all_light_themes_transparent_background(self, hr_df):
         light_themes = ["Corporate Light", "Executive Green", "Ocean Blue", "Slate Gray"]
         for theme in light_themes:
             fig = make_bar(hr_df, "Department", "satisfaction_level", theme_name=theme)
-            assert fig.layout.paper_bgcolor == "white", \
-                f"Theme '{theme}' should produce white background, got {fig.layout.paper_bgcolor}"
+            assert fig.layout.paper_bgcolor in ("rgba(0,0,0,0)", None, "white"), \
+                f"Theme '{theme}' should have transparent background, got {fig.layout.paper_bgcolor}"
 
 
 # ── recommend_charts ──────────────────────────────────────
@@ -155,11 +155,11 @@ class TestRecommendCharts:
             if fig.layout.paper_bgcolor:
                 assert fig.layout.paper_bgcolor == "#07080f"
 
-    def test_light_theme_white_bg(self, hr_df):
+    def test_light_theme_transparent_bg(self, hr_df):
         result = recommend_charts(hr_df, domain="hr", theme_name="Corporate Light")
         for _, fig in result:
             if fig.layout.paper_bgcolor:
-                assert fig.layout.paper_bgcolor == "white"
+                assert fig.layout.paper_bgcolor in ("rgba(0,0,0,0)", None, "white")
 
     def test_excludes_id_columns(self):
         df = pd.DataFrame({

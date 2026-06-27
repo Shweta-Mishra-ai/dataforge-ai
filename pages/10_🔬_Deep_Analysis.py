@@ -153,8 +153,8 @@ with tab3:
             font=dict( size=11),
             title_font=dict( size=14),
         )
-        fig.update_xaxes(tickfont=dict(color="#0F172A"), title_font=dict())
-        fig.update_yaxes(tickfont=dict(color="#0F172A"), title_font=dict())
+        fig.update_xaxes(tickfont=dict(), title_font=dict())
+        fig.update_yaxes(tickfont=dict(), title_font=dict())
         st.plotly_chart(fig, width="stretch")
 
         if not outliers.empty:

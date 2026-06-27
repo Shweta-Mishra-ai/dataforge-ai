@@ -40,12 +40,12 @@ def base_layout(
     y_title: str = "",
     height: int = 420,
     show_legend: bool = True,
-    bg: str = "#FFFFFF",
+    bg: str = "rgba(0,0,0,0)",   # transparent — inherits Streamlit theme bg
 ) -> dict:
     """Return a consistent Plotly layout dict for board-level charts."""
     title_text = f"<b>{title}</b>"
     if subtitle:
-        title_text += f"<br><span style='font-size:12px;color:#64748B'>{subtitle}</span>"
+        title_text += f"<br><span style='font-size:12px;opacity:.6'>{subtitle}</span>"
 
     return dict(
         title=dict(
@@ -67,16 +67,16 @@ def base_layout(
         ),
         margin=dict(l=60, r=30, t=80, b=60),
         xaxis=dict(
-            title=dict(text=x_title, font=dict(size=12, color="#64748B")),
-            tickfont=dict(size=11, color="#64748B"),
-            showgrid=True, gridcolor="#F1F5F9", gridwidth=1,
+            title=dict(text=x_title, font=dict(size=12)),
+            tickfont=dict(size=11),
+            showgrid=True, gridcolor="rgba(128,128,128,.15)", gridwidth=1,
             showline=True, linecolor="#E2E8F0", linewidth=1,
             zeroline=False,
         ),
         yaxis=dict(
-            title=dict(text=y_title, font=dict(size=12, color="#64748B")),
-            tickfont=dict(size=11, color="#64748B"),
-            showgrid=True, gridcolor="#F1F5F9", gridwidth=1,
+            title=dict(text=y_title, font=dict(size=12)),
+            tickfont=dict(size=11),
+            showgrid=True, gridcolor="rgba(128,128,128,.15)", gridwidth=1,
             showline=False, zeroline=False,
         ),
     )
