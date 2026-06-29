@@ -79,8 +79,16 @@ def col_stats(s: pd.Series) -> Dict:
     iqr = q3 - q1
     mean_v = float(s.mean())
     std_v  = float(s.std())
-    skew_v = float(scipy_stats.skew(s))
-    kurt_v = float(scipy_stats.kurtosis(s))
+    try:
+        skew_v = float(scipy_stats.skew(s))
+    except Exception:
+        skew_v = 0.0
+        logger.debug("skew computation failed for column — data nearly constant")
+    try:
+        kurt_v = float(scipy_stats.kurtosis(s))
+    except Exception:
+        kurt_v = 0.0
+        logger.debug("kurtosis computation failed for column — data nearly constant")
     out_mask = (s < q1 - 1.5 * iqr) | (s > q3 + 1.5 * iqr)
     out_pct  = float(out_mask.mean() * 100)
     cv       = std_v / abs(mean_v) if mean_v != 0 else 0.0

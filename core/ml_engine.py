@@ -7,8 +7,6 @@ import pandas as pd
 import numpy as np
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Tuple, Any
-import warnings
-warnings.filterwarnings("ignore")
 
 from sklearn.model_selection import cross_val_score, train_test_split
 from sklearn.preprocessing import LabelEncoder, StandardScaler

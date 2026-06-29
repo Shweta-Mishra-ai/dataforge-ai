@@ -207,10 +207,8 @@ with st.sidebar:
         """, unsafe_allow_html=True)
 
     st.divider()
-    try:
-        _groq_key = st.secrets.get("GROQ_API_KEY", "") or ""
-    except Exception:
-        _groq_key = os.environ.get("GROQ_API_KEY", "") or ""
+    from core.config import get_groq_key
+    _groq_key = get_groq_key()
 
     if not _groq_key.strip():
         st.markdown("""

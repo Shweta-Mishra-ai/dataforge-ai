@@ -419,7 +419,7 @@ def _build_chart_prompt(ctype: str, stats: dict, domain: str) -> str:
                 max_val=stats["max"],
             )
     except Exception as e:
-        logger.warning(f"Prompt format error [{ctype}]: {e}")
+        logger.warning("Prompt format error [%s]: %s", ctype, e)
 
     return ""
 
@@ -635,10 +635,10 @@ def _llm_call(prompt: str, groq_api_key: str = "",
         )
         if raw and _validate_output(raw, domain):
             return raw
-        logger.warning(f"LLM output failed validation [{task}] — using fallback")
+        logger.warning("LLM output failed validation [%s] — using fallback", task)
         return None
     except Exception as e:
-        logger.warning(f"LLM call failed [{task}]: {e}")
+        logger.warning("LLM call failed [%s]: %s", task, e)
         return None
 
 
@@ -785,7 +785,7 @@ def generate_executive_summary(
                 if not _is_hallucinated(cleaned, df) and len(cleaned) > 80:
                     return cleaned
     except Exception as e:
-        logger.warning(f"Executive summary LLM failed: {e}")
+        logger.warning("Executive summary LLM failed: %s", e)
 
     # Rule-based fallback
     atr_col = next((c for c in df.columns
