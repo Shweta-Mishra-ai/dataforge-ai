@@ -17,14 +17,14 @@ def parse_tool_call(raw: str) -> Optional[Dict[str, Any]]:
     # ── Extract first { } block ────────────────────────────
     match = re.search(r"\{.*\}", text, re.DOTALL)
     if not match:
-        logger.warning(f"No JSON found in: {text[:200]}")
+        logger.warning("No JSON found in response (first 200 chars): %s", text[:200])
         return None
 
     # ── Parse JSON ─────────────────────────────────────────
     try:
         data = json.loads(match.group(0))
     except json.JSONDecodeError as e:
-        logger.warning(f"JSON error: {e}")
+        logger.warning("JSON error: %s", e)
         return None
 
     # ── Validate ───────────────────────────────────────────

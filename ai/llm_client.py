@@ -90,7 +90,7 @@ class LLMClient:
         try:
             return self.chat(messages, system)
         except Exception as e:
-            logger.error(f"LLM failed: {e}")
+            logger.error("LLM failed: %s", e)
             return fallback
 
     # ─────────────────────────────────────────────────────
@@ -127,7 +127,7 @@ class LLMClient:
                 if result and result.strip():
                     return result.strip()
             except Exception as e:
-                logger.warning(f"[{prov}] task={task} failed: {e}")
+                logger.warning("[%s] task=%s failed: %s", prov, task, e)
                 continue
 
         return None
@@ -163,7 +163,7 @@ class LLMClient:
             )
             return resp.choices[0].message.content
         except Exception as e:
-            logger.warning(f"Groq report call failed: {e}")
+            logger.warning("Groq report call failed: %s", e)
             return None
 
     def _gemini(self, system: str, user: str,
@@ -184,11 +184,16 @@ class LLMClient:
             resp = model.generate_content(user)
             return resp.text
         except Exception as e:
-            logger.warning(f"Gemini call failed: {e}")
+            logger.warning("Gemini call failed: %s", e)
             return None
 
     @staticmethod
     def _load_secret(key: str) -> str:
+        # Centralised via core.config — single source of truth
+        from core.config import get_groq_key
+        if key == "GROQ_API_KEY":
+            return get_groq_key()
+        # Fallback for other keys
         val = os.environ.get(key, "").strip()
         if val:
             return val
@@ -216,11 +221,5 @@ def get_client(api_key: str = "") -> LLMClient:
 
 
 def _load_groq_key() -> str:
-    val = os.environ.get("GROQ_API_KEY", "").strip()
-    if val:
-        return val
-    try:
-        import streamlit as st
-        return (st.secrets.get("GROQ_API_KEY", "") or "").strip()
-    except Exception:
-        return ""
+    from core.config import get_groq_key
+    return get_groq_key()

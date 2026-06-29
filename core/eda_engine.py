@@ -6,8 +6,6 @@ import pandas as pd
 import numpy as np
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Tuple
-import warnings
-warnings.filterwarnings("ignore")
 
 from scipy import stats as scipy_stats
 from scipy.stats import (
@@ -25,58 +23,195 @@ logger = logging.getLogger(__name__)
 # ══════════════════════════════════════════════════════════
 
 @dataclass
-class UnivariateResult:
-    column:          str
-    dtype:           str
-    n:               int
-    missing:         int
-    missing_pct:     float
-    # Descriptive
-    mean:            Optional[float] = None
-    median:          Optional[float] = None
-    mode:            Optional[float] = None
-    std:             Optional[float] = None
-    variance:        Optional[float] = None
-    cv:              Optional[float] = None   # coefficient of variation
-    min_val:         Optional[float] = None
-    max_val:         Optional[float] = None
-    range_val:       Optional[float] = None
-    q1:              Optional[float] = None
-    q3:              Optional[float] = None
-    iqr:             Optional[float] = None
-    p5:              Optional[float] = None   # 5th percentile
-    p95:             Optional[float] = None   # 95th percentile
-    # Distribution shape
-    skewness:        Optional[float] = None
-    skew_label:      Optional[str]   = None
-    kurtosis:        Optional[float] = None
-    kurtosis_label:  Optional[str]   = None
-    # Normality tests
-    shapiro_stat:    Optional[float] = None
-    shapiro_p:       Optional[float] = None
-    dagostino_stat:  Optional[float] = None
-    dagostino_p:     Optional[float] = None
-    anderson_stat:   Optional[float] = None
+class DescriptiveStats:
+    """Central tendency, spread, and percentile statistics for a numeric column."""
+    mean:      Optional[float] = None
+    median:    Optional[float] = None
+    mode:      Optional[float] = None
+    std:       Optional[float] = None
+    variance:  Optional[float] = None
+    cv:        Optional[float] = None   # coefficient of variation
+    min_val:   Optional[float] = None
+    max_val:   Optional[float] = None
+    range_val: Optional[float] = None
+    q1:        Optional[float] = None
+    q3:        Optional[float] = None
+    iqr:       Optional[float] = None
+    p5:        Optional[float] = None   # 5th percentile
+    p95:       Optional[float] = None   # 95th percentile
+
+
+@dataclass
+class ShapeStats:
+    """Distribution shape: skewness, kurtosis, and normality tests."""
+    skewness:         Optional[float] = None
+    skew_label:       Optional[str]   = None
+    kurtosis:         Optional[float] = None
+    kurtosis_label:   Optional[str]   = None
+    shapiro_stat:     Optional[float] = None
+    shapiro_p:        Optional[float] = None
+    dagostino_stat:   Optional[float] = None
+    dagostino_p:      Optional[float] = None
+    anderson_stat:    Optional[float] = None
     anderson_critical: Optional[float] = None
-    is_normal:       Optional[bool]  = None
-    normality_verdict: Optional[str] = None
-    # Outliers — multiple methods
-    outliers_iqr:    int = 0
-    outliers_zscore: int = 0
-    outliers_modz:   int = 0   # modified z-score
-    outlier_pct:     float = 0.0
-    recommended_method: str = "IQR"
-    iqr_lower:       Optional[float] = None
-    iqr_upper:       Optional[float] = None
-    # Distribution fit
-    best_fit_dist:   Optional[str]   = None
-    best_fit_params: Optional[Dict]  = None
+    is_normal:        Optional[bool]  = None
+    normality_verdict: Optional[str]  = None
+
+
+@dataclass
+class OutlierStats:
+    """Outlier counts via multiple methods (IQR, z-score, modified z-score)."""
+    outliers_iqr:       int   = 0
+    outliers_zscore:    int   = 0
+    outliers_modz:      int   = 0   # modified z-score
+    outlier_pct:        float = 0.0
+    recommended_method: str   = "IQR"
+    iqr_lower:          Optional[float] = None
+    iqr_upper:          Optional[float] = None
+
+
+@dataclass
+class CategoricalStats:
+    """Statistics for categorical / string columns."""
+    unique_count: int            = 0
+    top_value:    Optional[str]  = None
+    top_pct:      Optional[float]= None
+    entropy:      Optional[float]= None   # information entropy
+
+
+@dataclass
+class UnivariateResult:
+    """
+    Per-column EDA result. Composes 4 focused sub-dataclasses.
+
+    Flat field access is preserved via properties for backward compatibility:
+        result.mean  →  result.descriptive.mean
+        result.skewness  →  result.shape.skewness
+        etc.
+    """
+    column:      str
+    dtype:       str
+    n:           int
+    missing:     int
+    missing_pct: float
+    interpretation: str = ""
+
+    # Sub-objects (populated by analyze_univariate)
+    descriptive:  DescriptiveStats  = None  # type: ignore[assignment]
+    shape:        ShapeStats        = None  # type: ignore[assignment]
+    outliers:     OutlierStats      = None  # type: ignore[assignment]
+    categorical:  CategoricalStats  = None  # type: ignore[assignment]
+    best_fit_dist:   Optional[str]  = None
+    best_fit_params: Optional[Dict] = None
+
+    # ── Field routing maps ──────────────────────────────────────────────────
+    _DESCRIPTIVE_FIELDS  = frozenset(["mean","median","mode","std","variance","cv",
+                                       "min_val","max_val","range_val","q1","q3","iqr",
+                                       "p5","p95"])
+    _SHAPE_FIELDS        = frozenset(["skewness","skew_label","kurtosis","kurtosis_label",
+                                       "shapiro_stat","shapiro_p","dagostino_stat","dagostino_p",
+                                       "anderson_stat","anderson_critical","is_normal",
+                                       "normality_verdict"])
+    _OUTLIER_FIELDS      = frozenset(["outliers_iqr","outliers_zscore","outliers_modz",
+                                       "outlier_pct","recommended_method","iqr_lower","iqr_upper"])
+    _CATEGORICAL_FIELDS  = frozenset(["top_value","top_pct","entropy"])
+
+    def __setattr__(self, key: str, value) -> None:
+        """Route flat field assignments to the correct sub-object."""
+        if key in UnivariateResult._DESCRIPTIVE_FIELDS and hasattr(self, "descriptive"):
+            setattr(self.descriptive, key, value)
+        elif key in UnivariateResult._SHAPE_FIELDS and hasattr(self, "shape"):
+            setattr(self.shape, key, value)
+        elif key in UnivariateResult._OUTLIER_FIELDS and hasattr(self, "outliers"):
+            setattr(self.outliers, key, value)
+        elif key in UnivariateResult._CATEGORICAL_FIELDS and hasattr(self, "categorical"):
+            setattr(self.categorical, key, value)
+        else:
+            object.__setattr__(self, key, value)
+        if self.descriptive is None:  self.descriptive  = DescriptiveStats()
+        if self.shape is None:        self.shape        = ShapeStats()
+        if self.outliers is None:     self.outliers     = OutlierStats()
+        if self.categorical is None:  self.categorical  = CategoricalStats()
+
+    # ── Backward-compatible flat properties ─────────────────────────────────
+    # Descriptive
+    @property
+    def mean(self):      return self.descriptive.mean
+    @property
+    def median(self):    return self.descriptive.median
+    @property
+    def mode(self):      return self.descriptive.mode
+    @property
+    def std(self):       return self.descriptive.std
+    @property
+    def variance(self):  return self.descriptive.variance
+    @property
+    def cv(self):        return self.descriptive.cv
+    @property
+    def min_val(self):   return self.descriptive.min_val
+    @property
+    def max_val(self):   return self.descriptive.max_val
+    @property
+    def range_val(self): return self.descriptive.range_val
+    @property
+    def q1(self):        return self.descriptive.q1
+    @property
+    def q3(self):        return self.descriptive.q3
+    @property
+    def iqr(self):       return self.descriptive.iqr
+    @property
+    def p5(self):        return self.descriptive.p5
+    @property
+    def p95(self):       return self.descriptive.p95
+    # Shape
+    @property
+    def skewness(self):           return self.shape.skewness
+    @property
+    def skew_label(self):         return self.shape.skew_label
+    @property
+    def kurtosis(self):           return self.shape.kurtosis
+    @property
+    def kurtosis_label(self):     return self.shape.kurtosis_label
+    @property
+    def shapiro_stat(self):       return self.shape.shapiro_stat
+    @property
+    def shapiro_p(self):          return self.shape.shapiro_p
+    @property
+    def dagostino_stat(self):     return self.shape.dagostino_stat
+    @property
+    def dagostino_p(self):        return self.shape.dagostino_p
+    @property
+    def anderson_stat(self):      return self.shape.anderson_stat
+    @property
+    def anderson_critical(self):  return self.shape.anderson_critical
+    @property
+    def is_normal(self):          return self.shape.is_normal
+    @property
+    def normality_verdict(self):  return self.shape.normality_verdict
+    # Outliers
+    @property
+    def outliers_iqr(self):          return self.outliers.outliers_iqr
+    @property
+    def outliers_zscore(self):       return self.outliers.outliers_zscore
+    @property
+    def outliers_modz(self):         return self.outliers.outliers_modz
+    @property
+    def outlier_pct(self):           return self.outliers.outlier_pct
+    @property
+    def recommended_method(self):    return self.outliers.recommended_method
+    @property
+    def iqr_lower(self):             return self.outliers.iqr_lower
+    @property
+    def iqr_upper(self):             return self.outliers.iqr_upper
     # Categorical
-    unique_count:    int = 0
-    top_value:       Optional[str]   = None
-    top_pct:         Optional[float] = None
-    entropy:         Optional[float] = None   # information entropy
-    interpretation:  str = ""
+    @property
+    def unique_count(self):  return self.categorical.unique_count
+    @property
+    def top_value(self):     return self.categorical.top_value
+    @property
+    def top_pct(self):       return self.categorical.top_pct
+    @property
+    def entropy(self):       return self.categorical.entropy
 
 
 @dataclass
@@ -195,7 +330,7 @@ def analyze_univariate(series: pd.Series) -> UnivariateResult:
         column=name, dtype=str(series.dtype),
         n=n, missing=int(series.isna().sum()),
         missing_pct=round(series.isna().mean() * 100, 2),
-        unique_count=int(clean.nunique()),
+        # unique_count set via sub-object below
     )
 
     if n < 3:
@@ -203,6 +338,8 @@ def analyze_univariate(series: pd.Series) -> UnivariateResult:
         return result
 
     # ── Categorical ───────────────────────────────────────
+    result.categorical.unique_count = int(clean.nunique())
+
     if series.dtype == object or str(series.dtype) == "str":
         vc = clean.value_counts()
         result.top_value   = str(vc.index[0])[:40] if len(vc) > 0 else None
@@ -234,10 +371,10 @@ def analyze_univariate(series: pd.Series) -> UnivariateResult:
     result.mean     = round(float(s.mean()), 6)
     result.median   = round(float(s.median()), 6)
     result.std      = round(float(s.std()), 6)
-    result.variance = round(float(s.var()), 6)
+    result.descriptive.variance = round(float(s.var()), 6)
     result.min_val  = round(float(s.min()), 6)
     result.max_val  = round(float(s.max()), 6)
-    result.range_val = round(result.max_val - result.min_val, 6)
+    result.descriptive.range_val = round(result.max_val - result.min_val, 6)
     result.q1       = round(float(s.quantile(0.25)), 6)
     result.q3       = round(float(s.quantile(0.75)), 6)
     result.iqr      = round(result.q3 - result.q1, 6)
@@ -247,52 +384,54 @@ def analyze_univariate(series: pd.Series) -> UnivariateResult:
 
     try:
         mode_val   = float(s.mode().iloc[0])
-        result.mode = round(mode_val, 6)
+        result.descriptive.mode = round(mode_val, 6)
     except Exception:
         logger.warning("%s unexpected failure", exc_info=True)
 
     # Distribution shape
     skew = float(s.skew())
     kurt = float(s.kurtosis())
-    result.skewness = round(skew, 4)
-    result.kurtosis = round(kurt, 4)
+    result.shape.skewness = round(skew, 4)
+    result.shape.kurtosis = round(kurt, 4)
 
     if abs(skew) < 0.5:
-        result.skew_label = "Approximately symmetric"
+        result.shape.skew_label = "Approximately symmetric"
     elif 0.5 <= abs(skew) < 1:
-        result.skew_label = "Moderately {}".format(
+        result.shape.skew_label = "Moderately {}".format(
             "right-skewed" if skew > 0 else "left-skewed")
     else:
-        result.skew_label = "Heavily {}".format(
+        result.shape.skew_label = "Heavily {}".format(
             "right-skewed" if skew > 0 else "left-skewed")
 
     if kurt > 3:
-        result.kurtosis_label = "Leptokurtic — heavy tails, extreme values likely"
+        result.shape.kurtosis_label = "Leptokurtic — heavy tails, extreme values likely"
     elif kurt < -1:
-        result.kurtosis_label = "Platykurtic — light tails, few extremes"
+        result.shape.kurtosis_label = "Platykurtic — light tails, few extremes"
     else:
-        result.kurtosis_label = "Mesokurtic — normal-like tails"
+        result.shape.kurtosis_label = "Mesokurtic — normal-like tails"
 
     # Normality tests
     sample = s.sample(min(n, 5000), random_state=42)
     try:
         sw_stat, sw_p = shapiro(sample)
-        result.shapiro_stat = round(float(sw_stat), 6)
+        result.shape.shapiro_stat = round(float(sw_stat), 6)
         result.shapiro_p    = round(float(sw_p), 6)
     except Exception:
         logger.warning("%s unexpected failure", exc_info=True)
 
     try:
         da_stat, da_p = normaltest(s)
-        result.dagostino_stat = round(float(da_stat), 6)
+        result.shape.dagostino_stat = round(float(da_stat), 6)
         result.dagostino_p    = round(float(da_p), 6)
     except Exception:
         logger.warning("%s unexpected failure", exc_info=True)
 
     try:
         ad_result = anderson(sample, dist="norm")
-        result.anderson_stat     = round(float(ad_result.statistic), 6)
-        result.anderson_critical = round(float(ad_result.critical_values[2]), 6)
+        result.anderson_stat = round(float(ad_result.statistic), 6)
+        # critical_values[2] = 5% level; guard for scipy >= 1.17 API change
+        if hasattr(ad_result, "critical_values"):
+            result.shape.anderson_critical = round(float(ad_result.critical_values[2]), 6)
     except Exception:
         logger.warning("%s unexpected failure", exc_info=True)
 
@@ -312,8 +451,8 @@ def analyze_univariate(series: pd.Series) -> UnivariateResult:
         if result.anderson_stat < result.anderson_critical:
             normal_votes += 1
 
-    result.is_normal = (normal_votes / max(total_votes, 1)) >= 0.5
-    result.normality_verdict = (
+    result.shape.is_normal = (normal_votes / max(total_votes, 1)) >= 0.5
+    result.shape.normality_verdict = (
         "NORMAL (p>0.05 majority)" if result.is_normal
         else "NON-NORMAL (p<0.05 majority)"
     )
@@ -328,13 +467,13 @@ def analyze_univariate(series: pd.Series) -> UnivariateResult:
 
     if result.std and result.std > 0:
         z = np.abs((s - result.mean) / result.std)
-        result.outliers_zscore = int((z > 3).sum())
+        result.outliers.outliers_zscore = int((z > 3).sum())
 
-    result.outliers_modz = _modified_zscore_outliers(s)
+    result.outliers.outliers_modz = _modified_zscore_outliers(s)
     result.outlier_pct   = round(result.outliers_iqr / n * 100, 2)
 
     # Method recommendation
-    result.recommended_method = (
+    result.outliers.recommended_method = (
         "Z-Score (data is normal)" if result.is_normal
         else "Modified Z-Score (robust, non-normal data)"
     )
