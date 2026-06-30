@@ -227,7 +227,7 @@ if gen_btn:
                                      f"{'positively' if r > 0 else 'negatively'} correlated "
                                      f"(r={r:.2f}, sharing {r**2*100:.0f}% of variance).")
                 except Exception:
-                    pass
+                    logger.debug("Correlation pair skip — likely constant series", exc_info=True)
 
             # Missing data specifics
             if miss_pct > 0:

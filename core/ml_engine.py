@@ -53,6 +53,7 @@ class ModelResult:
     # Model object (not serialized)
     model:          Any = field(default=None, repr=False)
     is_best:        bool = False
+    train_error:    Optional[str] = None  # set when training failed — UI shows this instead of metrics
 
 
 @dataclass
@@ -438,7 +439,8 @@ def train_models(
                 model=pipe,
             ))
 
-        except Exception:
+        except Exception as e:
+            logger.warning("Model '%s' training failed: %s", name, e, exc_info=True)
             results.append(ModelResult(
                 name=name, task=task,
                 cv_score=-999, cv_std=0,
@@ -446,6 +448,7 @@ def train_models(
                 overfit_gap=0, overfit_label="N/A",
                 metric_name="N/A",
                 model=None,
+                train_error=str(e),
             ))
 
     # Sort by cv_score

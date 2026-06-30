@@ -102,6 +102,7 @@ def _safe_numeric_array(s: pd.Series) -> np.ndarray:
         arr = arr[np.isfinite(arr)]
         return arr
     except Exception:
+        logger.debug("Numeric coercion failed for series — returning empty array", exc_info=True)
         return np.array([], dtype=float)
 
 
@@ -494,6 +495,10 @@ def profile_dataset(df: pd.DataFrame) -> DatasetProfile:
         try:
             col_profiles.append(_profile_column(df, col))
         except Exception:
+            logger.warning(
+                "Column profiling failed for '%s' (dtype=%s) — using degraded fallback profile",
+                col, df[col].dtype, exc_info=True
+            )
             # Absolute fallback — never crash
             col_profiles.append(ColumnProfile(
                 name=col,

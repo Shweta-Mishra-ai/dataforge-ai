@@ -196,6 +196,7 @@ def analyze_root_cause(
                 _, p = scipy_stats.mannwhitneyu(
                     low_vals, high_vals, alternative="two-sided")
             except Exception:
+                logger.warning("Mann-Whitney U test failed — defaulting to p=1.0 (not significant)", exc_info=True)
                 p = 1.0
 
             if p < 0.05 and diff_pct > 5:
@@ -395,6 +396,7 @@ def analyze_cohort(
             stat, p_val  = scipy_stats.kruskal(*groups)
             test_used    = "Kruskal-Wallis"
     except Exception:
+        logger.warning("Group comparison test failed — defaulting to p=1.0 (not significant)", exc_info=True)
         p_val, test_used = 1.0, "N/A"
 
     is_sig = p_val < 0.05

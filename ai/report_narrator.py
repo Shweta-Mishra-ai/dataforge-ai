@@ -222,6 +222,7 @@ def _corr_stats(df: pd.DataFrame) -> list:
         pairs.sort(key=lambda x: abs(x[2]), reverse=True)
         return pairs
     except Exception:
+        logger.debug("Correlation pair extraction failed — returning empty list", exc_info=True)
         return []
 
 
@@ -362,6 +363,7 @@ def _build_chart_prompt(ctype: str, stats: dict, domain: str) -> str:
             LINE_CHART_PROMPT, DISTRIBUTION_CHART_PROMPT,
         )
     except ImportError:
+        logger.error("ai.prompt_builder import failed — check package installation", exc_info=True)
         return ""
 
     try:
@@ -446,12 +448,14 @@ def _build_exec_prompt(df: pd.DataFrame, domain: str) -> str:
             # Unknown domain gets generic business prompt, not HR
             return ""
     except ImportError:
+        logger.error("ai.prompt_builder import failed — check package installation", exc_info=True)
         return ""
 
     summary = _build_raw_summary(df, domain)
     try:
         return template.format(raw_data_summary=summary)
     except Exception:
+        logger.error("Prompt template formatting failed — check template placeholders", exc_info=True)
         return ""
 
 
@@ -475,12 +479,14 @@ def _build_insight_prompt(df: pd.DataFrame, domain: str) -> str:
         if not template:
             return ""
     except ImportError:
+        logger.error("ai.prompt_builder import failed — check package installation", exc_info=True)
         return ""
 
     summary = _build_raw_summary(df, domain)
     try:
         return template.format(raw_data_summary=summary)
     except Exception:
+        logger.error("Prompt template formatting failed — check template placeholders", exc_info=True)
         return ""
 
 

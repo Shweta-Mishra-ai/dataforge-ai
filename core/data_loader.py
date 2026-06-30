@@ -101,6 +101,7 @@ def load_file(uploaded_file, sheet_name=0) -> LoadResult:
         )
 
     except Exception as e:
+        logger.error("File load failed for '%s': %s", uploaded_file.name, e, exc_info=True)
         return LoadResult(df=None, success=False,
             error="Failed to load file: {}".format(str(e)))
 
@@ -186,10 +187,12 @@ def _load_json(f, warnings: list) -> Optional[pd.DataFrame]:
 
         return df
     except Exception:
+        logger.debug("Primary JSON parse failed, trying pd.read_json fallback", exc_info=True)
         try:
             f.seek(0)
             return pd.read_json(f)
         except Exception:
+            logger.warning("All JSON parse strategies failed for uploaded file", exc_info=True)
             return None
 
 
