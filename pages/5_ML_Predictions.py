@@ -213,8 +213,10 @@ with tab1:
 
     # Summary table
     rows = []
+    failed_models = []
     for m in report.models:
         if m.cv_score == -999:
+            failed_models.append((m.name, m.train_error or "Unknown error"))
             continue
         row = {
             "Model":         m.name,
@@ -235,6 +237,11 @@ with tab1:
     if rows:
         st.dataframe(pd.DataFrame(rows), use_container_width=True,
                      hide_index=True)
+
+    if failed_models:
+        with st.expander(f"⚠️ {len(failed_models)} model(s) failed to train"):
+            for name, err in failed_models:
+                st.warning(f"**{name}**: {err}")
 
     # Bar chart comparison
     valid_models = [m for m in report.models if m.cv_score != -999]

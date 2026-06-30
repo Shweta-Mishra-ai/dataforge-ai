@@ -630,12 +630,14 @@ def analyze_group_comparison(
             _, lev_p = levene(*group_arrays)
             _equal_var = lev_p > 0.05
         except Exception:
+            logger.debug("Levene's test failed — assuming equal variance", exc_info=True)
             _equal_var = True
 
         try:
             stat, p   = f_oneway(*group_arrays)
             test_name = "One-Way ANOVA"
         except Exception:
+            logger.warning("ANOVA failed — falling back to Kruskal-Wallis (non-parametric)", exc_info=True)
             stat, p   = kruskal(*group_arrays)
             test_name = "Kruskal-Wallis"
     else:
@@ -813,6 +815,7 @@ def analyze_time_series(
         result.interpretation = "{} | {}".format(result.trend, stat_note)
 
     except Exception as e:
+        logger.warning("Time series analysis failed", exc_info=True)
         result.interpretation = "Time series analysis failed: {}".format(str(e))
 
     return result

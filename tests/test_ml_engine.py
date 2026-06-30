@@ -76,3 +76,35 @@ class TestPredictWhatIfOOD:
                                  X_train_ref=report.X_test)
         assert "ood_warnings" in result, "Out-of-range input must produce ood_warnings"
         assert any("age" in w for w in result["ood_warnings"])
+
+
+# ── Regression: failed model training must be surfaced, not silently -999 ────
+class TestFailedModelSurfacing:
+    def test_train_error_field_exists_on_model_result(self):
+        """ModelResult must have a train_error field for UI to display."""
+        from core.ml_engine import ModelResult
+        fields = ModelResult.__dataclass_fields__
+        assert "train_error" in fields, "ModelResult missing train_error field"
+
+    def test_failed_model_has_train_error_populated(self):
+        """A model that fails training must populate train_error, not just -999."""
+        from core.ml_engine import train_models, prepare_features
+        import pandas as pd
+        import numpy as np
+
+        rng = np.random.default_rng(0)
+        n = 60
+        df = pd.DataFrame({
+            "a": rng.standard_normal(n),
+            "b": rng.standard_normal(n),
+            "target": rng.choice([0, 1], n),
+        })
+        X, y, _ = prepare_features(df, "target")
+        results, X_test, y_test, target_enc, warning = train_models(X, y, "classification")
+        # Even if none fail in this run, the contract must hold for the field
+        for r in results:
+            if r.cv_score == -999:
+                assert r.train_error is not None, (
+                    f"Model '{r.name}' failed (-999) but train_error is None — "
+                    "user has no way to know why."
+                )

@@ -50,6 +50,7 @@ def validate_dataframe(df: pd.DataFrame) -> ValidationResult:
     try:
         result.memory_mb = round(df.memory_usage(deep=True).sum() / (1024*1024), 2)
     except Exception:
+        logger.debug("Memory usage estimate failed", exc_info=True)
         result.memory_mb = 0.0
 
     # ── Blocking checks ───────────────────────────────────

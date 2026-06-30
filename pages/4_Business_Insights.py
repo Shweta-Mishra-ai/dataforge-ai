@@ -3,11 +3,14 @@ pages/4_Business_Insights.py — DataForge AI
 MNC-standard: structured insights, adaptive dark/light theme, no hardcoded bg colors.
 """
 import io
+import logging
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+
+logger = logging.getLogger(__name__)
 
 from core.session_manager import require_data, get_df, get_filename
 require_data()
@@ -238,7 +241,7 @@ with tabs[0]:
                 elif abs(sk) > 1.5:
                     highlights.append(f"'{col}' skewed ({sk:+.1f}), use median={md:.2f} not mean={m:.2f}")
             except Exception:
-                pass
+                logger.warning("Column stat highlight failed for '%s'", col, exc_info=True)
         summary = (f"Analysis of {len(df):,} records across {len(df.columns)} variables "
                    f"({len(num_cols)} numeric, {len(cat_cols)} categorical). "
                    f"{'Data complete — no missing values.' if miss_pct==0 else f'Overall missing rate: {miss_pct:.1f}%.'} "
@@ -288,7 +291,7 @@ with tabs[0]:
                   Missing {s.isna().sum()} ({s.isna().mean()*100:.1f}%)
                 </div>""", unsafe_allow_html=True)
             except Exception:
-                pass
+                logger.warning("Finding row render failed for column", exc_info=True)
 
 
 # ─── Tab 2: Structured Insights ───────────────────────────────────────────────
@@ -418,7 +421,7 @@ with tabs[2]:
                             f"Bringing bottom quartile to median represents a significant performance uplift."
                         )
                 except Exception:
-                    pass
+                    logger.warning("Opportunity fallback failed for '%s'", col, exc_info=True)
             if opps_fallback:
                 for i, opp in enumerate(opps_fallback, 1):
                     st.markdown(f"""

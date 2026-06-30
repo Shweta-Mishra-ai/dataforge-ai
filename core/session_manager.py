@@ -172,6 +172,10 @@ def _hash_df(df: pd.DataFrame) -> str:
         content = "|".join(parts)
         return hashlib.md5(content.encode("utf-8", errors="replace")).hexdigest()
     except Exception:
+        logger.warning(
+            "DataFrame hash computation failed completely — using id()-based hash "
+            "(cache will not survive reruns)", exc_info=True
+        )
         return hashlib.md5(str(id(df)).encode()).hexdigest()
 
 

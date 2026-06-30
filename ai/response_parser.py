@@ -45,5 +45,6 @@ def parse_insight_array(raw: str) -> list:
         return []
     try:
         return json.loads(match.group(0))
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        logger.warning("parse_insight_array JSON error: %s", e)
         return []

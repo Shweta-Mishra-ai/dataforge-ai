@@ -3,8 +3,11 @@ app.py — DataForge AI
 Professional landing page with client config, logo upload, and file upload.
 Client name + logo collected HERE — not buried in page 8.
 """
+import logging
 import streamlit as st
 import os
+
+logger = logging.getLogger(__name__)
 
 st.set_page_config(
     page_title="DataForge AI — Professional Data Analysis",
@@ -423,6 +426,7 @@ with col_right:
                 grade = getattr(profile, "data_quality_grade", "")
                 miss = getattr(profile, "missing_pct", df.isna().mean().mean() * 100)
             except Exception:
+                logger.warning("Home page data quality profile failed", exc_info=True)
                 profile = None
                 qual = "—"
                 grade = ""

@@ -341,7 +341,7 @@ def _build_cover(T: dict, config: dict, kpis_preview: list) -> bytes:
                 mask="auto",
             )
         except Exception:
-            pass  # logo fails gracefully — PDF still builds
+            logger.warning("PDF logo embed failed — continuing without logo", exc_info=True)
 
     # Domain badge
     cv.setFillColor(_c(T["domain_badge"]))
