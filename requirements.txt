@@ -18,3 +18,8 @@ shap>=0.44.0
 pypdf>=4.0.0
 google-generativeai>=0.7.0
 tenacity>=8.2.0
+
+
+# Dev/test only — property-based testing
+hypothesis>=6.100.0
+pytest>=8.0.0

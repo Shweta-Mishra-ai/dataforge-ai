@@ -77,6 +77,14 @@ class MLReport:
     feature_importance: List[FeatureImportance] = field(default_factory=list)
     shap_values:        Optional[np.ndarray] = None
     shap_feature_names: Optional[List[str]] = None
+    # ── Large objects — memory cost in st.session_state ─────────────────────
+    # feature_ranges replaces storing the full X_test DataFrame for OOD checks.
+    # A 100k-row × 20-col X_test costs ~16MB in session state; feature_ranges
+    # costs ~1KB (just min/max per column). predict_what_if() uses this instead.
+    feature_ranges:     Dict[str, Dict[str, float]] = field(default_factory=dict)
+    # X_test/y_test/y_pred kept ONLY for the current request/test cycle.
+    # Callers should NOT persist MLReport with these populated into
+    # st.session_state for long — call clear_large_arrays() before storing.
     X_test:             Optional[pd.DataFrame] = None
     y_test:             Optional[pd.Series] = None
     y_pred:             Optional[np.ndarray] = None
@@ -84,6 +92,19 @@ class MLReport:
     label_encoders:     Dict = field(default_factory=dict)
     target_encoder:     Any = field(default=None, repr=False)
     warnings:           List[str] = field(default_factory=list)
+
+    def clear_large_arrays(self) -> None:
+        """
+        Call before storing MLReport in st.session_state for the session.
+        Drops X_test/y_test/y_pred/shap_values (large numpy/pandas objects)
+        while preserving feature_ranges (tiny dict) for OOD validation in
+        predict_what_if(). Reduces session_state memory footprint by ~95%
+        on large datasets.
+        """
+        self.X_test = None
+        self.y_test = None
+        self.y_pred = None
+        self.shap_values = None
     insights:           List[str] = field(default_factory=list)
 
 
@@ -572,9 +593,38 @@ def predict_what_if(
         return {"error": "No trained model available."}
 
     # ── Input range validation ─────────────────────────────────────────────
+    # Uses feature_ranges (tiny dict, ~1KB) instead of the full X_test
+    # DataFrame — avoids holding large arrays in session_state long-term.
+    # X_train_ref param kept for backward compatibility / explicit override.
     ood_warnings = []
-    X_ref = X_train_ref if X_train_ref is not None else getattr(ml_report, "X_test", None)
-    if X_ref is not None:
+    if X_train_ref is not None:
+        for feat, val in input_values.items():
+            if feat in X_train_ref.columns and val is not None:
+                try:
+                    col_min = float(X_train_ref[feat].min())
+                    col_max = float(X_train_ref[feat].max())
+                    if val < col_min or val > col_max:
+                        ood_warnings.append(
+                            f"'{feat}' = {val} is outside training range "
+                            f"[{col_min:.2g}, {col_max:.2g}] — prediction may be unreliable."
+                        )
+                except Exception:
+                    logger.debug("Range check failed for %s", feat, exc_info=True)
+    elif ml_report.feature_ranges:
+        for feat, val in input_values.items():
+            rng = ml_report.feature_ranges.get(feat)
+            if rng and val is not None:
+                try:
+                    if val < rng["min"] or val > rng["max"]:
+                        ood_warnings.append(
+                            f"'{feat}' = {val} is outside training range "
+                            f"[{rng['min']:.2g}, {rng['max']:.2g}] — prediction may be unreliable."
+                        )
+                except Exception:
+                    logger.debug("Range check failed for %s", feat, exc_info=True)
+    elif getattr(ml_report, "X_test", None) is not None:
+        # Last-resort fallback if feature_ranges wasn't populated (legacy reports)
+        X_ref = ml_report.X_test
         for feat, val in input_values.items():
             if feat in X_ref.columns and val is not None:
                 try:
@@ -802,6 +852,19 @@ def run_ml_pipeline(
         except Exception:
             logger.warning("%s unexpected ML failure", exc_info=True)
 
+    # ── Compute lightweight feature ranges for OOD validation ───────────────
+    # Stored instead of the full X DataFrame — ~1KB vs potentially tens of MB
+    feature_ranges = {}
+    for col in X.columns:
+        try:
+            if pd.api.types.is_numeric_dtype(X[col]):
+                feature_ranges[col] = {
+                    "min": float(X[col].min()),
+                    "max": float(X[col].max()),
+                }
+        except Exception:
+            logger.debug("feature range skip for %s", col)
+
     report = MLReport(
         task=task,
         target_col=target_col,
@@ -814,6 +877,7 @@ def run_ml_pipeline(
         feature_importance=feat_importance,
         shap_values=shap_values,
         shap_feature_names=list(X.columns) if shap_values is not None else None,
+        feature_ranges=feature_ranges,
         X_test=X_test,
         y_test=y_test,
         y_pred=y_pred,

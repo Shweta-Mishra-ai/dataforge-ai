@@ -209,46 +209,32 @@ def _profile_column(df: pd.DataFrame, col: str) -> ColumnProfile:
     stats         = {}
     quality_issues = []
 
-    # ── Numeric analysis ───────────────────────────────────
+    # ── Numeric analysis — delegates to canonical col_stats() ──────────────
     if inferred in ("numeric", "binary") and pd.api.types.is_numeric_dtype(s):
-        arr = _safe_numeric_array(s)
+        try:
+            from core.engines.base import col_stats as _col_stats
+            _cs = _col_stats(s)
+        except Exception:
+            logger.warning("col_stats failed for '%s'", col, exc_info=True)
+            _cs = {}
 
-        if len(arr) >= 4:
-            mean    = round(float(np.mean(arr)), 6)
-            median  = round(float(np.median(arr)), 6)
-            std     = round(float(np.std(arr, ddof=1)), 6) if len(arr) > 1 else 0.0
-            min_val = round(float(np.min(arr)), 6)
-            max_val = round(float(np.max(arr)), 6)
-
-            q25_v = _safe_percentile(arr, 25)
-            q75_v = _safe_percentile(arr, 75)
-
-            if q25_v is not None and q75_v is not None:
-                q25 = round(q25_v, 6)
-                q75 = round(q75_v, 6)
-                iqr = q75_v - q25_v
-
-                # Outlier detection — IQR method
-                if iqr > 0:
-                    lo = q25_v - 1.5 * iqr
-                    hi = q75_v + 1.5 * iqr
-                    outlier_mask  = (arr < lo) | (arr > hi)
-                    outlier_count = int(outlier_mask.sum())
-                    has_outliers  = outlier_count > 0
-                    outlier_pct   = round(outlier_count / max(n, 1) * 100, 1)
-
-            # Skewness
-            try:
-                if std and std > 0:
-                    skewness = round(float(pd.Series(arr).skew()), 4)
-            except Exception:
-                logger.warning("%s unexpected failure", exc_info=True)
+        if _cs:
+            mean    = _cs.get("mean")
+            median  = _cs.get("median")
+            std     = _cs.get("std")
+            min_val = _cs.get("min")
+            max_val = _cs.get("max")
+            q25     = _cs.get("q1")
+            q75     = _cs.get("q3")
+            skewness = _cs.get("skew")
+            outlier_count = int(_cs.get("outliers", 0))
+            has_outliers  = outlier_count > 0
+            outlier_pct   = round(_cs.get("outlier_pct", 0.0), 1)
 
             stats = {
-                "mean":   mean,   "median": median,
-                "std":    std,    "min":    min_val,
-                "max":    max_val,"q25":    q25,
-                "q75":    q75,    "skew":   skewness,
+                "mean": mean, "median": median, "std": std,
+                "min": min_val, "max": max_val,
+                "q25": q25, "q75": q75, "skew": skewness,
             }
 
         # Quality issues for numeric

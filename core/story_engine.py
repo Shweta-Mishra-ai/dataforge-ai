@@ -123,6 +123,101 @@ def _detect_anomalies(df: pd.DataFrame, stats: Dict) -> List[str]:
 #  MAIN ORCHESTRATOR
 # ══════════════════════════════════════════════════════════
 
+def _build_narrative_summary(
+    df: pd.DataFrame, domain: str, confidence: float,
+    deduped: List[Insight], corrs: List[Dict],
+    attrition: Optional[AttritionAnalysis], raw: Dict,
+) -> str:
+    """
+    Synthesises a single headline narrative claim instead of listing facts.
+    Priority order for the headline: attrition signal > critical insight >
+    strongest correlation > data quality. Supporting sentences follow,
+    each connecting back to the headline rather than standing alone.
+    """
+    n_crit = sum(1 for i in deduped if i.severity == "critical")
+    n_warn = sum(1 for i in deduped if i.severity == "warning")
+    miss   = round(df.isna().mean().mean() * 100, 1)
+    n_rows = len(df)
+
+    # ── HEADLINE: pick the single most important claim ─────────────────────
+    headline = None
+
+    if attrition is not None and attrition.severity in ("critical", "high"):
+        cohort_note = ""
+        if attrition.top_drivers:
+            d = attrition.top_drivers[0]
+            cohort_note = f", concentrated among {d.get('label', 'a specific cohort')}"
+        headline = (
+            f"The {attrition.rate:.1f}% attrition rate ({attrition.n_left:,} of "
+            f"{attrition.n_total:,} employees){cohort_note} is the dominant signal "
+            f"in this dataset and warrants immediate retention review."
+        )
+    elif n_crit > 0:
+        top_critical = next((i for i in deduped if i.severity == "critical"), None)
+        if top_critical:
+            headline = (
+                f"{top_critical.problem} This is the most urgent finding in the "
+                f"dataset — {n_crit} critical issue{'s' if n_crit > 1 else ''} total."
+            )
+    elif corrs and corrs[0]["strength"] == "strong":
+        top = corrs[0]
+        headline = (
+            f"'{top['col_a']}' and '{top['col_b']}' show a strong "
+            f"{top['direction']} relationship (Spearman r={top['r']:+.2f}), "
+            f"explaining {top['r']**2*100:.0f}% of shared variance — the clearest "
+            f"structural pattern in this dataset."
+        )
+    elif miss > 15:
+        headline = (
+            f"Data completeness is the primary concern: {miss:.1f}% of values "
+            f"are missing across {n_rows:,} records, which will materially affect "
+            f"any downstream analysis or modelling."
+        )
+    else:
+        headline = (
+            f"Analysis of {n_rows:,} records across {len(df.columns)} variables "
+            f"in the {domain.upper()} domain (detection confidence: {confidence:.0%}) "
+            f"did not surface a single dominant risk — findings below are of "
+            f"comparable priority."
+        )
+
+    # ── SUPPORTING sentences — connect to headline, don't repeat it ────────
+    support = []
+
+    if attrition is not None and headline and "attrition rate" not in headline.lower()[:60]:
+        support.append(
+            f"Separately, attrition stands at {attrition.rate:.1f}% "
+            f"({attrition.severity} severity)."
+        )
+
+    if n_warn > 0:
+        support.append(
+            f"{n_warn} additional warning{'s' if n_warn > 1 else ''} "
+            f"{'require' if n_warn == 1 else 'require'} review but are not urgent."
+        )
+
+    if miss > 0 and miss <= 15:
+        support.append(f"Data completeness is acceptable ({100-miss:.1f}% complete).")
+    elif miss == 0:
+        support.append("Data is fully complete with no missing values.")
+
+    if corrs and "Spearman r=" not in (headline or ""):
+        top = corrs[0]
+        support.append(
+            f"Notable relationship: '{top['col_a']}' vs '{top['col_b']}' "
+            f"(r={top['r']:+.2f}, {top['strength']})."
+        )
+
+    n_actions = len(raw.get("actions", []))
+    if n_actions:
+        support.append(
+            f"{n_actions} recommendation{'s' if n_actions > 1 else ''} "
+            f"{'follows' if n_actions == 1 else 'follow'} below."
+        )
+
+    return headline + (" " + " ".join(support) if support else "")
+
+
 def generate_story(df: pd.DataFrame) -> StoryReport:
     """
     Main entry point.  Returns a StoryReport with all insights, risks,
@@ -226,38 +321,11 @@ def generate_story(df: pd.DataFrame) -> StoryReport:
 
     exec_summary = raw.get("executive_summary", "")
     if not exec_summary:
-        n_crit = sum(1 for i in deduped if i.severity == "critical")
-        n_warn = sum(1 for i in deduped if i.severity == "warning")
-        miss   = round(df.isna().mean().mean() * 100, 1)
-        parts  = [
-            f"Analysis of {len(df):,} records across {len(df.columns)} variables "
-            f"({domain.upper()} domain, confidence: {confidence:.0%}).",
-        ]
-        if n_crit:
-            parts.append(f"{n_crit} critical issue{'s' if n_crit > 1 else ''} require immediate attention.")
-        if n_warn:
-            parts.append(f"{n_warn} additional warning{'s' if n_warn > 1 else ''} identified.")
-        if miss == 0:
-            parts.append("Data is fully complete — no missing values.")
-        else:
-            parts.append(f"Overall missing data rate: {miss:.1f}%.")
-        if corrs:
-            top = corrs[0]
-            parts.append(
-                f"Strongest relationship: '{top['col_a']}' and '{top['col_b']}' "
-                f"(Spearman r={top['r']:+.3f}, {top['strength']})."
-            )
-        # Domain-specific headline
-        if attrition is not None:
-            parts.append(
-                f"Attrition rate: {attrition.rate:.1f}% ({attrition.n_left:,} of "
-                f"{attrition.n_total:,} employees). Severity: {attrition.severity.upper()}."
-            )
-        # Recommendation count
-        n_actions = len(raw.get("actions", []))
-        if n_actions:
-            parts.append(f"{n_actions} recommendation{'s' if n_actions > 1 else ''} provided.")
-        exec_summary = " ".join(parts)
+        exec_summary = _build_narrative_summary(
+            df=df, domain=domain, confidence=confidence,
+            deduped=deduped, corrs=corrs, attrition=attrition,
+            raw=raw,
+        )
 
     # ── Data quality verdict ──────────────────────────────────────────────────
     miss_overall = df.isna().mean().mean() * 100

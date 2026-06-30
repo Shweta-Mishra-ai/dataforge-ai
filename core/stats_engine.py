@@ -141,43 +141,44 @@ def _numeric_stats(s: pd.Series, name: str) -> ColumnStats:
     if n < 3:
         return cs
 
-    # ── Descriptive ───────────────────────────────────────
-    cs.mean     = round(float(clean.mean()), 4)
-    cs.median   = round(float(clean.median()), 4)
-    cs.std      = round(float(clean.std()), 4)
-    cs.variance = round(float(clean.var()), 4)
-    cs.min_val  = round(float(clean.min()), 4)
-    cs.max_val  = round(float(clean.max()), 4)
-    cs.range_val = round(cs.max_val - cs.min_val, 4)
-    cs.q1       = round(float(clean.quantile(0.25)), 4)
-    cs.q3       = round(float(clean.quantile(0.75)), 4)
-    cs.iqr      = round(cs.q3 - cs.q1, 4)
-
-    # ── Skewness ──────────────────────────────────────────
-    skew = float(clean.skew())
-    cs.skewness = round(skew, 4)
-    if skew > 1:
-        cs.skew_label = "heavily right-skewed"
-    elif skew > 0.5:
-        cs.skew_label = "moderately right-skewed"
-    elif skew < -1:
-        cs.skew_label = "heavily left-skewed"
-    elif skew < -0.5:
-        cs.skew_label = "moderately left-skewed"
+    # ── Delegate basic stats to canonical col_stats() ─────────────────────
+    from core.engines.base import col_stats as _col_stats
+    _cs = _col_stats(s)
+    if _cs:
+        cs.mean      = round(_cs["mean"], 4)
+        cs.median    = round(_cs["median"], 4)
+        cs.std       = round(_cs["std"], 4)
+        cs.variance  = round(_cs["std"] ** 2, 4)
+        cs.min_val   = round(_cs["min"], 4)
+        cs.max_val   = round(_cs["max"], 4)
+        cs.range_val = round(_cs["max"] - _cs["min"], 4)
+        cs.q1        = round(_cs["q1"], 4)
+        cs.q3        = round(_cs["q3"], 4)
+        cs.iqr       = round(_cs["iqr"], 4)
+        skew         = _cs["skew"]
+        cs.skewness  = round(skew, 4)
     else:
-        cs.skew_label = "approximately symmetric"
+        return cs
+
+    # ── Skew label ────────────────────────────────────────
+    skew = cs.skewness or 0
+    if skew > 1:      cs.skew_label = "heavily right-skewed"
+    elif skew > 0.5:  cs.skew_label = "moderately right-skewed"
+    elif skew < -1:   cs.skew_label = "heavily left-skewed"
+    elif skew < -0.5: cs.skew_label = "moderately left-skewed"
+    else:             cs.skew_label = "approximately symmetric"
 
     # ── Kurtosis ──────────────────────────────────────────
-    kurt = float(clean.kurtosis())  # excess kurtosis
-    cs.kurtosis = round(kurt, 4)
-    if kurt > 1:
-        cs.kurtosis_label = "leptokurtic (heavy tails)"
-    elif kurt < -1:
-        cs.kurtosis_label = "platykurtic (light tails)"
-    else:
-        cs.kurtosis_label = "mesokurtic (normal-like tails)"
+    try:
+        kurt = float(clean.kurtosis())
+        cs.kurtosis = round(kurt, 4)
+        if kurt > 1:   cs.kurtosis_label = "leptokurtic (heavy tails)"
+        elif kurt < -1: cs.kurtosis_label = "platykurtic (light tails)"
+        else:           cs.kurtosis_label = "mesokurtic (normal-like tails)"
+    except Exception:
+        logger.warning("kurtosis failed for '%s'", name, exc_info=True)
 
-    # ── Normality test ────────────────────────────────────
+    # ── Normality test (stats_engine adds this on top of col_stats) ───────
     if n <= 5000:
         try:
             stat, pval = scipy_stats.shapiro(clean.sample(min(n, 5000), random_state=42))
@@ -197,20 +198,17 @@ def _numeric_stats(s: pd.Series, name: str) -> ColumnStats:
 
     cs.normality_label = "Normal" if cs.is_normal else "Non-Normal"
 
-    # ── Outliers — IQR (1.5x) ─────────────────────────────
+    # ── Outliers (both methods — stats_engine augments col_stats) ─────────
     if cs.iqr and cs.iqr > 0:
         lo_iqr = cs.q1 - 1.5 * cs.iqr
         hi_iqr = cs.q3 + 1.5 * cs.iqr
         cs.outlier_count_iqr = int(((clean < lo_iqr) | (clean > hi_iqr)).sum())
 
-    # ── Outliers — Z-score (|z| > 3) ──────────────────────
     if cs.std and cs.std > 0:
         z_scores = np.abs((clean - cs.mean) / cs.std)
         cs.outlier_count_zscore = int((z_scores > 3).sum())
 
     cs.outlier_pct = round(cs.outlier_count_iqr / max(n, 1) * 100, 1)
-
-    # Recommend method based on normality
     cs.outlier_method_recommended = (
         "Z-Score (normal distribution)" if cs.is_normal
         else "IQR (non-normal distribution)"
