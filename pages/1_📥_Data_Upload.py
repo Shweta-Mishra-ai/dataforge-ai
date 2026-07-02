@@ -163,7 +163,7 @@ tab1, tab2, tab3 = st.tabs(["Raw Data", "Column Info", "Missing Values"])
 with tab1:
     st.caption("Showing first 100 rows of {:,} total rows".format(len(df)))
     # FIXED: Reverted width="stretch" syntax back to use_container_width=True
-    st.dataframe(df.head(100), use_container_width=True, height=400)
+    st.dataframe(df.head(100), width="stretch", height=400)
 
 with tab2:
     info_rows = []
@@ -177,7 +177,7 @@ with tab2:
             "Sample":  str(s.dropna().iloc[0])[:40] if len(s.dropna()) > 0 else "—",
         })
     info_df = pd.DataFrame(info_rows)
-    st.dataframe(info_df, use_container_width=True, height=400)
+    st.dataframe(info_df, width="stretch", height=400)
 
 with tab3:
     miss = df.isna().sum()
@@ -190,7 +190,7 @@ with tab3:
             "Missing":   miss.values,
             "Missing %": (miss.values / len(df) * 100).round(1),
         })
-        st.dataframe(miss_df, use_container_width=True, height=400)
+        st.dataframe(miss_df, width="stretch", height=400)
 
 # ── Numeric Stats ──────────────────────────────────────────
 num_cols = df.select_dtypes(include="number").columns.tolist()
@@ -199,7 +199,7 @@ if num_cols:
     st.markdown("### Descriptive Statistics")
     st.dataframe(
         df[num_cols].describe().round(3),
-        use_container_width=True)
+        width="stretch")
 
 # ── Navigation hint ────────────────────────────────────────
 st.divider()

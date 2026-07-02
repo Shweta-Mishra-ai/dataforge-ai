@@ -135,7 +135,7 @@ st.markdown("### Step 3 — Train Models")
 col_btn, col_info = st.columns([1, 3])
 with col_btn:
     train_btn = st.button("Train All Models", type="primary",
-                          use_container_width=True)
+                          width="stretch")
 with col_info:
     st.caption(
         "Trains Ridge/Logistic Regression, Random Forest, "
@@ -166,6 +166,9 @@ if report.warnings:
         if "⚠️" in w and "imbalance" in w.lower():
             # Imbalance warnings must be top-level, not buried in expander
             st.error(w)
+        elif "too many for classification" in w.lower() or "unique classes detected" in w.lower():
+            # Target column selection error — show clearly with guidance
+            st.error(f"🎯 **Target column issue:** {w}")
         elif "⚠️" in w:
             st.warning(w)
 
@@ -235,7 +238,7 @@ with tab1:
         rows.append(row)
 
     if rows:
-        st.dataframe(pd.DataFrame(rows), use_container_width=True,
+        st.dataframe(pd.DataFrame(rows), width="stretch",
                      hide_index=True)
 
     if failed_models:
@@ -271,7 +274,7 @@ with tab1:
             legend=dict(orientation="h", y=1.1),
             yaxis=dict(range=[0, 1.1]),
         )
-        st.plotly_chart(_style_fig(fig), use_container_width=True)
+        st.plotly_chart(_style_fig(fig), width="stretch")
 
     # Best model highlight
     if report.best_model:
@@ -303,7 +306,7 @@ with tab1:
         )
         fig_pie.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                                margin=dict(l=10,r=10,t=40,b=10))
-        st.plotly_chart(_style_fig(fig_pie), use_container_width=True)
+        st.plotly_chart(_style_fig(fig_pie), width="stretch")
         if max(values) > 0.80:
             st.warning(
                 "Imbalanced classes detected ({:.0f}% dominant). "
@@ -350,7 +353,7 @@ with tab2:
             yaxis=dict(autorange="reversed"),
             height=max(300, len(fi) * 35),
         )
-        st.plotly_chart(_style_fig(fig), use_container_width=True)
+        st.plotly_chart(_style_fig(fig), width="stretch")
 
         # Legend
         c1, c2, c3 = st.columns(3)
@@ -369,7 +372,7 @@ with tab2:
                 "Direction":   f.direction.title(),
                 "Explanation": f.explanation,
             })
-        st.dataframe(pd.DataFrame(rows), use_container_width=True,
+        st.dataframe(pd.DataFrame(rows), width="stretch",
                      hide_index=True)
 
 # ── Tab 3: What-If Simulator ──────────────────────────────
@@ -477,7 +480,7 @@ with tab3:
                             {"Class": k, "Probability": "{:.1f}%".format(v*100)}
                             for k, v in result_pred["probabilities"].items()
                         ])
-                        st.dataframe(prob_df, use_container_width=True,
+                        st.dataframe(prob_df, width="stretch",
                                      hide_index=True)
 
 # ── Tab 4: Insights ───────────────────────────────────────

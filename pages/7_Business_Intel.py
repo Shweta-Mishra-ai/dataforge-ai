@@ -128,7 +128,7 @@ with tab1:
                 "CV":            bm.cv,
                 "Variation":     bm.benchmark_label.split(" — ")[0],
             })
-        st.dataframe(pd.DataFrame(rows), use_container_width=True,
+        st.dataframe(pd.DataFrame(rows), width="stretch",
                      hide_index=True)
 
         # Select one for deep dive
@@ -162,7 +162,7 @@ with tab1:
             title="Distribution with Percentile Benchmarks: {}".format(sel),
             **PLOTLY_BASE
         )
-        st.plotly_chart(_style_fig(fig), use_container_width=True)
+        st.plotly_chart(_style_fig(fig), width="stretch")
 
 # ── Tab 2: Root Cause Analysis ────────────────────────────
 with tab2:
@@ -206,7 +206,7 @@ with tab2:
                     "p-value":   d["p_value"],
                     "Detail":    d["detail"][:80],
                 })
-            st.dataframe(pd.DataFrame(rows), use_container_width=True,
+            st.dataframe(pd.DataFrame(rows), width="stretch",
                          hide_index=True)
 
             # Impact bar chart
@@ -229,7 +229,7 @@ with tab2:
                     xaxis_title="Factor", yaxis_title="Impact (%)",
                     **PLOTLY_BASE
                 )
-                st.plotly_chart(_style_fig(fig), use_container_width=True)
+                st.plotly_chart(_style_fig(fig), width="stretch")
 
         if rc.recommendations:
             st.markdown("#### Recommendations")
@@ -294,7 +294,7 @@ with tab3:
                     "vs Avg":      "{}%".format(c["vs_avg_pct"]),
                     "Status":      c["status"].upper(),
                 })
-            st.dataframe(pd.DataFrame(rows), use_container_width=True,
+            st.dataframe(pd.DataFrame(rows), width="stretch",
                          hide_index=True)
 
             # Bar chart with avg line
@@ -324,7 +324,7 @@ with tab3:
                 title="Avg '{}' by '{}' Cohort".format(metric_col, cohort_col),
                 **PLOTLY_BASE
             )
-            st.plotly_chart(_style_fig(fig), use_container_width=True)
+            st.plotly_chart(_style_fig(fig), width="stretch")
 
             # Color guide
             c1, c2, c3 = st.columns(3)
@@ -409,7 +409,7 @@ with tab4:
                 **PLOTLY_BASE,
                 legend=dict(orientation="h", y=1.1),
             )
-            st.plotly_chart(_style_fig(fig), use_container_width=True)
+            st.plotly_chart(_style_fig(fig), width="stretch")
 
             # Table
             st.dataframe(
@@ -421,7 +421,7 @@ with tab4:
                     "cumulative_pct": "Cumulative %",
                     "in_top_20": "Top 20%?",
                 }),
-                use_container_width=True, hide_index=True
+                width="stretch", hide_index=True
             )
 
 # ── Tab 5: Segment Health ─────────────────────────────────
@@ -539,7 +539,7 @@ with tab5:
                         title="Segment Comparison (100 = dataset average)",
                         **PLOTLY_BASE,
                     )
-                    st.plotly_chart(_style_fig(fig), use_container_width=True)
+                    st.plotly_chart(_style_fig(fig), width="stretch")
 
                 # Full metrics table
                 st.markdown("#### Metric Detail — {}".format(sel_seg))
@@ -553,5 +553,5 @@ with tab5:
                         "Status":      m["status"].upper(),
                     })
                 st.dataframe(pd.DataFrame(metric_rows),
-                             use_container_width=True, hide_index=True)
+                             width="stretch", hide_index=True)
 

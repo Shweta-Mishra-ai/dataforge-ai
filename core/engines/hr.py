@@ -9,6 +9,7 @@ from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
+from scipy import stats as scipy_stats
 
 from core.engines.base import Insight, AttritionAnalysis, build_insight, col_stats, correlations
 

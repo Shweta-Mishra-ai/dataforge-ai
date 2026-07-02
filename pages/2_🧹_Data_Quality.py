@@ -109,7 +109,7 @@ if missing_actions:
         rows = [{"Column": a.column, "Issue": a.issue,
                  "Action Taken": a.action, "Rows Affected": a.rows_affected}
                 for a in missing_actions]
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 else:
     st.success("**No missing values** found.")
 
@@ -129,7 +129,7 @@ if flagged:
         st.info("Extreme outliers (3x IQR) flagged but not removed — review before modeling.")
         rows = [{"Column": a.column, "Issue": a.issue, "Action": a.action}
                 for a in flagged]
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
 # Other changes
 all_minor = groups["type_fix"] + groups["whitespace"] + groups["other"]
@@ -137,7 +137,7 @@ if all_minor:
     with st.expander("OTHER CHANGES — {}".format(len(all_minor)), expanded=False):
         rows = [{"Column": a.column, "Issue": a.issue, "Action": a.action}
                 for a in all_minor]
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
 st.divider()
 
@@ -173,7 +173,7 @@ with tab_num:
                 "Best Method": cs.outlier_method_recommended,
             })
         if rows:
-            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
             c1, c2, c3 = st.columns(3)
             c1.info("**Skewness > 1** — Right-skewed. Use median, not mean.")
             c2.info("**|Skewness| < 0.5** — Symmetric. Mean is reliable.")
@@ -196,7 +196,7 @@ with tab_cat:
                 "Top Value %": "{}%".format(cs.top_value_pct) if cs.top_value_pct else "-",
                 "Missing": "{}%".format(cs.missing_pct),
             })
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
         c1, c2 = st.columns(2)
         c1.info("**Low cardinality** (10 or fewer unique) — Good for grouping.")
         c2.warning("**High cardinality** (80%+ unique) — Likely ID field, skip in analysis.")
@@ -218,7 +218,7 @@ with tab_corr:
                     "p-value": c.p_value, "Strength": c.strength.title(),
                     "Direction": c.direction.title(),
                 })
-            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
             c1, c2, c3 = st.columns(3)
             c1.error("|r| >= 0.7 — Strong relationship")
             c2.warning("|r| 0.4-0.7 — Moderate, worth investigating")
@@ -306,7 +306,7 @@ for col in df_clean.columns[:25]:
                 vc["Percentage"] = (
                     vc["Count"] / len(df_clean) * 100
                 ).round(1).astype(str) + "%"
-                st.dataframe(vc, use_container_width=True, hide_index=True)
+                st.dataframe(vc, width="stretch", hide_index=True)
 
         if cs.missing_count > 0:
             st.warning("Missing: {} values ({:.1f}%) — handled in cleaning.".format(

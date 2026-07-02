@@ -103,7 +103,7 @@ with tab1:
     if num_rows:
         st.markdown("#### Numeric Columns Summary")
         st.dataframe(pd.DataFrame(num_rows),
-                     use_container_width=True, hide_index=True)
+                     width="stretch", hide_index=True)
 
     # Categorical summary
     cat_rows = []
@@ -123,7 +123,7 @@ with tab1:
     if cat_rows:
         st.markdown("#### Categorical Columns Summary")
         st.dataframe(pd.DataFrame(cat_rows),
-                     use_container_width=True, hide_index=True)
+                     width="stretch", hide_index=True)
         st.caption("Entropy: higher value = more diverse categories (max = log2(unique))")
 
     # Per-column deep dive
@@ -264,7 +264,7 @@ with tab2:
                     "Effect":       c.effect_label,
                 })
             st.dataframe(pd.DataFrame(rows),
-                         use_container_width=True, hide_index=True)
+                         width="stretch", hide_index=True)
 
         # Heatmap
         num_cols = report.numeric_cols[:10]
@@ -360,7 +360,7 @@ with tab3:
                             "Std":    stats_d["std"],
                         })
                     st.dataframe(pd.DataFrame(rows),
-                                 use_container_width=True, hide_index=True)
+                                 width="stretch", hide_index=True)
 
                 # Box plot by group
                 try:
@@ -403,7 +403,7 @@ with tab4:
                 "Interpretation": r.interpretation,
             })
         df_vif = pd.DataFrame(rows)
-        st.dataframe(df_vif, use_container_width=True, hide_index=True)
+        st.dataframe(df_vif, width="stretch", hide_index=True)
 
         # VIF bar chart
         fig = go.Figure(go.Bar(
