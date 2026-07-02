@@ -34,7 +34,7 @@ C_MGRAY  = "#E2E8F0"
 SEQ_BLUE = [C_NAVY, C_BLUE, "#1976D2", "#1565C0", "#0D47A1"]
 
 
-from core.dashboards.base import _apply_theme, _find_col
+from core.dashboards._utils import _apply_theme, _find_col
 
 def _hr_kpis(df: pd.DataFrame) -> List[Dict]:
     kpis = []

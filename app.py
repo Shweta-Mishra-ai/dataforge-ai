@@ -345,6 +345,31 @@ with col_left:
     if analyst:
         st.session_state["analyst_name"] = analyst
 
+    # ── White-label agency branding ─────────────────────────────────────
+    with st.expander("🏷️ White-Label Branding (optional)"):
+        st.caption(
+            "Replace 'DataForge AI' with your own agency/freelance brand "
+            "on every PDF report header, cover page, and footer."
+        )
+        agency_name = st.text_input(
+            "Your Agency / Brand Name",
+            value=st.session_state.get("agency_name", ""),
+            placeholder="e.g. Mishra Analytics",
+            help="Shown on PDF header and cover instead of 'DataForge AI'",
+            key="input_agency_name"
+        )
+        if agency_name:
+            st.session_state["agency_name"] = agency_name
+
+        agency_tagline = st.text_input(
+            "Tagline (optional)",
+            value=st.session_state.get("agency_tagline", ""),
+            placeholder="e.g. Data-Driven Decisions",
+            key="input_agency_tagline"
+        )
+        if agency_tagline:
+            st.session_state["agency_tagline"] = agency_tagline
+
     # Config summary
     if client_name or report_title:
         st.markdown("""
@@ -456,11 +481,11 @@ with col_right:
         # ── CTA buttons ───────────────────────────────────────────────
         b1, b2, b3 = st.columns(3)
         with b1:
-            st.page_link("pages/3_#L01f4ca_Dashboard.py", label="📊 Explore Dashboard", use_container_width=True)
+            st.page_link("pages/3_#L01f4ca_Dashboard.py", label="📊 Explore Dashboard", width="stretch")
         with b2:
-            st.page_link("pages/2_#L01f9f9_Data_Quality.py", label="🔍 Quality Report", use_container_width=True)
+            st.page_link("pages/2_#L01f9f9_Data_Quality.py", label="🔍 Quality Report", width="stretch")
         with b3:
-            st.page_link("pages/8_Reports.py", label="📄 Generate PDF", use_container_width=True)
+            st.page_link("pages/8_Reports.py", label="📄 Generate PDF", width="stretch")
 
         # Warnings
         if result.warnings:

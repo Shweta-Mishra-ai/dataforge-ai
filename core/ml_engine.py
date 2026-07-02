@@ -807,6 +807,23 @@ def run_ml_pipeline(
 
     task, task_reason = detect_task(df[target_col])
 
+    # Guard: if classification with >50 unique classes, force regression
+    # (roc_auc_score requires all classes in every test split — impossible with 100+ classes)
+    if task == "classification":
+        n_unique_target = int(df[target_col].nunique())
+        if n_unique_target > 50:
+            task = "regression"
+            task_reason = (
+                f"Forced to regression: {n_unique_target} unique classes detected "
+                f"(max 50 supported for classification). "
+                f"Select a categorical column as target for classification."
+            )
+            logger.warning(
+                "Target '%s' has %d unique values — too many for classification "
+                "(max 50). Switching to regression.",
+                target_col, n_unique_target
+            )
+
     # Class balance for classification
     class_balance = None
     if task == "classification":

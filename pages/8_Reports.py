@@ -368,6 +368,9 @@ if gen_btn:
             "logo_bytes":   pre_logo_bytes,
             "logo_ext":     pre_logo_ext,
             "avg_salary_k": avg_salary_k,
+            # White-label: freelancer/agency brand replaces "DataForge AI"
+            "agency_name":    st.session_state.get("agency_name", ""),
+            "agency_tagline": st.session_state.get("agency_tagline", "Advanced Analytics Platform"),
         }
 
         pdf_bytes = build_pdf(
@@ -395,7 +398,7 @@ if gen_btn:
             file_name=f"DataForge_Report_{fname_clean.replace(' ','_')}.pdf",
             mime="application/pdf",
             type="primary",
-            use_container_width=True,
+            width="stretch",
         )
 
         # Logo is stored as bytes in session_state — no temp file to clean up
@@ -416,7 +419,7 @@ with c1:
     st.caption(f"{len(df):,} rows × {len(df.columns)} columns")
     st.download_button("Download CSV", data=df.to_csv(index=False).encode("utf-8"),
                        file_name=f"cleaned_{fname_clean.replace(' ','_')}.csv",
-                       mime="text/csv", use_container_width=True)
+                       mime="text/csv", width="stretch")
 with c2:
     st.markdown("**Excel — 3 Sheets**")
     st.caption("Data + Statistics + Column Info")
@@ -434,7 +437,7 @@ with c2:
         st.download_button("Download Excel", data=buf,
                            file_name=f"cleaned_{fname_clean.replace(' ','_')}.xlsx",
                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                           use_container_width=True)
+                           width="stretch")
     except Exception as e:
         st.error(f"Excel failed: {e}")
 with c3:
@@ -443,4 +446,4 @@ with c3:
     st.download_button("Download JSON",
                        data=df.to_json(orient="records", indent=2, date_format="iso").encode("utf-8"),
                        file_name=f"cleaned_{fname_clean.replace(' ','_')}.json",
-                       mime="application/json", use_container_width=True)
+                       mime="application/json", width="stretch")

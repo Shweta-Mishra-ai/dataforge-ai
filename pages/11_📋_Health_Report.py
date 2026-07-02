@@ -746,7 +746,7 @@ with c_dl1:
     st.caption("Health Score · {} Insights · Column Quality Table · Niche: {}".format(
         len(insights), nm["label"]))
     gen = st.button("📥 Generate & Download PDF", type="primary",
-                    use_container_width=True, key="gen_health_pdf")
+                    width="stretch", key="gen_health_pdf")
 with c_dl2:
     st.info(
         "💡 **Freelancing Tip:** This report is ready to send directly to clients. "
@@ -766,7 +766,7 @@ if gen:
                 file_name="DataForge_Health_{}.pdf".format(safe_name),
                 mime="application/pdf",
                 type="primary",
-                use_container_width=True,
+                width="stretch",
                 key="dl_health_pdf",
             )
         except Exception as e:

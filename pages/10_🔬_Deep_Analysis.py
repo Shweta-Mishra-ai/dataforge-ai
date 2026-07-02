@@ -104,7 +104,7 @@ with tab2:
             default=num_cols[:min(8, len(num_cols))]
         )
         if sel and len(sel) >= 2:
-            st.plotly_chart(make_heatmap(df[sel]), use_container_width=True)
+            st.plotly_chart(make_heatmap(df[sel]), width="stretch")
 
             corr   = df[sel].corr()
             pairs  = []
@@ -118,7 +118,7 @@ with tab2:
             pairs_df = pd.DataFrame(pairs).sort_values(
                 "Correlation", key=abs, ascending=False
             )
-            st.dataframe(pairs_df, use_container_width=True)
+            st.dataframe(pairs_df, width="stretch")
 
 # ── TAB 3 — Anomaly detection ──────────────────────────────
 with tab3:
@@ -159,4 +159,4 @@ with tab3:
 
         if not outliers.empty:
             st.markdown(f"**Outlier rows ({len(outliers):,}):**")
-            st.dataframe(outliers.head(100), use_container_width=True)
+            st.dataframe(outliers.head(100), width="stretch")

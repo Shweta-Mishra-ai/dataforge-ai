@@ -210,6 +210,8 @@ def build_pdf(
     report_title = config.get("title", "Data Analysis Report")
     client_name  = config.get("client_name", "Client")
     report_date  = datetime.now().strftime("%B %d, %Y")
+    # White-label: freelancers/agencies override the "DataForge AI" brand
+    agency_name  = config.get("agency_name") or "DataForge AI"
 
     # ── KPI preview for cover ─────────────────────────────
     n_rows    = len(df)
@@ -240,7 +242,8 @@ def build_pdf(
         c = _ReportCanvas(fn, T=T,
                              report_title=report_title,
                              client_name=client_name,
-                             report_date=report_date, **kw)
+                             report_date=report_date,
+                             agency_name=agency_name, **kw)
         c._domain = domain
         return c
 

@@ -369,7 +369,7 @@ with tabs[1]:
                         "Strength": strength, "Direction": c["direction"].title(),
                         "Significant": sig
                     })
-                st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+                st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
 
 # ─── Tab 3: Risks & Opportunities ─────────────────────────────────────────────
@@ -499,7 +499,7 @@ with tabs[3]:
                 cohort["Avg Hrs/Month"] = df_t.groupby("_band", observed=True)[hrs_col].mean().round(0).values
             overall_rate = float(left_mask.mean()) * 100
             st.dataframe(cohort.rename(columns={"_band":"Tenure Band"}).set_index("Tenure Band"),
-                         use_container_width=True)
+                         width="stretch")
             worst = cohort.loc[cohort["Attrition %"].idxmax()]
             st.caption(f"⚡ Highest risk: '{worst['_band']}' cohort at {float(worst['Attrition %']):.1f}% "
                        f"vs company average {overall_rate:.1f}%. "
@@ -521,7 +521,7 @@ with tabs[3]:
                 tbl["Avg Satisfaction"] = dept_atr.groupby(dept_col)[sat_col].mean().round(3)
             if eval_col:
                 tbl["Avg Performance"] = dept_atr.groupby(dept_col)[eval_col].mean().round(3)
-            st.dataframe(tbl.sort_values("Attrition %", ascending=False), use_container_width=True)
+            st.dataframe(tbl.sort_values("Attrition %", ascending=False), width="stretch")
 
         # Salary band attrition
         if sal_col and atr_col:
@@ -535,7 +535,7 @@ with tabs[3]:
             sal_tbl["Attrition %"] = (sal_tbl["Departed"] / sal_tbl["Employees"] * 100).round(1)
             if sat_col:
                 sal_tbl["Avg Satisfaction"] = sal_df.groupby(sal_col)[sat_col].mean().round(3)
-            st.dataframe(sal_tbl.sort_values("Attrition %", ascending=False), use_container_width=True)
+            st.dataframe(sal_tbl.sort_values("Attrition %", ascending=False), width="stretch")
 
         # Flight risk
         if sat_col and atr_col and ten_col:
@@ -598,7 +598,7 @@ with tabs[3]:
                                       bva[budget_col].replace(0, np.nan) * 100).round(1)
                 st.dataframe(bva.rename(columns={group_col:"Period/Category"})
                                .sort_values("Variance %", key=abs, ascending=False)
-                               .head(15), use_container_width=True)
+                               .head(15), width="stretch")
                 over = (bva["Variance"] > 0).sum()
                 under = (bva["Variance"] < 0).sum()
                 st.caption(f"📊 {over} periods/categories over budget, {under} under budget. "
@@ -611,7 +611,7 @@ with tabs[3]:
             if cost_col:
                 cat_agg["Gross Profit"]   = cat_agg[rev_col] - cat_agg[cost_col]
                 cat_agg["Gross Margin %"] = (cat_agg["Gross Profit"] / cat_agg[rev_col] * 100).round(1)
-            st.dataframe(cat_agg.sort_values(rev_col, ascending=False), use_container_width=True)
+            st.dataframe(cat_agg.sort_values(rev_col, ascending=False), width="stretch")
 
     elif domain == "ecommerce":
         rating_col = _find(df, ["rating"], exclude=["count","num"])
@@ -647,7 +647,7 @@ with tabs[3]:
                          .round({"Avg_Rating":2})
                          .query("Products >= 3")
                          .sort_values("Avg_Rating", ascending=False))
-            st.dataframe(cat_rat, use_container_width=True)
+            st.dataframe(cat_rat, width="stretch")
             worst_cat = cat_rat["Avg_Rating"].idxmin()
             st.caption(f"⚡ Lowest rated: '{worst_cat}' — investigate quality or description accuracy.")
 
@@ -697,7 +697,7 @@ with tabs[3]:
             if target_col:
                 target_by_rep = df.groupby(rep_col)[target_col].sum()
                 rep_data["Achievement %"] = (rep_data["Revenue"] / target_by_rep * 100).round(1)
-            st.dataframe(rep_data.sort_values("Revenue", ascending=False), use_container_width=True)
+            st.dataframe(rep_data.sort_values("Revenue", ascending=False), width="stretch")
             top_pct = float(rep_data["Revenue Share %"].iloc[0])
             if top_pct > 40:
                 st.warning(f"⚡ Revenue concentration: top rep = {top_pct:.1f}% of total. "
@@ -708,7 +708,7 @@ with tabs[3]:
             reg_data = df.groupby(region_col)[rev_col].agg(["sum","count","mean"]).round(0)
             reg_data.columns = ["Total Revenue","Deals","Avg Deal"]
             reg_data["Share %"] = (reg_data["Total Revenue"] / reg_data["Total Revenue"].sum() * 100).round(1)
-            st.dataframe(reg_data.sort_values("Total Revenue", ascending=False), use_container_width=True)
+            st.dataframe(reg_data.sort_values("Total Revenue", ascending=False), width="stretch")
 
     else:
         # General domain — full correlation + distribution analysis
@@ -734,7 +734,7 @@ with tabs[3]:
             })
         if profile_rows:
             st.dataframe(pd.DataFrame(profile_rows).set_index("Column"),
-                         use_container_width=True)
+                         width="stretch")
 
         if len(num_cols) >= 2:
             st.markdown("#### Correlation Heatmap")
@@ -760,11 +760,11 @@ with tabs[3]:
                 c1, c2 = st.columns([1, 2])
                 with c1:
                     st.dataframe(vc.reset_index().rename(columns={col:"Value","count":"Count"}),
-                                 use_container_width=True, hide_index=True)
+                                 width="stretch", hide_index=True)
                 with c2:
                     fig = px.bar(vc.reset_index(), x=col, y="count",
                                  title=f"'{col}' distribution (top 10)")
-                    st.plotly_chart(_style_fig(fig), use_container_width=True,
+                    st.plotly_chart(_style_fig(fig), width="stretch",
                                     config={"displayModeBar": False})
 
 

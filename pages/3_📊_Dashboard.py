@@ -135,7 +135,7 @@ with st.sidebar:
 
     st.divider()
     st.caption(f"Showing {len(df_filtered):,} of {len(df_master):,} rows")
-    if st.button("Reset Filters", use_container_width=True):
+    if st.button("Reset Filters", width="stretch"):
         st.rerun()
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -328,7 +328,7 @@ with tabs[tab_idx]:
         try:
             desc = df_filtered[num_cols].describe().round(3)
             desc.index = desc.index.str.upper()
-            st.dataframe(desc.astype(str), use_container_width=True)
+            st.dataframe(desc.astype(str), width="stretch")
         except Exception:
             logger.warning("%s unexpected failure", exc_info=True)
 
@@ -519,5 +519,5 @@ with tabs[tab_idx]:
 # ── Data Preview ──────────────────────────────────────────────────────────────
 st.divider()
 with st.expander("🔍 Filtered Data Preview"):
-    st.dataframe(df_filtered.head(200), use_container_width=True)
+    st.dataframe(df_filtered.head(200), width="stretch")
     st.caption(f"Showing first 200 of {len(df_filtered):,} rows after filters.")

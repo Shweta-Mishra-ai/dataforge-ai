@@ -197,13 +197,16 @@ def _styles(T: dict) -> dict:
 class _ReportCanvas(CV.Canvas):
     """Draws premium header + footer on every content page."""
 
-    def __init__(self, fn, T, report_title="", client_name="", report_date="", **kw):
+    def __init__(self, fn, T, report_title="", client_name="", report_date="",
+                 agency_name="DataForge AI", **kw):
         super().__init__(fn, **kw)
         self._sp          = []
         self.T            = T
         self.report_title = report_title[:60]
         self.client_name  = client_name
         self.report_date  = report_date
+        # White-label: freelancers/agencies can override the masthead brand
+        self.agency_name  = (agency_name or "DataForge AI")[:40]
 
     def showPage(self):
         self._sp.append(dict(self.__dict__))
@@ -228,7 +231,7 @@ class _ReportCanvas(CV.Canvas):
         self.rect(0, H - 25.5*mm, W, 1.5*mm, fill=1, stroke=0)
         self.setFillColor(HexColor("#FFFFFF"))
         self.setFont("Helvetica-Bold", 10)
-        self.drawString(18*mm, H - 14*mm, "DataForge AI")
+        self.drawString(18*mm, H - 14*mm, self.agency_name)
         self.setFont("Helvetica", 7.5)
         self.setFillColor(HexColor(T["accent2"]))
         self.drawString(18*mm, H - 20*mm, self.report_title)
@@ -275,6 +278,9 @@ def _build_cover(T: dict, config: dict, kpis_preview: list) -> bytes:
     client_name = config.get("client_name", "Client")
     report_date = datetime.now().strftime("%B %d, %Y")
     domain_lbl  = T.get("domain_label", "BUSINESS ANALYTICS")
+    # White-label: agency_name overrides "DataForge AI" on cover; tagline is configurable
+    agency_name = (config.get("agency_name") or "DataForge AI")[:40]
+    agency_tagline = config.get("agency_tagline", "Advanced Analytics Platform")[:60]
 
     # BG
     cv.setFillColor(_c(T["cover_bg"]))
@@ -296,10 +302,10 @@ def _build_cover(T: dict, config: dict, kpis_preview: list) -> bytes:
     # Brand
     cv.setFillColor(HexColor("#FFFFFF"))
     cv.setFont("Helvetica-Bold", 15)
-    cv.drawString(20*mm, H - 32*mm, "DataForge AI")
+    cv.drawString(20*mm, H - 32*mm, agency_name)
     cv.setFillColor(HexColor(T["accent2"]))
     cv.setFont("Helvetica", 9.5)
-    cv.drawString(20*mm, H - 40*mm, "Advanced Analytics Platform")
+    cv.drawString(20*mm, H - 40*mm, agency_tagline)
     cv.setFillColor(_c(T["cover_accent"]))
     cv.rect(20*mm, H - 44*mm, 55*mm, 1.2*mm, fill=1, stroke=0)
 
@@ -371,7 +377,7 @@ def _build_cover(T: dict, config: dict, kpis_preview: list) -> bytes:
     cv.setFillColor(HexColor(T["accent2"]))
     cv.setFont("Helvetica", 10)
     cv.drawString(20*mm, H / 2 + 12*mm,
-                  config.get("subtitle", "Powered by DataForge AI"))
+                  config.get("subtitle", f"Powered by {agency_name}"))
     cv.setFillColor(_c(T["cover_accent"]))
     cv.rect(20*mm, H / 2 + 6*mm, W - 37*mm, 1.5*mm, fill=1, stroke=0)
 
@@ -417,7 +423,7 @@ def _build_cover(T: dict, config: dict, kpis_preview: list) -> bytes:
     cv.setFillColor(HexColor(T["accent2"]))
     cv.setFont("Helvetica", 6.5)
     cv.drawRightString(W - 21*mm, 5*mm,
-                       "DataForge AI — Advanced Analytics Platform")
+                       f"{agency_name} — {agency_tagline}")
     cv.save()
     buf.seek(0)
     return buf.read()
