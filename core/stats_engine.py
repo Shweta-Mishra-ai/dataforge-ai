@@ -1,8 +1,11 @@
+import logging
 import pandas as pd
 import numpy as np
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 from scipy import stats as scipy_stats
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -371,4 +374,3 @@ def _recommend_analysis(
         recs.append("Exploratory Data Analysis (EDA) — start with distributions and correlations")
 
     return recs
-
